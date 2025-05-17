@@ -217,8 +217,4 @@ Language: {language}, Topic: {topic}.
     match = re.search(r"Score[:\s]+(\d{1,2})", ai)
     if match:
         sc = int(match.group(1))
-        clr = "green" if sc)>=9 else "orange" if sc>=6 else "red"
-        st.markdown(
-            f"<div style='padding:8px; border-radius:10px; background-color:{clr}; color:white; display:inline-block;'>Score: {sc}</div>",
-            unsafe_allow_html=True
-        )
+                    clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
