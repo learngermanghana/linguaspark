@@ -144,6 +144,7 @@ banner_lines = [
 if roleplay and scenario:
     banner_lines.append(f"**Scenario:** {scenario}")
 banner_lines.append("Start chatting below. 💬")
+# Properly join lines with double newlines
 st.info("
 
 ".join(banner_lines))
