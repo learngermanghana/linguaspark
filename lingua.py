@@ -176,10 +176,14 @@ with st.expander("⚙️ Settings", expanded=True):
 # --- Welcome Banner & Chat ---
 # Display name
 if trial_mode:
-    trials_df = pd.read_csv("trials.csv")
+    try:
+        trials_df = pd.read_csv("trials.csv")
+    except FileNotFoundError:
+        trials_df = pd.DataFrame(columns=["email","trial_code","created"])
     row = trials_df[trials_df['trial_code'] == code]
     display_name = row['email'].values[0].split('@')[0].replace('.', ' ').title() if not row.empty else 'there'
 else:
+    display_name = 'Student'
     display_name = 'Student'
 
 st.markdown(
