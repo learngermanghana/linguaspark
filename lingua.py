@@ -15,8 +15,31 @@ if not api_key:
 client = OpenAI(api_key=api_key)
 
 # --- Page setup ---
-st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-st.title("🌟 LinguaSpark – Your AI Conversation Partner")
+st.set_page_config(
+    page_title="Falowen – Your AI Conversation Partner",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+st.title("🌟 Falowen – Your AI Conversation Partner")
+
+# --- Load CSV files with fallback ---
+students_file = "students.csv"
+try:
+    paid_df = pd.read_csv(students_file)
+except Exception:
+    paid_df = pd.DataFrame(columns=["code", "expiry"])
+
+trials_file = "trials.csv"
+try:
+    trials_df = pd.read_csv(trials_file)
+except Exception:
+    trials_df = pd.DataFrame(columns=["email", "trial_code", "created"])
+
+usage_file = "usage.csv"
+try:
+    usage_df = pd.read_csv(usage_file, parse_dates=["date"]).
+except Exception:
+    usage_df = pd.DataFrame(columns=["user_key", "date", "trial_count", "daily_count"])
 
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
@@ -25,153 +48,100 @@ mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
-        st.subheader("🧑‍🏫 Manage Paid Codes")
-        try:
-            paid_df = pd.read_csv("students.csv")
-        except FileNotFoundError:
-            paid_df = pd.DataFrame(columns=["code","expiry"])
-        new_code = st.text_input("New Student Code:")
-        new_expiry = st.date_input("Expiry Date:")
-        if st.button("➕ Add Paid Code"):
-            if new_code and new_code not in paid_df['code'].values:
+        # Manage paid codes
+        st.subheader("🧑‍🏫 Paid Codes")
+        new_code = st.text_input("New Paid Code")
+        new_expiry = st.date_input("Expiry Date")
+        if st.button("Add Paid Code"):
+            if new_code and new_code not in paid_df["code"].tolist():
                 paid_df.loc[len(paid_df)] = [new_code, new_expiry]
-                paid_df.to_csv("students.csv", index=False)
-                st.success(f"✅ Added paid code {new_code}")
-            else:
-                st.warning("Code exists or empty.")
-        st.subheader("📋 Paid Codes List")
+                paid_df.to_csv(students_file, index=False)
+                st.success("Added paid code")
         st.dataframe(paid_df)
-        # delete paid codes
-        st.subheader("🗑️ Delete Paid Codes")
-        for idx, row in paid_df.iterrows():
-            if st.button(f"Delete {row['code']}", key=f"del_paid_{idx}"):
-                paid_df = paid_df[paid_df['code'] != row['code']]
-                paid_df.to_csv("students.csv", index=False)
-                st.experimental_rerun()
-
-        # trial codes
+        # Manage trial codes
         st.subheader("🎫 Trial Codes")
-        try:
-            trials_df = pd.read_csv("trials.csv")
-        except FileNotFoundError:
-            trials_df = pd.DataFrame(columns=["email","trial_code","created"])
+        new_email = st.text_input("New Trial Email")
+        if st.button("Issue Trial Code"):
+            code_val = uuid.uuid4().hex[:8]
+            trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
+            trials_df.to_csv(trials_file, index=False)
+            st.success(f"Issued trial code {code_val}")
         st.dataframe(trials_df)
-        st.subheader("🗑️ Delete Trial Codes")
-        for idx, row in trials_df.iterrows():
-            if st.button(f"Delete {row['trial_code']}", key=f"del_trial_{idx}"):
-                trials_df = trials_df[trials_df['trial_code'] != row['trial_code']]
-                trials_df.to_csv("trials.csv", index=False)
-                st.experimental_rerun()
     else:
         st.info("Enter correct teacher password.")
     st.stop()
 
 # --- Practice Mode ---
-# load paid users
-try:
-    paid_users = pd.read_csv("students.csv")["code"].tolist()
-except FileNotFoundError:
-    paid_users = []
-
-# prompt for code or email to get trial code
-code = st.text_input("Enter your access code (paid or trial):")
-if not code:
-    st.subheader("🎫 Get Your Free Trial Code")
-    email = st.text_input("Enter your email:")
-    if email:
-        try:
-            trials_df = pd.read_csv("trials.csv")
-        except FileNotFoundError:
-            trials_df = pd.DataFrame(columns=["email","trial_code","created"])
-        if email in trials_df['email'].values:
-            trial_code = trials_df.loc[trials_df['email']==email, 'trial_code'].values[0]
+paid_codes = paid_df["code"].tolist()
+# Access control
+access_code = st.text_input("Enter your paid or trial code:")
+if not access_code:
+    st.info("Please enter your code. If you don't have one, request a trial code via email.")
+    email_req = st.text_input("Email for trial code")
+    if email_req and st.button("Request Trial Code"):
+        existing = trials_df[trials_df["email"] == email_req]
+        if existing.empty:
+            new_code = uuid.uuid4().hex[:8]
+            trials_df.loc[len(trials_df)] = [email_req, new_code, datetime.now()]
+            trials_df.to_csv(trials_file, index=False)
+            st.success(f"Your trial code: {new_code}")
         else:
-            trial_code = uuid.uuid4().hex[:8]
-            trials_df.loc[len(trials_df)] = [email, trial_code, datetime.now().isoformat()]
-            trials_df.to_csv("trials.csv", index=False)
-        # Display code in single line f-string to avoid unterminated literal
-        st.success(f"Your trial code is **{trial_code}**. Paste it above to start your 5-message trial.")
-    else:
-        st.info("Please enter your email to receive a trial code.")
+            st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
     st.stop()
 
-# determine mode
-if code in paid_users:
+if access_code in paid_codes:
     trial_mode = False
-elif code:
-    try:
-        trials_df
-    except NameError:
-        trials_df = pd.read_csv("trials.csv")
-    if code in trials_df['trial_code'].values:
-        trial_mode = True
-    else:
-        st.error("Invalid code. Please use a valid paid or trial code.")
-        st.stop()
+elif access_code in trials_df["trial_code"].tolist():
+    trial_mode = True
 else:
-    # should not reach here
+    st.error("Invalid code.")
     st.stop()
 
-# --- Persist Usage ---
-USAGE_FILE = "usage.csv"
-try:
-    usage_df = pd.read_csv(USAGE_FILE, parse_dates=['date'])
-except FileNotFoundError:
-    usage_df = pd.DataFrame(columns=['user_key','date','trial_count','daily_count'])
-user_key = code
+# --- Usage tracking ---
 today = datetime.now().date()
-mask = (usage_df['user_key']==user_key)&(usage_df['date']==pd.Timestamp(today))
-if not mask.any():
-    usage_df.loc[len(usage_df)] = [user_key, pd.Timestamp(today), 0, 0]
-    mask = (usage_df['user_key']==user_key)&(usage_df['date']==pd.Timestamp(today))
-row_idx = usage_df[mask].index[0]
-trial_count = int(usage_df.at[row_idx,'trial_count'])
-daily_count = int(usage_df.at[row_idx,'daily_count'])
-# enforce
-if trial_mode and trial_count>=5:
-    st.error("🔒 Trial over. Please pay to continue.")
+row = usage_df[(usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))]
+if row.empty:
+    usage_df.loc[len(usage_df)] = [access_code, today, 0, 0]
+    row_idx = len(usage_df) - 1
+else:
+    row_idx = row.index[0]
+trial_count = usage_df.at[row_idx, "trial_count"]
+daily_count = usage_df.at[row_idx, "daily_count"]
+if trial_mode and trial_count >= 5:
+    st.error("Trial ended.")
     st.stop()
-if not trial_mode and daily_count>=30:
-    st.warning("🚫 Daily limit reached.")
+if not trial_mode and daily_count >= 30:
+    st.warning("Daily limit reached.")
     st.stop()
+
+# Increment count function
+def increment_usage(trial: bool):
+    if trial:
+        usage_df.at[row_idx, "trial_count"] += 1
+    else:
+        usage_df.at[row_idx, "daily_count"] += 1
+    usage_df.to_csv(usage_file, index=False)
 
 # --- Settings ---
-with st.sidebar:
-    st.header("Settings")
-    language = st.selectbox("Language",["German","French","English"])
-    topic = st.selectbox("Topic",["Travel","Food","Daily Routine","Work","Free Talk"])
-    level = st.selectbox("Level",["A1","A2","B1","B2","C1"])
-    scenario_mode = st.checkbox("Role-Play Scenario")
-    if scenario_mode:
-        scenarios = {
-            'A1':['Ordering at Cafe','Introducing','Directions'],
-            'A2':['Hotel','Market','Routine'],
-            'B1':['Interview','Trip','Hometown'],
-            'B2':['Sustainability','Tech','Art'],
-            'C1':['Contract','News','Debate']
-        }[level]
-        scenario = st.selectbox("Scenario", scenarios)
+with st.expander("Settings"):
+    language = st.selectbox("Language", ["German", "French", "English"])
+    level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
 # --- Welcome ---
-name = code
-st.markdown(f"<div style='padding:16px;border-radius:12px;background:#e0f7fa;'>👋 Hello {name}! Let's chat (A1–C1). Start by typing or uploading voice. 💬</div>",unsafe_allow_html=True)
+display = trials_df[trials_df["trial_code"] == access_code]["email"]
+display = display.str.split("@").str[0].replace({"": "user"}).iloc[0] if not display.empty else "User"
+st.markdown(f"👋 Hello {display}! Let's chat.")
 
-# --- Chat ---
-if 'messages' not in st.session_state: st.session_state.messages=[]
-for m in st.session_state.messages:
-    with st.chat_message(m['role']): st.markdown(m['content'])
-user_input = st.chat_input("Your message...")
-if user_input:
-    # update counts
-    if trial_mode: usage_df.at[row_idx,'trial_count']=trial_count+1
-    else: usage_df.at[row_idx,'daily_count']=daily_count+1
-    usage_df.to_csv(USAGE_FILE,index=False)
-    # show user
-    st.session_state.messages.append({'role':'user','content':user_input}); st.chat_message('user').markdown(user_input)
-    # correction
-    corr = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{'role':'system','content':f"Correct to {level}: '{user_input}'"}]).choices[0].message.content.strip()
-    if corr.lower()!=user_input.lower(): st.markdown(f"**Correction:** {corr}")
-    # tutor
-    prompt = f"Tutor {level}, topic {topic}" + (f" scenario {scenario}" if scenario_mode else "") + " rate with Score: X."
-    ai = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{'role':'system','content':prompt},*st.session_state.messages]).choices[0].message.content
-    st.session_state.messages.append({'role':'assistant','content':ai}); st.chat_message('assistant').markdown(ai)
+# Chat history
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+for m in st.session_state["messages"]:
+    st.write(f"{m['role']}: {m['content']}")
+
+# Chat input
+msg = st.text_input("Your message here")
+if msg:
+    increment_usage(trial_mode)
+    st.session_state["messages"].append({"role": "user", "content": msg})
+    # AI processing...
+    # etc...
