@@ -77,7 +77,7 @@ if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
 # Load persistent trial count from URL params
-params = st.experimental_get_query_params()
+params = st.query_params
 if 'trial' in params:
     try:
         st.session_state.trial_messages = int(params['trial'][0])
@@ -185,10 +185,10 @@ if chat_input:
     system_prompt = (
         f"You are a tutor for a {level} student.\n"
         f"Language: {language}, Topic: {topic}.\n\n"
-        "- Reply naturally in {language}, using {level}-appropriate vocabulary and grammar.\n"
-        "- If the student's message contains any grammar mistakes, provide a second paragraph explaining each correction in English, prefaced with **Correction**:.\n"
-        "- Keep responses concise and appropriate for the student's proficiency level.\n"
-        "- After replying, rate the student's message on a scale from 1 to 10 based on grammar, vocabulary, and clarity, and write `Score: X` on a new line."
+        f"- Reply naturally in {language}, using {level}-appropriate vocabulary and grammar.\n"
+        f"- If the student's message contains any grammar mistakes, provide a second paragraph explaining each correction in English, prefaced with **Correction**:.\n"
+        f"- Keep responses concise and appropriate for the student's proficiency level.\n"
+        f"- After replying, rate the student's message on a scale from 1 to 10 based on grammar, vocabulary, and clarity, and write `Score: X` on a new line."
     )
 
     # Fetch AI response
