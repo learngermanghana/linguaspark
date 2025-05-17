@@ -131,25 +131,32 @@ if trial_mode:
 else:
     display = "Student"
 
-# --- Mobile Friendly Welcome Banner ---
+# --- Mobile-Optimized Welcome Banner ---
 st.markdown(
     f"""
-    <div style='
+    <style>
+    @media only screen and (max-width: 600px) {{
+        .custom-banner {{
+            font-size: 0.98em !important;
+            padding: 8px 4px !important;
+            line-height: 1.3;
+        }}
+    }}
+    </style>
+    <div class="custom-banner" style='
         padding:12px 6px; 
         border-radius:10px; 
         background:#e0f7fa; 
         width:100%;
-        max-width: 600px;
-        margin: 0 auto 16px auto;
-        font-size: 1.05em;
-        text-align: center;
-        box-sizing: border-box;
-        word-break: break-word;
+        max-width:600px;
+        margin:0 auto 16px auto;
+        font-size:1.05em;
+        text-align:center;
+        box-sizing:border-box;
+        word-break:break-word;
+        line-height:1.5;
     '>
-    <span style='font-size:1.4em;'>👋</span> Hello <b>{display}</b>! I'm your AI Speaking Partner 🤖<br>
-    <br>
-    Let's practice your <b>{level} {language}</b> skills!<br>
-    Choose a topic and start chatting below. 💬
+        👋 <b>{display}</b> – Practice your <b>{level} {language}</b>! Start chatting below. 💬
     </div>
     """,
     unsafe_allow_html=True
