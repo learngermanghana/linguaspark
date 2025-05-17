@@ -34,7 +34,7 @@ else:
         st.stop()
 # Authenticate with Google Sheets API
 gc = gspread.authorize(credentials)
-sheet = gc.open_by_key(st.secrets.get("general", {}).get("1Y3sxmESo5TueiJlTL611KYgTV4_gNOyum65gyEkY-N0"))
+sheet = gc.open_by_key(st.secrets.get("general", {}).get("SHEET_ID"))
 ws = sheet.worksheet("students")
 
 # --- Page setup ---
@@ -48,16 +48,30 @@ mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
-        st.subheader("🧑‍🏫 Manage Student Access (Google Sheets)")
-        records = ws.get_all_records()
-        user_df = pd.DataFrame(records)
+        st.subheader("🧑‍🏫 Manage Student Access")
+        # Try loading from Google Sheets
+        try:
+            records = ws.get_all_records()
+            user_df = pd.DataFrame(records)
+            sheet_backend = True
+        except Exception:
+            # Fallback to local Excel
+            try:
+                user_df = pd.read_excel("students.xlsx")
+            except Exception:
+                user_df = pd.DataFrame(columns=['code', 'expiry'])
+            sheet_backend = False
         st.dataframe(user_df)
 
         new_code = st.text_input("New Student Code")
         new_expiry = st.date_input("Expiry Date")
         if st.button("➕ Add Code"):
             if new_code and new_code not in user_df['code'].values:
-                ws.append_row([new_code, new_expiry.strftime("%Y-%m-%d")])
+                if sheet_backend:
+                    ws.append_row([new_code, new_expiry.strftime("%Y-%m-%d")])
+                else:
+                    user_df = user_df.append({'code': new_code, 'expiry': new_expiry}, ignore_index=True)
+                    user_df.to_excel("students.xlsx", index=False)
                 st.success(f"✅ Added code {new_code}")
             else:
                 st.warning("⚠️ Code already exists or is empty.")
@@ -66,13 +80,21 @@ if mode == "Teacher Dashboard":
     st.stop()
 
 # --- Practice Mode ---
-# Load paid users from Google Sheet
+# Load paid users from Google Sheet or local Excel (for localhost fallback)
+
 def load_users():
+    # Try Google Sheets first
     try:
         records = ws.get_all_records()
         return {r['code']: r['expiry'] for r in records}
     except Exception:
-        return {}
+        # Fallback to local Excel file
+        try:
+            df = pd.read_excel("students.xlsx")
+            return {row['code']: row['expiry'] for _, row in df.iterrows()}
+        except Exception:
+            return {}
+
 paid_users = load_users()
 
 # Initialize session counters
