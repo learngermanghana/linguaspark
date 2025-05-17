@@ -8,7 +8,9 @@ import sqlite3
 
 # --- Page setup ---
 st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-st.title("🌟 LinguaSpark – Your AI Conversation Partner")
+# --- Page setup ---
+st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
+st.title("🌟 LinguaSpark – Your AI Conversation Partner")("🌟 LinguaSpark – Your AI Conversation Partner")
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -18,7 +20,7 @@ if not api_key:
 client = OpenAI(api_key=api_key)
 
 # --- SQLite setup ---
-conn = sqlite3.connect('students.db')
+conn = sqlite3.connect('students.db', check_same_thread=False)
 c = conn.cursor()
 c.execute(
     """
@@ -38,7 +40,6 @@ if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Student Access (SQLite)")
-        # Load data
         df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
         st.dataframe(df)
 
@@ -71,18 +72,18 @@ paid_users = load_users()
 # Initialize session counters
 if 'trial_messages' not in st.session_state:
     st.session_state.trial_messages = 0
-# Load persistent trial count from URL params
+if 'daily_count' not in st.session_state:
+    st.session_state.daily_count = 0
+if 'usage_date' not in st.session_state:
+    st.session_state.usage_date = datetime.now().date()
+
+# Load persistent trial count
 qp = st.query_params
 if 'trial' in qp:
     try:
         st.session_state.trial_messages = int(qp['trial'][0])
     except:
         pass
-
-if 'daily_count' not in st.session_state:
-    st.session_state.daily_count = 0
-if 'usage_date' not in st.session_state:
-    st.session_state.usage_date = datetime.now().date()
 
 # Reset daily count on new day
 today = datetime.now().date()
@@ -164,6 +165,7 @@ user_input = st.chat_input("💬 Type your message here...", key="chat_input")
 if user_input:
     if trial_mode:
         st.session_state.trial_messages += 1
+        st.experimental_set_query_params(trial=st.session_state.trial_messages)
     else:
         st.session_state.daily_count += 1
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -185,7 +187,7 @@ Language: {language}, Topic: {topic}.
     st.session_state.messages.append({"role": "assistant", "content": ai})
     parts = ai.split("\n\n")
     reply = parts[0]
-    correction = "\n\n".join(parts[1:]) if len(parts) > 1 else None
+    correction = "\n\n".join(parts[1:]) if len(parts)>1 else None
     st.chat_message("assistant").markdown(reply)
     if correction:
         st.markdown(f"**Correction:** {correction}")
