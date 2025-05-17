@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 import pandas as pd
 import uuid
+from pathlib import Path
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -22,41 +23,56 @@ st.set_page_config(
 )
 st.title("🌟 Falowen – Your AI Conversation Partner")
 
-# --- Load CSV files with fallback ---
+# --- Helpers for CSV I/O (atomic) ---
 def load_df(path, cols):
-    try:
-        return pd.read_csv(path)
-    except FileNotFoundError:
+    p = Path(path)
+    if not p.exists():
         return pd.DataFrame(columns=cols)
+    return pd.read_csv(p)
 
+def save_df(df, path):
+    tmp = Path(f"{path}.tmp")
+    df.to_csv(tmp, index=False)
+    tmp.replace(Path(path))
+
+# --- Load CSV files with fallback ---
 paid_df   = load_df("students.csv", ["code","expiry"])
-trials_df = load_df("trials.csv", ["email","trial_code","created"])
-usage_df  = load_df("usage.csv", ["user_key","date","trial_count","daily_count"])
+trials_df = load_df("trials.csv",   ["email","trial_code","created"])
+usage_df  = load_df("usage.csv",    ["user_key","date","trial_count","daily_count"])
+
+# --- Inputs needed before access control ---
+email_req = st.text_input("📧 Enter your email to request a trial code")
 
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard (Protected) ---
 if mode == "Teacher Dashboard":
+    teacher_pw = st.secrets.get("TEACHER_PASSWORD")
+    if not teacher_pw:
+        st.error("❌ TEACHER_PASSWORD not found in secrets.toml")
+        st.stop()
+
     pwd = st.text_input("🔐 Teacher Password:", type="password")
-    if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
-        # Paid Codes
+    if pwd == teacher_pw:
+        # Paid Codes Management
         st.subheader("🧑‍🏫 Paid Codes Management")
-        new_code = st.text_input("New Paid Code")
-        new_expiry = st.date_input("Expiry Date")
+        new_code   = st.text_input("New Paid Code", key="paid_code")
+        new_expiry = st.date_input("Expiry Date", key="paid_expiry")
         if st.button("➕ Add Paid Code"):
             if new_code and new_code not in paid_df["code"].tolist():
                 paid_df.loc[len(paid_df)] = [new_code, new_expiry]
-                paid_df.to_csv("students.csv", index=False)
+                save_df(paid_df, "students.csv")
                 st.success(f"Added paid code {new_code}")
         st.dataframe(paid_df)
-        # Trial Codes
+
+        # Trial Codes Management
         st.subheader("🎫 Trial Codes Management")
-        new_email = st.text_input("New Trial Email")
+        new_email = st.text_input("New Trial Email", key="trial_email")
         if st.button("➕ Issue Trial Code"):
             code_val = uuid.uuid4().hex[:8]
             trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
-            trials_df.to_csv("trials.csv", index=False)
+            save_df(trials_df, "trials.csv")
             st.success(f"Issued trial code {code_val}")
         st.dataframe(trials_df)
     else:
@@ -64,23 +80,34 @@ if mode == "Teacher Dashboard":
     st.stop()
 
 # --- Practice Mode: Access Control ---
-paid_codes  = paid_df["code"].tolist()
-trial_codes = trials_df["trial_code"].tolist()
+paid_codes  = set(paid_df["code"].tolist())
+trial_codes = set(trials_df["trial_code"].tolist())
 access_code = st.text_input("Enter your paid or trial code:")
-if not access_code:
-    st.info("
 
-".join(banner_lines))
+if not access_code:
+    # Show generic banner
+    display = "Learner"
+    level = "A1"
+    language = "English"
+    banner = [
+        f"👋 Hello {display}! I'm your AI Speaking Partner 🤖",
+        f"**Let's practice your {level} {language} skills!**",
+        "Start chatting below. 💬"
+    ]
+    st.info("\n\n".join(banner))
+
     if email_req and st.button("Request Trial Code"):
-        row = trials_df[trials_df.email == email_req]
-        if row.empty:
+        existing = trials_df[trials_df.email == email_req]
+        if existing.empty:
             new_code = uuid.uuid4().hex[:8]
             trials_df.loc[len(trials_df)] = [email_req, new_code, datetime.now()]
-            trials_df.to_csv("trials.csv", index=False)
+            save_df(trials_df, "trials.csv")
             st.success(f"Your trial code: {new_code}")
         else:
-            st.success(f"Your existing trial code: {row.trial_code.iloc[0]}")
+            st.success(f"Your existing trial code: {existing.trial_code.iloc[0]}")
     st.stop()
+
+# Validate access code
 if access_code in paid_codes:
     trial_mode = False
 elif access_code in trial_codes:
@@ -94,6 +121,7 @@ today = datetime.now().date()
 mask = (usage_df.user_key == access_code) & (usage_df.date == pd.Timestamp(today))
 if not mask.any():
     usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
+    save_df(usage_df, "usage.csv")
     mask = (usage_df.user_key == access_code) & (usage_df.date == pd.Timestamp(today))
 row_idx = usage_df[mask].index[0]
 trial_count = int(usage_df.at[row_idx, 'trial_count'])
@@ -105,12 +133,13 @@ if not trial_mode and daily_count >= 30:
     st.warning("🚫 Daily limit reached.")
     st.stop()
 
+# Persist usage helper
 def persist_usage(is_trial):
     if is_trial:
         usage_df.at[row_idx, 'trial_count'] += 1
     else:
         usage_df.at[row_idx, 'daily_count'] += 1
-    usage_df.to_csv("usage.csv", index=False)
+    save_df(usage_df, "usage.csv")
 
 # --- Settings & Role-Play Scenarios ---
 with st.expander("⚙️ Settings", expanded=True):
@@ -137,7 +166,6 @@ else:
     display = 'Student'
 
 # --- Welcome Banner ---
-# Use Streamlit native info box for mobile-friendly banner
 banner_lines = [
     f"👋 Hello {display}! I'm your AI Speaking Partner 🤖",
     f"**Let's practice your {level} {language} skills!**"
@@ -145,16 +173,14 @@ banner_lines = [
 if roleplay and scenario:
     banner_lines.append(f"**Scenario:** {scenario}")
 banner_lines.append("Start chatting below. 💬")
-# Properly join lines with double newlines
-st.info("
-
-".join(banner_lines))
+st.info("\n\n".join(banner_lines))
 
 # --- Chat Interface with Grammar Correction & Scoring ---
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
 for msg in st.session_state['messages']:
-    with st.chat_message(msg['role']): st.markdown(msg['content'])
+    with st.chat_message(msg['role']):
+        st.markdown(msg['content'])
 
 user_input = st.chat_input("💬 Type your message here...")
 if user_input:
