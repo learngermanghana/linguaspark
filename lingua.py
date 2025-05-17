@@ -7,6 +7,10 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
+# --- Page setup ---
+st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
+st.title("🌟 LinguaSpark – Your AI Conversation Partner")
+
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
@@ -20,18 +24,20 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 # Load credentials from Streamlit secrets or local JSON for localhost
+import json
+
 gcp_info = st.secrets.get("gcp_service_account")
 if gcp_info:
     credentials = Credentials.from_service_account_info(gcp_info, scopes=scope)
 else:
-    import json
     try:
         with open("service_account.json") as f:
             info = json.load(f)
         credentials = Credentials.from_service_account_info(info, scopes=scope)
-    except Exception:
-        st.error("⚠️ Missing Google service account credentials. Add to .streamlit/secrets.toml or place service_account.json in app directory.")
+    except FileNotFoundError:
+        st.error("⚠️ Missing Google credentials. Add to .streamlit/secrets.toml or place service_account.json in app directory.")
         st.stop()
+
 # Authenticate with Google Sheets API
 gc = gspread.authorize(credentials)
 # Try Google Sheets, fallback to local Excel if permission error
@@ -44,10 +50,6 @@ except Exception:
     ws = None
     sheet_backend = False
 
-# --- Page setup ---
-st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-st.title("🌟 LinguaSpark – Your AI Conversation Partner")
-
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
@@ -56,18 +58,15 @@ if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Student Access")
-        # Try loading from Google Sheets
-        try:
+        # Load from Sheets or Excel
+        if sheet_backend:
             records = ws.get_all_records()
             user_df = pd.DataFrame(records)
-            sheet_backend = True
-        except Exception:
-            # Fallback to local Excel
+        else:
             try:
                 user_df = pd.read_excel("students.xlsx")
-            except Exception:
-                user_df = pd.DataFrame(columns=['code', 'expiry'])
-            sheet_backend = False
+            except FileNotFoundError:
+                user_df = pd.DataFrame(columns=["code", "expiry"])
         st.dataframe(user_df)
 
         new_code = st.text_input("New Student Code")
@@ -87,19 +86,17 @@ if mode == "Teacher Dashboard":
     st.stop()
 
 # --- Practice Mode ---
-# Load paid users from Google Sheet or local Excel (for localhost fallback)
+# Load users from Sheets or Excel
 
 def load_users():
-    # Try Google Sheets first
-    try:
+    if sheet_backend:
         records = ws.get_all_records()
         return {r['code']: r['expiry'] for r in records}
-    except Exception:
-        # Fallback to local Excel file
+    else:
         try:
             df = pd.read_excel("students.xlsx")
             return {row['code']: row['expiry'] for _, row in df.iterrows()}
-        except Exception:
+        except FileNotFoundError:
             return {}
 
 paid_users = load_users()
@@ -142,7 +139,6 @@ else:
         st.stop()
     st.info(f"🎁 Free trial: {5 - st.session_state.trial_messages} messages left")
 
-# Paid users daily message limit
 if not trial_mode and st.session_state.daily_count >= 30:
     st.warning("🚫 Daily message limit reached. Please try again tomorrow.")
     st.stop()
@@ -191,17 +187,12 @@ for msg in st.session_state.messages:
 # --- Chat Input & Processing ---
 user_input = st.chat_input("💬 Type your message here...", key="chat_input")
 if user_input:
-    # Update counters
     if trial_mode:
         st.session_state.trial_messages += 1
     else:
         st.session_state.daily_count += 1
-
-    # Append user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.chat_message("user").markdown(user_input)
-
-    # Create system prompt
     system_prompt = f"""
 You are a tutor for a {level} student.
 Language: {language}, Topic: {topic}.
@@ -217,20 +208,16 @@ Language: {language}, Topic: {topic}.
     )
     ai = response.choices[0].message.content
     st.session_state.messages.append({"role": "assistant", "content": ai})
-
-    # Display assistant reply and corrections
     parts = ai.split("\n\n")
     reply = parts[0]
     correction = "\n\n".join(parts[1:]) if len(parts) > 1 else None
     st.chat_message("assistant").markdown(reply)
     if correction:
         st.markdown(f"**Correction:** {correction}")
-
-    # Display score badge
     match = re.search(r"Score[:\s]+(\d{1,2})", ai)
     if match:
         sc = int(match.group(1))
-        clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
+        clr = "green" if sc)>=9 else "orange" if sc>=6 else "red"
         st.markdown(
             f"<div style='padding:8px; border-radius:10px; background-color:{clr}; color:white; display:inline-block;'>Score: {sc}</div>",
             unsafe_allow_html=True
