@@ -34,8 +34,15 @@ else:
         st.stop()
 # Authenticate with Google Sheets API
 gc = gspread.authorize(credentials)
-sheet = gc.open_by_key(st.secrets.get("general", {}).get("SHEET_ID"))
-ws = sheet.worksheet("students")
+# Try Google Sheets, fallback to local Excel if permission error
+try:
+    sheet = gc.open_by_key(st.secrets.get("general", {}).get("SHEET_ID"))
+    ws = sheet.worksheet("students")
+    sheet_backend = True
+except Exception:
+    st.warning("⚠️ Google Sheets access failed. Falling back to local Excel storage.")
+    ws = None
+    sheet_backend = False
 
 # --- Page setup ---
 st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
