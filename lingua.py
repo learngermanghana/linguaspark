@@ -77,7 +77,7 @@ if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
 # Load persistent trial count from URL params
-params = st.query_params
+params = st.get_query_params()
 if 'trial' in params:
     try:
         st.session_state.trial_messages = int(params['trial'][0])
@@ -173,7 +173,7 @@ if chat_input:
     # Update counters
     if trial_mode:
         st.session_state.trial_messages += 1
-        st.experimental_set_query_params(trial=st.session_state.trial_messages)
+        st.set_query_params(trial=str(st.session_state.trial_messages))
     else:
         st.session_state.daily_count += 1
 
@@ -199,7 +199,7 @@ if chat_input:
     ai_content = response.choices[0].message.content
 
     # Display AI response
-    st.session_state.messages.append({"role": "assistant", "content": ai_content})  
+    st.session_state.messages.append({"role": "assistant", "content": ai_content})
     parts = ai_content.split("\n\n")
     reply = parts[0]
     correction = "\n\n".join(parts[1:]) if len(parts) > 1 else None
@@ -214,7 +214,6 @@ if chat_input:
         score = int(match.group(1))
         color = "green" if score >= 9 else "orange" if score >= 6 else "red"
         st.markdown(
-            f"<div style='padding:8px; border-radius:10px; background-color:{color}; color:white;'"
-            f" display:inline-block;'>Score: {score}</div>",
+            f"<div style='padding:8px; border-radius:10px; background-color:{color}; color:white; display:inline-block;'>Score: {score}</div>",
             unsafe_allow_html=True
         )
