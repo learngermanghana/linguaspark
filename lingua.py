@@ -99,7 +99,7 @@ else:
 today = datetime.now().date()
 mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
 if not mask.any():
-    usage_df.loc[len(usage_df)] = [access_code, today, 0, 0]
+    usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
     mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
 row_idx = usage_df[mask].index[0]
 trial_count = int(usage_df.at[row_idx, "trial_count"])
