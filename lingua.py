@@ -77,11 +77,12 @@ if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
 # Load persistent trial count from URL params
-params = st.query_params
+# Use stable get/set API to avoid mixing experimental calls
+params = st.get_query_params()
 if 'trial' in params:
     try:
         st.session_state.trial_messages = int(params['trial'][0])
-    except ValueError:
+    except (ValueError, KeyError):
         pass
 
 # Reset daily count if a new day has started
