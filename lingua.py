@@ -34,7 +34,7 @@ else:
         st.stop()
 # Authenticate with Google Sheets API
 gc = gspread.authorize(credentials)
-sheet = gc.open_by_key(st.secrets.get("general", {}).get("SHEET_ID"))
+sheet = gc.open_by_key(st.secrets.get("general", {}).get("1Y3sxmESo5TueiJlTL611KYgTV4_gNOyum65gyEkY-N0"))
 ws = sheet.worksheet("students")
 
 # --- Page setup ---
