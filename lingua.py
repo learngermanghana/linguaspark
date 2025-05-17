@@ -124,23 +124,41 @@ with st.expander("⚙️ Settings", expanded=True):
     language = st.selectbox("Language", ["German", "French", "English"])
     level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
-# --- Welcome ---
-if trial_mode:
-    row = trials_df[trials_df["trial_code"] == access_code]
-    display = row["email"].values[0].split("@")[0] if not row.empty else "Learner"
-else:
-    display = "Student"
-st.markdown(f"👋 Hello {display}! Let's chat.")
+# --- Welcome Banner ---
+st.markdown(
+    f"""
+    <div style='padding:16px;border-radius:12px;background:#e0f7fa;'>
+    👋 Hello {display}! I'm your AI Speaking Partner 🤖<br><br>
+    Let's practice your {level} {language} skills!<br>
+    Choose a topic and start chatting below. 💬
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-# Chat history
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
-for m in st.session_state["messages"]:
-    st.write(f"{m['role']}: {m['content']}")
+# --- Chat Interface ---
+# Display past messages
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
+for msg in st.session_state['messages']:
+    with st.chat_message(msg['role']):
+        st.markdown(msg['content'])
 
 # Chat input
-msg = st.text_input("Your message here")
-if msg:
+user_input = st.chat_input("💬 Type your message here...")
+if user_input:
+    # Update usage
     increment_usage(trial_mode)
-    st.session_state["messages"].append({"role": "user", "content": msg})
-    # AI processing goes here
+    # Append and display user message
+    st.session_state['messages'].append({'role': 'user', 'content': user_input})
+    st.chat_message('user').markdown(user_input)
+    
+    # Placeholder: call OpenAI for response
+    response = client.chat.completions.create(
+        model='gpt-3.5-turbo',
+        messages=[{'role': 'user', 'content': user_input}]
+    )
+    ai_reply = response.choices[0].message.content
+    # Append and display assistant message
+    st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
+    st.chat_message('assistant').markdown(ai_reply)
