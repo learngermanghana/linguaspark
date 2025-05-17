@@ -68,8 +68,9 @@ paid_codes  = paid_df["code"].tolist()
 trial_codes = trials_df["trial_code"].tolist()
 access_code = st.text_input("Enter your paid or trial code:")
 if not access_code:
-    st.info("Please enter your code or request a trial code below.")
-    email_req = st.text_input("Email for trial code request:")
+    st.info("
+
+".join(banner_lines))
     if email_req and st.button("Request Trial Code"):
         row = trials_df[trials_df.email == email_req]
         if row.empty:
