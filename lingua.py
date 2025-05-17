@@ -215,6 +215,10 @@ Language: {language}, Topic: {topic}.
     if correction:
         st.markdown(f"**Correction:** {correction}")
     match = re.search(r"Score[:\s]+(\d{1,2})", ai)
-    if match:
+        if match:
         sc = int(match.group(1))
-                    clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
+        clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
+        st.markdown(
+            f"<div style='padding:8px; border-radius:10px; background-color:{clr}; color:white; display:inline-block;'>Score: {sc}</div>",
+            unsafe_allow_html=True
+        )
