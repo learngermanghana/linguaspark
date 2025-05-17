@@ -72,7 +72,7 @@ paid_users = load_users()
 if 'trial_messages' not in st.session_state:
     st.session_state.trial_messages = 0
 # Load persistent trial count from URL params
-qp = st.experimental_get_query_params()
+qp = st.query_params
 if 'trial' in qp:
     try:
         st.session_state.trial_messages = int(qp['trial'][0])
