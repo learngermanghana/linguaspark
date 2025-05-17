@@ -23,7 +23,6 @@ scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-# Load credentials from Streamlit secrets or local JSON for localhost
 import json
 
 gcp_info = st.secrets.get("gcp_service_account")
@@ -38,7 +37,6 @@ else:
         st.error("⚠️ Missing Google credentials. Add to .streamlit/secrets.toml or place service_account.json in app directory.")
         st.stop()
 
-# Authenticate with Google Sheets API
 gc = gspread.authorize(credentials)
 # Try Google Sheets, fallback to local Excel if permission error
 try:
@@ -46,7 +44,6 @@ try:
     ws = sheet.worksheet("students")
     sheet_backend = True
 except Exception:
-    st.warning("⚠️ Google Sheets access failed. Falling back to local Excel storage.")
     ws = None
     sheet_backend = False
 
@@ -58,7 +55,6 @@ if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Student Access")
-        # Load from Sheets or Excel
         if sheet_backend:
             records = ws.get_all_records()
             user_df = pd.DataFrame(records)
@@ -68,7 +64,6 @@ if mode == "Teacher Dashboard":
             except FileNotFoundError:
                 user_df = pd.DataFrame(columns=["code", "expiry"])
         st.dataframe(user_df)
-
         new_code = st.text_input("New Student Code")
         new_expiry = st.date_input("Expiry Date")
         if st.button("➕ Add Code"):
@@ -86,8 +81,6 @@ if mode == "Teacher Dashboard":
     st.stop()
 
 # --- Practice Mode ---
-# Load users from Sheets or Excel
-
 def load_users():
     if sheet_backend:
         records = ws.get_all_records()
@@ -98,10 +91,8 @@ def load_users():
             return {row['code']: row['expiry'] for _, row in df.iterrows()}
         except FileNotFoundError:
             return {}
-
 paid_users = load_users()
 
-# Initialize session counters
 if 'trial_messages' not in st.session_state:
     st.session_state.trial_messages = 0
 if 'daily_count' not in st.session_state:
@@ -109,13 +100,11 @@ if 'daily_count' not in st.session_state:
 if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
-# Reset daily count on new day
 today = datetime.now().date()
 if st.session_state.usage_date != today:
     st.session_state.usage_date = today
     st.session_state.daily_count = 0
 
-# Access control: code or trial
 trial_mode = False
 code = st.text_input("Enter access code (or leave blank for a 5-message free trial):")
 if code:
@@ -143,7 +132,6 @@ if not trial_mode and st.session_state.daily_count >= 30:
     st.warning("🚫 Daily message limit reached. Please try again tomorrow.")
     st.stop()
 
-# --- Practice Settings ---
 if mode == "Practice":
     with st.sidebar:
         st.header("Settings")
@@ -151,7 +139,6 @@ if mode == "Practice":
         topic = st.selectbox("Topic", ["Travel", "Food", "Daily Routine", "Work", "Free Talk"])
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
-# --- Encouragement Banner ---
 name = code.title() if code else "there"
 st.markdown(
     f"<div style='padding:16px; border-radius:12px; background:#e0f7fa;'>👋 Hello {name}! I'm your AI Speaking Partner 🤖<br><br>"
@@ -161,7 +148,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Audio Upload ---
 st.subheader("📄 Upload Audio (WAV/MP3/M4A)")
 audio = st.file_uploader("Upload voice", type=["wav", "mp3", "m4a"], key="audio_upload")
 user_input = None
@@ -177,14 +163,12 @@ if audio:
     st.success("🚣️ Transcribed:")
     st.write(user_input)
 
-# --- Chat History ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 for msg in st.session_state.messages:
     with st.chat_message(msg['role']):
         st.markdown(msg['content'])
 
-# --- Chat Input & Processing ---
 user_input = st.chat_input("💬 Type your message here...", key="chat_input")
 if user_input:
     if trial_mode:
@@ -215,7 +199,7 @@ Language: {language}, Topic: {topic}.
     if correction:
         st.markdown(f"**Correction:** {correction}")
     match = re.search(r"Score[:\s]+(\d{1,2})", ai)
-        if match:
+    if match:
         sc = int(match.group(1))
         clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
         st.markdown(
