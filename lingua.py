@@ -2,15 +2,10 @@ import streamlit as st
 from openai import OpenAI
 import io
 import re
+import requests
 from datetime import datetime
 import pandas as pd
-import sqlite3
-
-# --- Page setup ---
-st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-# --- Page setup ---
-st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-st.title("🌟 LinguaSpark – Your AI Conversation Partner")("🌟 LinguaSpark – Your AI Conversation Partner")
+import uuid
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -19,18 +14,13 @@ if not api_key:
     st.stop()
 client = OpenAI(api_key=api_key)
 
-# --- SQLite setup ---
-conn = sqlite3.connect('students.db', check_same_thread=False)
-c = conn.cursor()
-c.execute(
-    """
-    CREATE TABLE IF NOT EXISTS students (
-        code TEXT PRIMARY KEY,
-        expiry TEXT
-    )
-    """
-)
-conn.commit()
+# --- Page setup ---
+st.set_page_config(
+    page_title="Falowen – Your AI Conversation Partner",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)  # Collapse sidebar by default for mobile-friendly view
+st.title("🌟 Falowen – Your AI Conversation Partner")
 
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
@@ -38,164 +28,148 @@ mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 # --- Teacher Dashboard ---
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
-    if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
-        st.subheader("🧑‍🏫 Manage Student Access (SQLite)")
-        df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
-        st.dataframe(df)
-
-        new_code = st.text_input("New Student Code")
-        new_expiry = st.date_input("Expiry Date")
-        if st.button("➕ Add Code"):
-            if new_code:
-                try:
-                    c.execute(
-                        "INSERT INTO students (code, expiry) VALUES (?, ?)",
-                        (new_code, new_expiry.strftime("%Y-%m-%d"))
-                    )
-                    conn.commit()
-                    st.success(f"✅ Added code {new_code}")
-                except sqlite3.IntegrityError:
-                    st.warning("⚠️ Code already exists.")
+    if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
+        st.subheader("🧑‍🏫 Manage Paid Codes")
+        try:
+            paid_df = pd.read_csv("students.csv")
+        except FileNotFoundError:
+            paid_df = pd.DataFrame(columns=["code","expiry"])
+        new_code = st.text_input("New Student Code:")
+        new_expiry = st.date_input("Expiry Date:")
+        if st.button("➕ Add Paid Code"):
+            if new_code and new_code not in paid_df['code'].values:
+                paid_df.loc[len(paid_df)] = [new_code, new_expiry]
+                paid_df.to_csv("students.csv", index=False)
+                st.success(f"✅ Added paid code {new_code}")
             else:
-                st.warning("⚠️ Please enter a valid code.")
+                st.warning("Code exists or empty.")
+        st.subheader("📋 Paid Codes List")
+        st.dataframe(paid_df)
+        # delete paid codes
+        st.subheader("🗑️ Delete Paid Codes")
+        for idx, row in paid_df.iterrows():
+            if st.button(f"Delete {row['code']}", key=f"del_paid_{idx}"):
+                paid_df = paid_df[paid_df['code'] != row['code']]
+                paid_df.to_csv("students.csv", index=False)
+                st.experimental_rerun()
+
+        # trial codes
+        st.subheader("🎫 Trial Codes")
+        try:
+            trials_df = pd.read_csv("trials.csv")
+        except FileNotFoundError:
+            trials_df = pd.DataFrame(columns=["email","trial_code","created"])
+        st.dataframe(trials_df)
+        st.subheader("🗑️ Delete Trial Codes")
+        for idx, row in trials_df.iterrows():
+            if st.button(f"Delete {row['trial_code']}", key=f"del_trial_{idx}"):
+                trials_df = trials_df[trials_df['trial_code'] != row['trial_code']]
+                trials_df.to_csv("trials.csv", index=False)
+                st.experimental_rerun()
     else:
-        st.info("Enter correct password to access the dashboard.")
+        st.info("Enter correct teacher password.")
     st.stop()
 
 # --- Practice Mode ---
-def load_users():
-    df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
-    return {row['code']: row['expiry'] for _, row in df.iterrows()}
+# load paid users
+try:
+    paid_users = pd.read_csv("students.csv")["code"].tolist()
+except FileNotFoundError:
+    paid_users = []
 
-paid_users = load_users()
-
-# Initialize session counters
-if 'trial_messages' not in st.session_state:
-    st.session_state.trial_messages = 0
-if 'daily_count' not in st.session_state:
-    st.session_state.daily_count = 0
-if 'usage_date' not in st.session_state:
-    st.session_state.usage_date = datetime.now().date()
-
-# Load persistent trial count
-qp = st.query_params
-if 'trial' in qp:
-    try:
-        st.session_state.trial_messages = int(qp['trial'][0])
-    except:
-        pass
-
-# Reset daily count on new day
-today = datetime.now().date()
-if st.session_state.usage_date != today:
-    st.session_state.usage_date = today
-    st.session_state.daily_count = 0
-
-# Access control: code or trial
-trial_mode = False
-code = st.text_input("Enter access code (or leave blank for a 5-message free trial):")
-if code:
-    if code not in paid_users:
-        st.warning("🔒 Invalid code. Please contact the tutor.")
-        st.stop()
-    expiry = datetime.strptime(paid_users[code], "%Y-%m-%d").date()
-    days_left = (expiry - today).days
-    if days_left < 0:
-        st.error("🔒 Access expired. Please renew your subscription.")
-        st.stop()
-    st.success(f"✅ Premium Access: {days_left} day(s) remaining.")
-else:
-    trial_mode = True
-    if st.session_state.trial_messages >= 5:
-        st.error(
-            "🔒 Free trial ended. Please pay 100 GHS for 60 days full access.\n"
-            "💳 MTN Momo: 233245022743 (Asadu Felix)\n"
-            "📞 WhatsApp proof: 233205706589"
-        )
-        st.stop()
-    st.info(f"🎁 Free trial: {5 - st.session_state.trial_messages} messages left")
-
-# Paid users daily message limit
-if not trial_mode and st.session_state.daily_count >= 30:
-    st.warning("🚫 Daily message limit reached. Please try again tomorrow.")
+# prompt for code or email to get trial code
+code = st.text_input("Enter your access code (paid or trial):")
+if not code:
+    st.subheader("🎫 Get Your Free Trial Code")
+    email = st.text_input("Enter your email:")
+    if email:
+        try:
+            trials_df = pd.read_csv("trials.csv")
+        except FileNotFoundError:
+            trials_df = pd.DataFrame(columns=["email","trial_code","created"])
+        if email in trials_df['email'].values:
+            trial_code = trials_df.loc[trials_df['email']==email, 'trial_code'].values[0]
+        else:
+            trial_code = uuid.uuid4().hex[:8]
+            trials_df.loc[len(trials_df)] = [email, trial_code, datetime.now().isoformat()]
+            trials_df.to_csv("trials.csv", index=False)
+        # Display code in single line f-string to avoid unterminated literal
+        st.success(f"Your trial code is **{trial_code}**. Paste it above to start your 5-message trial.")
+    else:
+        st.info("Please enter your email to receive a trial code.")
     st.stop()
 
-# --- Practice Settings ---
-if mode == "Practice":
-    with st.sidebar:
-        st.header("Settings")
-        language = st.selectbox("Language", ["German", "French", "English"])
-        topic = st.selectbox("Topic", ["Travel", "Food", "Daily Routine", "Work", "Free Talk"])
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
-
-# --- Encouragement Banner ---
-name = code.title() if code else "there"
-st.markdown(
-    f"<div style='padding:16px; border-radius:12px; background:#e0f7fa;'>👋 Hello {name}! I'm your AI Speaking Partner 🤖<br><br>"
-    "We can chat at any level from <b>A1 to C1</b> 📘.<br>"
-    "Choose your level, select a topic, and start chatting or upload your voice 🎤.<br><br>"
-    "I'm here to correct your mistakes and boost your confidence. Let's begin! 💬</div>",
-    unsafe_allow_html=True
-)
-
-# --- Audio Upload ---
-st.subheader("📄 Upload Audio (WAV/MP3/M4A)")
-audio = st.file_uploader("Upload voice", type=["wav", "mp3", "m4a"], key="audio_upload")
-user_input = None
-if audio:
-    buf = audio.read()
-    stream = io.BytesIO(buf)
-    stream.name = audio.name
-    user_input = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=stream,
-        language={"German": "de", "French": "fr", "English": "en"}[language]
-    ).text
-    st.success("🚣️ Transcribed:")
-    st.write(user_input)
-
-# --- Chat History & Input ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-for msg in st.session_state.messages:
-    with st.chat_message(msg['role']):
-        st.markdown(msg['content'])
-
-user_input = st.chat_input("💬 Type your message here...", key="chat_input")
-if user_input:
-    if trial_mode:
-        st.session_state.trial_messages += 1
-        st.experimental_set_query_params(trial=st.session_state.trial_messages)
+# determine mode
+if code in paid_users:
+    trial_mode = False
+elif code:
+    try:
+        trials_df
+    except NameError:
+        trials_df = pd.read_csv("trials.csv")
+    if code in trials_df['trial_code'].values:
+        trial_mode = True
     else:
-        st.session_state.daily_count += 1
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    st.chat_message("user").markdown(user_input)
-    system_prompt = f"""
-You are a tutor for a {level} student.
-Language: {language}, Topic: {topic}.
+        st.error("Invalid code. Please use a valid paid or trial code.")
+        st.stop()
+else:
+    # should not reach here
+    st.stop()
 
-- Reply naturally in {language}, using {level}-appropriate vocabulary and grammar.
-- If the student's message contains any grammar mistakes, provide a second paragraph explaining each correction in English, prefaced with **Correction:**.
-- Keep responses concise and appropriate for the student's proficiency level.
-- After replying, rate the student's message on a scale from 1 to 10 based on grammar, vocabulary, and clarity, and write `Score: X` on a new line.
-"""
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages]
+# --- Persist Usage ---
+USAGE_FILE = "usage.csv"
+try:
+    usage_df = pd.read_csv(USAGE_FILE, parse_dates=['date'])
+except FileNotFoundError:
+    usage_df = pd.DataFrame(columns=['user_key','date','trial_count','daily_count'])
+user_key = code
+today = datetime.now().date()
+mask = (usage_df['user_key']==user_key)&(usage_df['date']==pd.Timestamp(today))
+if not mask.any():
+    usage_df.loc[len(usage_df)] = [user_key, pd.Timestamp(today), 0, 0]
+    mask = (usage_df['user_key']==user_key)&(usage_df['date']==pd.Timestamp(today))
+row_idx = usage_df[mask].index[0]
+trial_count = int(usage_df.at[row_idx,'trial_count'])
+daily_count = int(usage_df.at[row_idx,'daily_count'])
+# Enforce limits and prompt payment
+if trial_mode and trial_count >= 5:
+    st.error("🔒 Your 5-message trial has ended.")
+    st.markdown(
+        """
+        To continue using **Falowen**, please pay **100 GHS** for a 60-day plan via Mobile Money:<br>
+        • Momo: **233245022743** (Asadu Felix) <button onclick="navigator.clipboard.writeText('233245022743')">Copy Number</button><br>
+        • Confirm payment: <a href="https://api.whatsapp.com/send?phone=233205706589&text=I%20have%20paid%20100%20GHS%20for%2060-day%20plan">WhatsApp</a>
+        """,
+        unsafe_allow_html=True
     )
-    ai = response.choices[0].message.content
-    st.session_state.messages.append({"role": "assistant", "content": ai})
-    parts = ai.split("\n\n")
-    reply = parts[0]
-    correction = "\n\n".join(parts[1:]) if len(parts)>1 else None
-    st.chat_message("assistant").markdown(reply)
-    if correction:
-        st.markdown(f"**Correction:** {correction}")
-    match = re.search(r"Score[:\s]+(\d{1,2})", ai)
-    if match:
-        sc = int(match.group(1))
-        clr = "green" if sc >= 9 else "orange" if sc >= 6 else "red"
-        st.markdown(
-            f"<div style='padding:8px; border-radius:10px; background-color:{clr}; color:white; display:inline-block;'>Score: {sc}</div>",
-            unsafe_allow_html=True
-        )
+    st.stop()
+if not trial_mode and daily_count >= 30:
+    st.warning("🚫 You’ve reached your daily limit of 30 messages.")
+    st.markdown(
+        """
+        Need more? Upgrade to the paid plan: **100 GHS** for 60 days unlimited access:<br>
+        • Momo: **233245022743** (Asadu Felix) <button onclick="navigator.clipboard.writeText('233245022743')">Copy Number</button><br>
+        • After payment, re-enter your paid code above to unlock access.<br>
+        • Confirm via WhatsApp: <a href="https://api.whatsapp.com/send?phone=233205706589&text=I%20have%20paid%20100%20GHS">Click here</a>
+        """,
+        unsafe_allow_html=True
+    )
+    st.stop()
+
+# --- Settings (Mobile-Friendly) ---
+# Use a collapsible expander instead of sidebar for mobile UX
+with st.expander("⚙️ Settings", expanded=True):
+    language = st.selectbox("Language", ["German","French","English"])
+    topic = st.selectbox("Topic", ["Travel","Food","Daily Routine","Work","Free Talk"])
+    level = st.selectbox("Level", ["A1","A2","B1","B2","C1"])
+    scenario_mode = st.checkbox("Role-Play Scenario")
+    if scenario_mode:
+        scenarios = {
+            'A1': ['Ordering at Cafe', 'Introducing', 'Directions'],
+            'A2': ['Hotel', 'Market', 'Routine'],
+            'B1': ['Interview', 'Trip', 'Hometown'],
+            'B2': ['Sustainability', 'Tech', 'Art'],
+            'C1': ['Contract', 'News', 'Debate']
+        }[level]
+        scenario = st.selectbox("Scenario", scenarios)
+
