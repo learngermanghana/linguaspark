@@ -76,7 +76,7 @@ if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
 # Load persistent trial count
-qp = st.experimental_get_query_params()
+qp = st.query_params
 if 'trial' in qp:
     try:
         st.session_state.trial_messages = int(qp['trial'][0])
