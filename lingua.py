@@ -61,7 +61,7 @@ if mode == "Teacher Dashboard":
         st.info("Enter correct password to access the dashboard.")
     st.stop()
 
-# --- Practice Mode ---
+# --- Practice Mode: helper to load users ---
 def load_users():
     df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
     return {row['code']: row['expiry'] for _, row in df.iterrows()}
@@ -76,7 +76,7 @@ if 'daily_count' not in st.session_state:
 if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
-# Load persistent trial count from URL
+# Load persistent trial count from URL params
 params = st.experimental_get_query_params()
 if 'trial' in params:
     try:
@@ -84,7 +84,7 @@ if 'trial' in params:
     except ValueError:
         pass
 
-# Reset daily count on new day
+# Reset daily count if a new day has started
 today = datetime.now().date()
 if st.session_state.usage_date != today:
     st.session_state.usage_date = today
@@ -114,7 +114,7 @@ else:
         st.stop()
     st.info(f"🎁 Free trial: {5 - st.session_state.trial_messages} messages left")
 
-# Paid users daily limit
+# Enforce daily limit for paid users
 if not trial_mode and st.session_state.daily_count >= 30:
     st.warning("🚫 Daily message limit reached. Please try again tomorrow.")
     st.stop()
@@ -127,7 +127,7 @@ if mode == "Practice":
         topic = st.selectbox("Topic", ["Travel", "Food", "Daily Routine", "Work", "Free Talk"])
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 else:
-    language = topic = level = None  # Ensure variables exist
+    language = topic = level = None
 
 # --- Encouragement Banner ---
 student_name = access_code.title() if access_code else "there"
@@ -136,7 +136,7 @@ st.markdown(
     f"👋 Hello {student_name}! I'm your AI Speaking Partner 🤖<br><br>"
     "We can chat at any level from <b>A1 to C1</b> 📘.<br>"
     "Choose your level, select a topic, and start chatting or upload your voice 🎤.<br><br>"
-    "I'm here to correct your mistakes and boost your confidence. Let's begin! 💬"
+    "I'm here to correct your mistakes and boost your confidence. Let's begin! 💬"  
     "</div>",
     unsafe_allow_html=True
 )
@@ -163,12 +163,12 @@ else:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous messages
+# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# When user sends input
+# Process new input
 if chat_input:
     # Update counters
     if trial_mode:
@@ -177,29 +177,29 @@ if chat_input:
     else:
         st.session_state.daily_count += 1
 
-    # Append and display user message
+    # Record user message
     st.session_state.messages.append({"role": "user", "content": chat_input})
     st.chat_message("user").markdown(chat_input)
 
-    # System prompt\    
-system_prompt = f"""You are a tutor for a {level} student.
-Language: {language}, Topic: {topic}.
+    # Build system prompt
+    system_prompt = (
+        f"You are a tutor for a {level} student.\n"
+        f"Language: {language}, Topic: {topic}.\n\n"
+        "- Reply naturally in {language}, using {level}-appropriate vocabulary and grammar.\n"
+        "- If the student's message contains any grammar mistakes, provide a second paragraph explaining each correction in English, prefaced with **Correction**:.\n"
+        "- Keep responses concise and appropriate for the student's proficiency level.\n"
+        "- After replying, rate the student's message on a scale from 1 to 10 based on grammar, vocabulary, and clarity, and write `Score: X` on a new line."
+    )
 
-- Reply naturally in {language}, using {level}-appropriate vocabulary and grammar.
-- If the student's message contains any grammar mistakes, provide a second paragraph explaining each correction in English, prefaced with **Correction**:.
-- Keep responses concise and appropriate for the student's proficiency level.
-- After replying, rate the student's message on a scale from 1 to 10 based on grammar, vocabulary, and clarity, and write `Score: X` on a new line.
-"""
-
-    # Call OpenAI Chat Completion
+    # Fetch AI response
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": system_prompt}, *st.session_state.messages]
     )
     ai_content = response.choices[0].message.content
 
-    # Append and display assistant message
-    st.session_state.messages.append({"role": "assistant", "content": ai_content})
+    # Display AI response
+    st.session_state.messages.append({"role": "assistant", "content": ai_content})  
     parts = ai_content.split("\n\n")
     reply = parts[0]
     correction = "\n\n".join(parts[1:]) if len(parts) > 1 else None
@@ -208,12 +208,13 @@ Language: {language}, Topic: {topic}.
     if correction:
         st.markdown(f"**Correction:** {correction}")
 
-    # Extract and display score
+    # Extract and show score
     match = re.search(r"Score[:\s]+(\d{1,2})", ai_content)
     if match:
         score = int(match.group(1))
         color = "green" if score >= 9 else "orange" if score >= 6 else "red"
         st.markdown(
-            f"<div style='padding:8px; border-radius:10px; background-color:{color}; color:white; display:inline-block;'>Score: {score}</div>",
+            f"<div style='padding:8px; border-radius:10px; background-color:{color}; color:white;'"
+            f" display:inline-block;'>Score: {score}</div>",
             unsafe_allow_html=True
         )
