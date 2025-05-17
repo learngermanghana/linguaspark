@@ -8,9 +8,7 @@ import sqlite3
 
 # --- Page setup ---
 st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-# --- Page setup ---
-st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
-st.title("🌟 LinguaSpark – Your AI Conversation Partner")("🌟 LinguaSpark – Your AI Conversation Partner")
+st.title("🌟 LinguaSpark – Your AI Conversation Partner")
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
