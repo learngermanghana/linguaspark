@@ -4,8 +4,7 @@ import io
 import re
 from datetime import datetime
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+import sqlite3
 
 # --- Page setup ---
 st.set_page_config(page_title="LinguaSpark – Talk to Learn", layout="wide")
@@ -18,34 +17,18 @@ if not api_key:
     st.stop()
 client = OpenAI(api_key=api_key)
 
-# --- Google Sheets setup ---
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-import json
-
-gcp_info = st.secrets.get("gcp_service_account")
-if gcp_info:
-    credentials = Credentials.from_service_account_info(gcp_info, scopes=scope)
-else:
-    try:
-        with open("service_account.json") as f:
-            info = json.load(f)
-        credentials = Credentials.from_service_account_info(info, scopes=scope)
-    except FileNotFoundError:
-        st.error("⚠️ Missing Google credentials. Add to .streamlit/secrets.toml or place service_account.json in app directory.")
-        st.stop()
-
-gc = gspread.authorize(credentials)
-# Try Google Sheets, fallback to local Excel if permission error
-try:
-    sheet = gc.open_by_key(st.secrets.get("general", {}).get("SHEET_ID"))
-    ws = sheet.worksheet("students")
-    sheet_backend = True
-except Exception:
-    ws = None
-    sheet_backend = False
+# --- SQLite setup ---
+conn = sqlite3.connect('students.db')
+c = conn.cursor()
+c.execute(
+    """
+    CREATE TABLE IF NOT EXISTS students (
+        code TEXT PRIMARY KEY,
+        expiry TEXT
+    )
+    """
+)
+conn.commit()
 
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
@@ -54,57 +37,60 @@ mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("general", {}).get("TEACHER_PASSWORD", "admin123"):
-        st.subheader("🧑‍🏫 Manage Student Access")
-        if sheet_backend:
-            records = ws.get_all_records()
-            user_df = pd.DataFrame(records)
-        else:
-            try:
-                user_df = pd.read_excel("students.xlsx")
-            except FileNotFoundError:
-                user_df = pd.DataFrame(columns=["code", "expiry"])
-        st.dataframe(user_df)
+        st.subheader("🧑‍🏫 Manage Student Access (SQLite)")
+        # Load data
+        df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
+        st.dataframe(df)
+
         new_code = st.text_input("New Student Code")
         new_expiry = st.date_input("Expiry Date")
         if st.button("➕ Add Code"):
-            if new_code and new_code not in user_df['code'].values:
-                if sheet_backend:
-                    ws.append_row([new_code, new_expiry.strftime("%Y-%m-%d")])
-                else:
-                    user_df = user_df.append({'code': new_code, 'expiry': new_expiry}, ignore_index=True)
-                    user_df.to_excel("students.xlsx", index=False)
-                st.success(f"✅ Added code {new_code}")
+            if new_code:
+                try:
+                    c.execute(
+                        "INSERT INTO students (code, expiry) VALUES (?, ?)",
+                        (new_code, new_expiry.strftime("%Y-%m-%d"))
+                    )
+                    conn.commit()
+                    st.success(f"✅ Added code {new_code}")
+                except sqlite3.IntegrityError:
+                    st.warning("⚠️ Code already exists.")
             else:
-                st.warning("⚠️ Code already exists or is empty.")
+                st.warning("⚠️ Please enter a valid code.")
     else:
         st.info("Enter correct password to access the dashboard.")
     st.stop()
 
 # --- Practice Mode ---
 def load_users():
-    if sheet_backend:
-        records = ws.get_all_records()
-        return {r['code']: r['expiry'] for r in records}
-    else:
-        try:
-            df = pd.read_excel("students.xlsx")
-            return {row['code']: row['expiry'] for _, row in df.iterrows()}
-        except FileNotFoundError:
-            return {}
+    df = pd.read_sql_query("SELECT code, expiry FROM students", conn)
+    return {row['code']: row['expiry'] for _, row in df.iterrows()}
+
 paid_users = load_users()
 
+# Initialize session counters
 if 'trial_messages' not in st.session_state:
     st.session_state.trial_messages = 0
+# Load persistent trial count from URL params
+qp = st.experimental_get_query_params()
+if 'trial' in qp:
+    try:
+        st.session_state.trial_messages = int(qp['trial'][0])
+    except:
+        pass
+
 if 'daily_count' not in st.session_state:
     st.session_state.daily_count = 0
 if 'usage_date' not in st.session_state:
     st.session_state.usage_date = datetime.now().date()
 
+# Reset daily count on new day
 today = datetime.now().date()
 if st.session_state.usage_date != today:
     st.session_state.usage_date = today
     st.session_state.daily_count = 0
 
+# Access control: code or trial
 trial_mode = False
 code = st.text_input("Enter access code (or leave blank for a 5-message free trial):")
 if code:
@@ -128,10 +114,12 @@ else:
         st.stop()
     st.info(f"🎁 Free trial: {5 - st.session_state.trial_messages} messages left")
 
+# Paid users daily message limit
 if not trial_mode and st.session_state.daily_count >= 30:
     st.warning("🚫 Daily message limit reached. Please try again tomorrow.")
     st.stop()
 
+# --- Practice Settings ---
 if mode == "Practice":
     with st.sidebar:
         st.header("Settings")
@@ -139,6 +127,7 @@ if mode == "Practice":
         topic = st.selectbox("Topic", ["Travel", "Food", "Daily Routine", "Work", "Free Talk"])
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
+# --- Encouragement Banner ---
 name = code.title() if code else "there"
 st.markdown(
     f"<div style='padding:16px; border-radius:12px; background:#e0f7fa;'>👋 Hello {name}! I'm your AI Speaking Partner 🤖<br><br>"
@@ -148,6 +137,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# --- Audio Upload ---
 st.subheader("📄 Upload Audio (WAV/MP3/M4A)")
 audio = st.file_uploader("Upload voice", type=["wav", "mp3", "m4a"], key="audio_upload")
 user_input = None
@@ -163,6 +153,7 @@ if audio:
     st.success("🚣️ Transcribed:")
     st.write(user_input)
 
+# --- Chat History & Input ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 for msg in st.session_state.messages:
