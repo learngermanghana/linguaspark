@@ -59,24 +59,18 @@ except FileNotFoundError:
     usage_df = pd.DataFrame(columns=["user_key", "date", "trial_count", "daily_count"])
 
 # --- Paystack Integration ---
-
 def create_paystack_payment(email, amount, currency="GHS"):
-    """
-    Initialize a Paystack payment. Amount is in Ghana cedis (GHS).
-    The returned link lets user pay with card or mobile money.
-    """
     PAYSTACK_SECRET_KEY = st.secrets.get("general", {}).get("PAYSTACK_SECRET_KEY")
     headers = {
         "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
         "Content-Type": "application/json"
     }
-    # Paystack expects amount in pesewas (i.e., GHS 20 = 2000)
     data = {
         "email": email,
         "amount": int(amount * 100),
         "currency": currency,
         "channels": ["card", "mobile_money"],
-        "callback_url": "https://your-app-url.com/payment-success"  # Replace with your real site URL
+        "callback_url": "https://linguaspark.streamlit.app/"  # Use your app URL here
     }
     r = requests.post("https://api.paystack.co/transaction/initialize", json=data, headers=headers)
     if r.ok:
@@ -86,11 +80,6 @@ def create_paystack_payment(email, amount, currency="GHS"):
         return None
 
 def verify_paystack_payment(reference):
-    """
-    Verify payment after user completes Paystack payment.
-    Get the `reference` from Paystack (from callback URL or user).
-    Returns True if payment was successful.
-    """
     PAYSTACK_SECRET_KEY = st.secrets.get("general", {}).get("PAYSTACK_SECRET_KEY")
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
     url = f"https://api.paystack.co/transaction/verify/{reference}"
@@ -109,8 +98,6 @@ if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Paid Codes")
-        
-        # Add New Paid Code
         with st.form("add_paid_code_form"):
             col1, col2 = st.columns([2, 2])
             new_code = col1.text_input("New Paid Code")
@@ -121,8 +108,6 @@ if mode == "Teacher Dashboard":
                 save_paid_df(paid_df)
                 st.success(f"Added paid code {new_code}")
                 st.experimental_rerun()
-        
-        # Edit/Delete Paid Codes
         for idx, row in paid_df.iterrows():
             col1, col2, col3, col4 = st.columns([3, 3, 1, 1])
             col1.text_input(f"Code_{idx}", value=row['code'], key=f"pc_code_{idx}", disabled=True)
@@ -139,11 +124,8 @@ if mode == "Teacher Dashboard":
                 save_paid_df(paid_df)
                 st.success(f"Deleted code {row['code']}")
                 st.experimental_rerun()
-        
         st.markdown("---")
         st.subheader("🎫 Manage Trial Codes")
-        
-        # Add New Trial Code
         with st.form("add_trial_code_form"):
             col1, col2 = st.columns([3, 2])
             new_email = col1.text_input("New Trial Email")
@@ -154,8 +136,6 @@ if mode == "Teacher Dashboard":
                 save_trials_df(trials_df)
                 st.success(f"Issued trial code {code_val}")
                 st.experimental_rerun()
-
-        # Edit/Delete Trial Codes
         for idx, row in trials_df.iterrows():
             col1, col2, col3, col4 = st.columns([4, 3, 1, 1])
             new_email = col1.text_input(f"TrialEmail_{idx}", value=row['email'], key=f"tc_email_{idx}")
@@ -184,28 +164,52 @@ if mode == "Pay & Subscribe":
         "You can use VISA/Mastercard or Mobile Money (MTN, Vodafone, AirtelTigo)."
     )
     st.markdown("""
-    **Test Mode:**  
-    - Use test email and any of Paystack's [test cards](https://paystack.com/docs/payments/test/#test-cards) or [test mobile money numbers](https://paystack.com/docs/payments/test/#mobile-money).  
-    - Real mode: switch your API key to `sk_live_...` and update callback URL.  
-    - After payment, contact us with your transaction reference or email for quick activation.
+    **How it works:**  
+    1. Enter your email and amount below.  
+    2. Click to pay via Paystack.  
+    3. After payment, you'll be redirected back here.  
+    4. Copy the `reference` code from your browser's address bar (after `?reference=`) and paste it below.  
+    5. Click **Verify Payment** to get your access code instantly!
     """)
+
+    # Payment link generator
     email = st.text_input("Your Email for Payment")
     amount = st.number_input("Amount (GHS)", min_value=1, value=50)
     if st.button("Pay with Paystack"):
         pay_url = create_paystack_payment(email, amount)
         if pay_url:
             st.markdown(f"[👉 Click here to pay securely with Paystack]({pay_url})", unsafe_allow_html=True)
-            st.success("After payment, note your reference or email for activation.")
+            st.success("After payment, copy the reference code from your address bar to verify below.")
 
     st.markdown("---")
-    st.markdown("#### Verify Your Payment (optional, for admins/users)")
-    reference = st.text_input("Enter Paystack Payment Reference")
+    st.markdown("#### Enter Your Payment Reference to Get Access Code")
+    reference = st.text_input("Paste your Paystack Payment Reference (from address bar after payment)")
     if st.button("Verify Payment"):
         if reference:
-            if verify_paystack_payment(reference):
-                st.success("✅ Payment successful! You can now be granted access.")
+            try:
+                used_refs_df = pd.read_csv("used_references.csv")
+            except FileNotFoundError:
+                used_refs_df = pd.DataFrame(columns=["reference", "email", "paid_code", "date"])
+            if reference in used_refs_df["reference"].tolist():
+                paid_code = used_refs_df.loc[used_refs_df["reference"] == reference, "paid_code"].iloc[0]
+                st.warning(f"This payment has already been used. Your code: **{paid_code}**")
             else:
-                st.error("❌ Payment not found or not successful.")
+                if verify_paystack_payment(reference):
+                    paid_code = uuid.uuid4().hex[:8]
+                    paid_df.loc[len(paid_df)] = [paid_code, datetime.now() + pd.Timedelta(days=365)]
+                    save_paid_df(paid_df)
+                    new_row = {
+                        "reference": reference,
+                        "email": email,
+                        "paid_code": paid_code,
+                        "date": datetime.now()
+                    }
+                    used_refs_df = pd.concat([used_refs_df, pd.DataFrame([new_row])], ignore_index=True)
+                    used_refs_df.to_csv("used_references.csv", index=False)
+                    st.success(f"✅ Payment successful! Your access code: **{paid_code}**")
+                    st.info("Copy your code and use it to access full features in Practice mode.")
+                else:
+                    st.error("❌ Payment not found or not successful. Double-check your reference code.")
 
 # --- Practice Mode ---
 if mode == "Practice":
@@ -269,7 +273,7 @@ if mode == "Practice":
     else:
         display = "Student"
 
-    # --- Mobile-Optimized Welcome Banner (custom font, dark text, modern style) ---
+    # --- Mobile-Optimized Welcome Banner ---
     st.markdown(
         f"""
         <style>
