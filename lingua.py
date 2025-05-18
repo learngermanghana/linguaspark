@@ -74,7 +74,7 @@ if mode == "Teacher Dashboard":
             col1, col2 = st.columns([2, 2])
             new_code = col1.text_input("New Paid Code")
             new_expiry = col2.date_input("Expiry Date", value=datetime.now())
-            add_btn = st.form_submit_button("➕ Add Paid Code")
+            add_btn = col2.form_submit_button("➕ Add Paid Code")
             if add_btn and new_code and new_code not in paid_df["code"].tolist():
                 paid_df.loc[len(paid_df)] = [new_code, pd.to_datetime(new_expiry)]
                 save_paid_df(paid_df)
@@ -136,32 +136,8 @@ if mode == "Teacher Dashboard":
 
 # --- Practice Mode ---
 if mode == "Practice":
-    # --------------- MOBILE-OPTIMIZED INSTRUCTIONS/WELCOME BANNER ---------------
-    st.markdown(
-        """
-        <div style="background-color:#eaf6ff;padding:16px 8px 16px 8px;border-radius:14px;box-shadow:0 1px 8px #bed5f7;font-size:1.08em;line-height:1.65;">
-        <b>Welcome to Falowen – Your AI Language Conversation Partner! 👋</b>
-        <br><br>
-        <span style="font-size:1em;">
-        🔹 <b>Trial Access</b>:<br>
-        Enter your email below to get a <b>free trial code</b> (limited access).
-        <br><br>
-        🔹 <b>Full Access (Paid)</b>:<br>
-        If you have a paid code, enter it below to unlock full access.
-        <br><br>
-        <b>How to Get Full Access:</b><br>
-        1️⃣ Send payment to <b>233245022743 (Asadu Felix)</b> via Mobile Money (MTN Ghana).<br>
-        2️⃣ After payment, confirm with your tutor or WhatsApp us for your paid access code.
-        <br><br>
-        <b>Contact:</b> <a href="https://wa.me/233205706589" target="_blank">WhatsApp: 233205706589</a>
-        </span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     paid_codes = paid_df["code"].tolist()
-    access_code = st.text_input("Enter your paid or trial code below 👇:")
+    access_code = st.text_input("Enter your paid or trial code:")
 
     if not access_code:
         st.info("Don't have a code? Enter your email to request a free trial code.")
@@ -208,10 +184,8 @@ if mode == "Practice":
         st.error(
             "🔒 Your 5-message trial has ended."
         )
-        st.markdown(
-            "To get unlimited access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
-            "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
-            unsafe_allow_html=True
+        st.info(
+            "To get unlimited access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. For help, contact WhatsApp: 233205706589"
         )
         st.stop()
 
@@ -219,15 +193,12 @@ if mode == "Practice":
         st.warning(
             "🚫 Daily limit reached for today."
         )
-        st.markdown(
-            "To increase your daily limit or renew your access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
-            "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
-            unsafe_allow_html=True
+        st.info(
+            "To increase your daily limit or renew your access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. For help, contact WhatsApp: 233205706589"
         )
         st.stop()
 
     # --- Main logic (no extra indentation) ---
-
     def increment_usage(is_trial: bool):
         if is_trial:
             usage_df.at[row_idx, "trial_count"] += 1
