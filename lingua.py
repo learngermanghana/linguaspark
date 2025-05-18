@@ -246,11 +246,29 @@ if mode == "Practice":
     row_idx = usage_df[mask].index[0]
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
+
+    # --- Usage Limits with Clear Payment Instructions ---
     if trial_mode and trial_count >= 5:
-        st.error("🔒 Your 5-message trial has ended.")
+        st.error(
+            "🔒 Your 5-message trial has ended."
+        )
+        st.info(
+            "To get unlimited access, please subscribe.\n\n"
+            "Click on the menu at the top-left of the page (three lines or hamburger icon), "
+            "select **'Pay & Subscribe'**, and follow the instructions to pay using card or mobile money. "
+            "Once you pay, you'll receive an access code for full access."
+        )
         st.stop()
+
     if not trial_mode and daily_count >= 30:
-        st.warning("🚫 Daily limit reached.")
+        st.warning(
+            "🚫 Daily limit reached for today."
+        )
+        st.info(
+            "To increase your daily limit or renew your access, please subscribe again.\n\n"
+            "Click on the menu at the top-left of the page (three lines or hamburger icon), "
+            "select **'Pay & Subscribe'**, and follow the instructions to pay using card or mobile money."
+        )
         st.stop()
 
     # Increment usage
