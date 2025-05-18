@@ -1,9 +1,15 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import uuid
 import random
+
+# --- Audio recording (optional, handles missing package gracefully) ---
+try:
+    from streamlit_audiorec import st_audiorec
+except ImportError:
+    st_audiorec = None
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -137,25 +143,53 @@ if mode == "Teacher Dashboard":
 
 # --- Practice Mode ---
 if mode == "Practice":
-    # --- Random Language Tips ---
-    language_tips = [
-        "💡 **Tip:** In German, all nouns are capitalized. Example: _Das Haus_ (the house).",
-        "💡 **Tip:** In French, adjectives usually come after the noun. Example: _une voiture rouge_ (a red car).",
-        "💡 **Tip:** English questions often start with a 'Wh-' word (what, where, why, when, who, which, how).",
-        "💡 **Tip:** In German, the verb usually comes second in statements, but first in yes/no questions.",
-        "💡 **Tip:** 'Bitte' in German means 'please', 'you're welcome', and sometimes 'pardon?'.",
-        "💡 **Tip:** French nouns have genders. 'Le' is masculine, 'La' is feminine.",
-        "💡 **Tip:** Practice aloud! Speaking out loud helps you remember new words.",
-        "💡 **Tip:** Consistent short practice sessions are better than one long one. Practice every day!",
-        "💡 **Tip:** In English, don’t forget to use articles: 'a', 'an', 'the'.",
-        "💡 **Tip:** Mistakes are part of learning. Even native speakers make them—just keep practicing!",
-    ]
-    tip = random.choice(language_tips)
+    # --- Language Selector (add as many as you like) ---
+    language = st.selectbox(
+        "Language",
+        ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
+    )
+
+    # --- Language-Specific Tips ---
+    tips_by_lang = {
+        "German": [
+            "💡 In German, all nouns are capitalized. Example: _Das Haus_ (the house).",
+            "💡 'Bitte' in German means 'please', 'you're welcome', and sometimes 'pardon?'."
+        ],
+        "French": [
+            "💡 In French, adjectives usually come after the noun. Example: _une voiture rouge_ (a red car).",
+            "💡 French nouns have genders. 'Le' is masculine, 'La' is feminine."
+        ],
+        "Spanish": [
+            "💡 In Spanish, nouns have gender. 'El' is masculine, 'La' is feminine.",
+            "💡 Most Spanish questions start with an upside-down question mark: ¿Cómo estás?"
+        ],
+        "Italian": [
+            "💡 In Italian, all nouns have gender. 'Il' or 'lo' is masculine, 'la' is feminine.",
+            "💡 Italian adjectives usually come after the noun: _una casa bella_ (a beautiful house)."
+        ],
+        "Portuguese": [
+            "💡 In Portuguese, verbs change endings for each person. Practice conjugations!",
+            "💡 Use 'obrigado' if you're male, 'obrigada' if you're female, to say 'thank you'."
+        ],
+        "Chinese": [
+            "💡 Chinese has no verb conjugation or plurals! The same word serves many purposes.",
+            "💡 Mandarin tones change the meaning of a word. Practice with audio!"
+        ],
+        "Arabic": [
+            "💡 Arabic is written from right to left.",
+            "💡 Most Arabic words are based on three-letter roots."
+        ],
+        "English": [
+            "💡 In English, don’t forget to use articles: 'a', 'an', 'the'.",
+            "💡 English questions often start with a 'Wh-' word."
+        ],
+    }
+    tip = random.choice(tips_by_lang.get(language, ["💡 Practice makes perfect!"]))
     st.info(tip)
 
-    # --- Fun Sir Felix Fact ---
+    # --- Fun Sir Felix Fact (same for all languages for now) ---
     sir_felix_facts = [
-        "Sir Felix speaks German, French, and English fluently!",
+        "Sir Felix speaks German, French, English, and more!",
         "Sir Felix believes that every mistake is a step to mastery.",
         "Sir Felix’s favorite word is 'possibility'.",
         "Sir Felix drinks a lot of virtual coffee to stay alert for your questions!",
@@ -163,8 +197,130 @@ if mode == "Practice":
         "Sir Felix loves puns and language jokes. Ask him one!"
     ]
     fact = random.choice(sir_felix_facts)
-    st.markdown(f"<div style='background:#f6f8ff;border-radius:10px;padding:12px 10px;margin:10px 0;font-size:1em;'>🧑‍🏫 <b>Did you know?</b> {fact}</div>", unsafe_allow_html=True)
+    st.info(f"🧑‍🏫 Did you know? {fact}")
 
+    # --- Daily Challenge (universal for all languages) ---
+    daily_challenges = [
+        "Ask Sir Felix three questions using 'where' or 'when'.",
+        "Write a short greeting in your selected language.",
+        "Try to use a new word from the tip in your next message.",
+        "Describe your favorite food in your selected language.",
+        "Practice a question and an answer.",
+        "Make a sentence using 'because' in your language.",
+        "Try to use the word of the day in a question.",
+        "Write your favorite hobby and ask Sir Felix about his.",
+        "Translate a common phrase from your language to the selected language.",
+        "End today’s practice with a thank you in a new language."
+    ]
+    challenge = random.choice(daily_challenges)
+    st.warning(f"🔥 **Daily Challenge:** {challenge}")
+
+    # --- Personal Progress Chart ---
+    # (Only works after code entry—so move after code validation if you want)
+    # For demo, leave here and catch errors if user hasn't entered code
+    try:
+        if not usage_df.empty and 'access_code' in locals():
+            chart_data = (
+                usage_df[usage_df["user_key"] == access_code]
+                .sort_values("date")
+                .set_index("date")
+            )
+            today = datetime.now().date()
+            last7 = [today - timedelta(days=i) for i in reversed(range(7))]
+            daily_counts = []
+            for d in last7:
+                rows = chart_data.loc[chart_data.index == pd.Timestamp(d)]
+                count = 0
+                if not rows.empty:
+                    count = int(rows["trial_count"].iloc[0] if trial_mode else rows["daily_count"].iloc[0])
+                daily_counts.append(count)
+            st.bar_chart(daily_counts, use_container_width=True)
+            st.caption("Your daily message count (last 7 days)")
+        else:
+            st.caption("No progress yet. Start chatting with Sir Felix!")
+    except Exception:
+        st.caption("Start chatting to see your progress chart!")
+
+    # --- Quiz Questions per Language ---
+    quiz_questions_by_lang = {
+        "German": [
+            {"q": "What is 'hello' in German?", "a": "hallo"},
+            {"q": "What does 'bitte' mean?", "a": "please"},
+            {"q": "Translate to German: 'thank you'", "a": "danke"},
+        ],
+        "French": [
+            {"q": "Translate to French: 'thank you'", "a": "merci"},
+            {"q": "What is 'apple' in French?", "a": "pomme"},
+        ],
+        "Spanish": [
+            {"q": "What is 'good morning' in Spanish?", "a": "buenos días"},
+            {"q": "Translate to Spanish: 'water'", "a": "agua"},
+        ],
+        "Italian": [
+            {"q": "What is 'ciao' in Italian?", "a": "hello"},
+            {"q": "Translate to Italian: 'bread'", "a": "pane"},
+        ],
+        "Portuguese": [
+            {"q": "What does 'obrigado' mean in Portuguese?", "a": "thank you"},
+            {"q": "Translate to Portuguese: 'house'", "a": "casa"},
+        ],
+        "Chinese": [
+            {"q": "What is 'hello' in Chinese (pinyin)?", "a": "ni hao"},
+            {"q": "What does 'xiexie' mean in Chinese?", "a": "thank you"},
+        ],
+        "Arabic": [
+            {"q": "How do you say 'peace' in Arabic?", "a": "salaam"},
+            {"q": "What is 'book' in Arabic?", "a": "kitaab"},
+        ],
+        "English": [
+            {"q": "What is a synonym for 'happy'?", "a": ""},
+            {"q": "Write a question using 'where'.", "a": ""},
+        ]
+    }
+    quiz_questions = quiz_questions_by_lang.get(language, [])
+    if not quiz_questions:
+        quiz_questions = [{"q": f"Type any sentence in {language}!", "a": ""}]
+
+    if "quiz_open" not in st.session_state:
+        st.session_state.quiz_open = False
+
+    if st.button("🎯 Quiz Me!"):
+        st.session_state.quiz_open = True
+        st.session_state.quiz_qs = random.sample(quiz_questions, min(3, len(quiz_questions)))
+        st.session_state.quiz_answers = [""] * len(st.session_state.quiz_qs)
+
+    if st.session_state.quiz_open:
+        st.subheader("📝 Quick Quiz with Sir Felix!")
+        for i, q in enumerate(st.session_state.quiz_qs):
+            ans = st.text_input(f"Q{i+1}: {q['q']}", key=f"quiz_q_{i}")
+            st.session_state.quiz_answers[i] = ans
+        if st.button("Submit Quiz Answers"):
+            for i, q in enumerate(st.session_state.quiz_qs):
+                user_ans = st.session_state.quiz_answers[i]
+                if q["a"]:
+                    if user_ans.strip().lower() == q["a"]:
+                        st.success(f"Q{i+1}: Correct!")
+                    else:
+                        st.warning(f"Q{i+1}: Correct answer: {q['a']}")
+                else:
+                    st.info(f"Q{i+1}: Great effort! Ask Sir Felix in chat for feedback.")
+            st.session_state.quiz_open = False
+            st.caption("Click 'Quiz Me!' for new questions.")
+
+    # --- Audio Pronunciation Practice ---
+    st.markdown("### 🎤 Practice Your Pronunciation (optional)")
+    if st_audiorec is not None:
+        audio_bytes = st_audiorec()
+        if audio_bytes:
+            st.audio(audio_bytes, format="audio/wav")
+            st.success("Recording successful! (Sir Felix will review your pronunciation soon.)")
+        else:
+            st.caption("👆 Press the microphone to record. If it does not work, update your browser, or send your voice note to WhatsApp: 233205706589.")
+    else:
+        st.warning("Audio recording is not supported in this environment or streamlit_audiorec is not installed.")
+        st.caption("You can record a voice note and send it to WhatsApp: 233205706589.")
+
+    # --- Instructions/Help ---
     with st.expander("ℹ️ How to Use / Get Access (click to show)"):
         st.markdown("""
         **Trial Access:**  
@@ -267,7 +423,6 @@ if mode == "Practice":
 
     # --- Settings ---
     with st.expander("⚙️ Settings", expanded=True):
-        language = st.selectbox("Language", ["German", "French", "English"])
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
     # Determine display name
@@ -297,7 +452,7 @@ if mode == "Practice":
             response = client.chat.completions.create(
                 model='gpt-3.5-turbo',
                 messages=[
-                    {'role': 'system', 'content': f"You are Sir Felix, a friendly language tutor. Always encourage and explain simply."},
+                    {'role': 'system', 'content': f"You are Sir Felix, a friendly {language} tutor. Always encourage and explain simply."},
                     *st.session_state['messages']
                 ]
             )
@@ -311,7 +466,7 @@ if mode == "Practice":
             st.markdown(f"**Sir Felix:** {ai_reply}")
 
         # --- GRAMMAR CHECK ---
-        if language in ["German", "French", "English"]:
+        if language in ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]:
             grammar_prompt = (
                 f"You are Sir Felix, a helpful {language} teacher. "
                 f"Check the following sentence for grammar, spelling, and phrasing errors. "
