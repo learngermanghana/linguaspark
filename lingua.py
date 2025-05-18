@@ -1,11 +1,9 @@
 import streamlit as st
 from openai import OpenAI
-import io
-import re
-import requests
 from datetime import datetime
 import pandas as pd
 import uuid
+import os
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -31,77 +29,45 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- Session State Initialization ---
+if "teacher_rerun" not in st.session_state:
+    st.session_state["teacher_rerun"] = False
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
 # --- CSV helpers ---
 students_file = "students.csv"
 trials_file = "trials.csv"
 usage_file = "usage.csv"
 
 def save_paid_df(df):
+    df["expiry"] = df["expiry"].astype(str)
     df.to_csv(students_file, index=False)
 
 def save_trials_df(df):
     df.to_csv(trials_file, index=False)
 
-# --- Load CSV files with fallback ---
-try:
-    paid_df = pd.read_csv(students_file)
-except FileNotFoundError:
-    paid_df = pd.DataFrame(columns=["code", "expiry"])
+def save_usage_df(df):
+    df.to_csv(usage_file, index=False)
 
-try:
-    trials_df = pd.read_csv(trials_file)
-except FileNotFoundError:
-    trials_df = pd.DataFrame(columns=["email", "trial_code", "created"])
+def load_df(path, cols, date_cols=None):
+    try:
+        return pd.read_csv(path, parse_dates=date_cols)
+    except FileNotFoundError:
+        return pd.DataFrame(columns=cols)
 
-try:
-    usage_df = pd.read_csv(usage_file, parse_dates=["date"])
-except FileNotFoundError:
-    usage_df = pd.DataFrame(columns=["user_key", "date", "trial_count", "daily_count"])
+paid_df = load_df(students_file, ["code", "expiry"])
+if not paid_df.empty:
+    paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
 
-# --- Paystack Integration ---
-def create_paystack_payment(email, amount, currency="GHS"):
-    PAYSTACK_SECRET_KEY = st.secrets.get("general", {}).get("PAYSTACK_SECRET_KEY")
-    headers = {
-        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "email": email,
-        "amount": int(amount * 100),
-        "currency": currency,
-        "channels": ["card", "mobile_money"],
-        "callback_url": "https://linguaspark.streamlit.app/"  # Use your app URL here
-    }
-    r = requests.post("https://api.paystack.co/transaction/initialize", json=data, headers=headers)
-    if r.ok:
-        return r.json()["data"]["authorization_url"]
-    else:
-        st.error("Paystack payment link creation failed: " + r.text)
-        return None
-
-def verify_paystack_payment(reference):
-    PAYSTACK_SECRET_KEY = st.secrets.get("general", {}).get("PAYSTACK_SECRET_KEY")
-    headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
-    url = f"https://api.paystack.co/transaction/verify/{reference}"
-    resp = requests.get(url, headers=headers)
-    st.write("Verifying reference:", reference)
-    st.write("Paystack API response:", resp.text)
-    if resp.ok:
-        status = resp.json()["data"]["status"]
-        return status == "success"
-    else:
-        return False
+trials_df = load_df(trials_file, ["email", "trial_code", "created"])
+usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
 # --- Navigation ---
-mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard", "Pay & Subscribe"])
+mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard (Add, Edit, Delete Codes) ---
 if mode == "Teacher Dashboard":
-    # Handle safe rerun using session state
-    if st.session_state.get("teacher_rerun"):
-        st.session_state["teacher_rerun"] = False
-        st.experimental_rerun()
-
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Paid Codes")
@@ -111,7 +77,7 @@ if mode == "Teacher Dashboard":
             new_expiry = col2.date_input("Expiry Date", value=datetime.now())
             add_btn = st.form_submit_button("➕ Add Paid Code")
             if add_btn and new_code and new_code not in paid_df["code"].tolist():
-                paid_df.loc[len(paid_df)] = [new_code, new_expiry]
+                paid_df.loc[len(paid_df)] = [new_code, pd.to_datetime(new_expiry)]
                 save_paid_df(paid_df)
                 st.success(f"Added paid code {new_code}")
                 st.session_state["teacher_rerun"] = True
@@ -119,11 +85,11 @@ if mode == "Teacher Dashboard":
         for idx, row in paid_df.iterrows():
             col1, col2, col3, col4 = st.columns([3, 3, 1, 1])
             col1.text_input(f"Code_{idx}", value=row['code'], key=f"pc_code_{idx}", disabled=True)
-            new_expiry = col2.date_input(f"Expiry_{idx}", value=pd.to_datetime(row['expiry']), key=f"pc_exp_{idx}")
+            new_expiry = col2.date_input(f"Expiry_{idx}", value=row['expiry'], key=f"pc_exp_{idx}")
             edit_btn = col3.button("💾", key=f"pc_save_{idx}")
             del_btn = col4.button("🗑️", key=f"pc_del_{idx}")
             if edit_btn:
-                paid_df.at[idx, "expiry"] = new_expiry
+                paid_df.at[idx, "expiry"] = pd.to_datetime(new_expiry)
                 save_paid_df(paid_df)
                 st.success(f"Updated expiry for {row['code']}")
                 st.session_state["teacher_rerun"] = True
@@ -169,67 +135,38 @@ if mode == "Teacher Dashboard":
         st.info("Enter correct teacher password.")
     st.stop()
 
-# --- Pay & Subscribe (with Paystack) ---
-if mode == "Pay & Subscribe":
-    st.subheader("💳 Subscribe for Full Access (Card & Mobile Money)")
-    st.info(
-        "Payments are handled securely by Paystack. "
-        "You can use VISA/Mastercard or Mobile Money (MTN, Vodafone, AirtelTigo)."
-    )
-    st.markdown("""
-    **How it works:**  
-    1. Enter your email and amount below.  
-    2. Click to pay via Paystack.  
-    3. After payment, you'll be redirected back here.  
-    4. Copy the `reference` code from your browser's address bar (after `?reference=`) and paste it below.  
-    5. Click **Verify Payment** to get your access code instantly!
-    """)
-
-    # Payment link generator
-    email = st.text_input("Your Email for Payment")
-    amount = st.number_input("Amount (GHS)", min_value=1, value=50)
-    if st.button("Pay with Paystack"):
-        pay_url = create_paystack_payment(email, amount)
-        if pay_url:
-            st.markdown(f"[👉 Click here to pay securely with Paystack]({pay_url})", unsafe_allow_html=True)
-            st.success("After payment, copy the reference code from your address bar to verify below.")
-
-    st.markdown("---")
-    st.markdown("#### Enter Your Payment Reference to Get Access Code")
-    reference = st.text_input("Paste your Paystack Payment Reference (from address bar after payment)")
-    if st.button("Verify Payment"):
-        if reference:
-            try:
-                used_refs_df = pd.read_csv("used_references.csv")
-            except FileNotFoundError:
-                used_refs_df = pd.DataFrame(columns=["reference", "email", "paid_code", "date"])
-            if reference in used_refs_df["reference"].tolist():
-                paid_code = used_refs_df.loc[used_refs_df["reference"] == reference, "paid_code"].iloc[0]
-                st.warning(f"This payment has already been used. Your code: **{paid_code}**")
-            else:
-                if verify_paystack_payment(reference):
-                    paid_code = uuid.uuid4().hex[:8]
-                    paid_df.loc[len(paid_df)] = [paid_code, datetime.now() + pd.Timedelta(days=365)]
-                    save_paid_df(paid_df)
-                    new_row = {
-                        "reference": reference,
-                        "email": email,
-                        "paid_code": paid_code,
-                        "date": datetime.now()
-                    }
-                    used_refs_df = pd.concat([used_refs_df, pd.DataFrame([new_row])], ignore_index=True)
-                    used_refs_df.to_csv("used_references.csv", index=False)
-                    st.success(f"✅ Payment successful! Your access code: **{paid_code}**")
-                    st.info("Copy your code and use it to access full features in Practice mode.")
-                else:
-                    st.error("❌ Payment not found or not successful. Double-check your reference code.")
-
 # --- Practice Mode ---
 if mode == "Practice":
+    # --------------- INSTRUCTIONS/WELCOME BANNER ---------------
+    st.markdown(
+        """
+        <div style="background-color:#eaf6ff;padding:18px 14px;border-radius:14px;box-shadow:0 1px 8px #bed5f7;font-size:1.09em;">
+        <b>Welcome to Falowen – Your AI Language Conversation Partner! 👋</b><br><br>
+        <ul style='margin-left:1em;'>
+          <li>
+            <b>Trial Access:</b> Enter your email below to receive a <b>free trial code</b> (limited access).
+          </li>
+          <li>
+            <b>Full Access (Paid):</b> If you have a paid code, enter it below to unlock full unlimited access.
+          </li>
+          <li>
+            <b>How to Get Full Access:</b><br>
+            <b>1.</b> Send payment to <b>233245022743 (Asadu Felix)</b> via Mobile Money (MTN Ghana).<br>
+            <b>2.</b> After payment, confirm with your tutor or contact us via WhatsApp for your paid access code.
+          </li>
+        </ul>
+        <br>
+        <b>Contact:</b> <a href="https://wa.me/233205706589" target="_blank">WhatsApp: 233205706589</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     paid_codes = paid_df["code"].tolist()
-    access_code = st.text_input("Enter your paid or trial code:")
+    access_code = st.text_input("Enter your paid or trial code below 👇:")
+
     if not access_code:
-        st.info("Please enter your code. If you don't have one, request a trial code below.")
+        st.info("Don't have a code? Enter your email to request a free trial code.")
         email_req = st.text_input("Email for trial code")
         if email_req and st.button("Request Trial Code"):
             existing = trials_df[trials_df["email"] == email_req]
@@ -242,7 +179,14 @@ if mode == "Practice":
                 st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
         st.stop()
 
+    # --- Access Code Validation ---
+    trial_mode = False
     if access_code in paid_codes:
+        code_row = paid_df[paid_df["code"] == access_code]
+        expiry = code_row["expiry"].values[0]
+        if pd.isnull(expiry) or pd.to_datetime(expiry) < datetime.now():
+            st.error("Your code has expired. Please subscribe again.")
+            st.stop()
         trial_mode = False
     elif access_code in trials_df["trial_code"].tolist():
         trial_mode = True
@@ -255,6 +199,7 @@ if mode == "Practice":
     mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
     if not mask.any():
         usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
+        save_usage_df(usage_df)
         mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
     row_idx = usage_df[mask].index[0]
     trial_count = int(usage_df.at[row_idx, "trial_count"])
@@ -266,10 +211,9 @@ if mode == "Practice":
             "🔒 Your 5-message trial has ended."
         )
         st.info(
-            "To get unlimited access, please subscribe.\n\n"
-            "Click on the menu at the top-left of the page (three lines or hamburger icon), "
-            "select **'Pay & Subscribe'**, and follow the instructions to pay using card or mobile money. "
-            "Once you pay, you'll receive an access code for full access."
+            "To get unlimited access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
+            "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
+            unsafe_allow_html=True
         )
         st.stop()
 
@@ -278,9 +222,9 @@ if mode == "Practice":
             "🚫 Daily limit reached for today."
         )
         st.info(
-            "To increase your daily limit or renew your access, please subscribe again.\n\n"
-            "Click on the menu at the top-left of the page (three lines or hamburger icon), "
-            "select **'Pay & Subscribe'**, and follow the instructions to pay using card or mobile money."
+            "To increase your daily limit or renew your access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
+            "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
+            unsafe_allow_html=True
         )
         st.stop()
 
@@ -290,7 +234,7 @@ if mode == "Practice":
             usage_df.at[row_idx, "trial_count"] += 1
         else:
             usage_df.at[row_idx, "daily_count"] += 1
-        usage_df.to_csv(usage_file, index=False)
+        save_usage_df(usage_df)
 
     # --- Settings ---
     with st.expander("⚙️ Settings", expanded=True):
@@ -343,8 +287,6 @@ if mode == "Practice":
     )
 
     # --- Chat Interface ---
-    if 'messages' not in st.session_state:
-        st.session_state['messages'] = []
     for msg in st.session_state['messages']:
         with st.chat_message(msg['role']):
             st.markdown(msg['content'])
@@ -355,12 +297,17 @@ if mode == "Practice":
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
         st.chat_message('user').markdown(user_input)
 
-        # AI conversation response
-        response = client.chat.completions.create(
-            model='gpt-3.5-turbo',
-            messages=[{'role': 'system', 'content': f"You are a {level} {language} tutor."}, *st.session_state['messages']]
-        )
-        ai_reply = response.choices[0].message.content
+        try:
+            # AI conversation response
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[{'role': 'system', 'content': f"You are a {level} {language} tutor."}, *st.session_state['messages']]
+            )
+            ai_reply = response.choices[0].message.content
+        except Exception as e:
+            ai_reply = "Sorry, there was a problem generating a response. Please try again."
+            st.error(str(e))
+
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
         st.chat_message('assistant').markdown(ai_reply)
 
@@ -372,10 +319,13 @@ if mode == "Practice":
                 f"Give the corrected sentence and a short explanation. "
                 f"Sentence: {user_input}"
             )
-            grammar_response = client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[{"role": "system", "content": grammar_prompt}],
-                max_tokens=120
-            )
-            grammar_reply = grammar_response.choices[0].message.content.strip()
-            st.info(f"📝 **Grammar Correction:**\n{grammar_reply}")
+            try:
+                grammar_response = client.chat.completions.create(
+                    model='gpt-3.5-turbo',
+                    messages=[{"role": "system", "content": grammar_prompt}],
+                    max_tokens=120
+                )
+                grammar_reply = grammar_response.choices[0].message.content.strip()
+                st.info(f"📝 **Grammar Correction:**\n{grammar_reply}")
+            except Exception as e:
+                st.warning("Grammar check failed. Please try again.")
