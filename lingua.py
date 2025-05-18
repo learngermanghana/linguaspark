@@ -84,6 +84,8 @@ def verify_paystack_payment(reference):
     headers = {"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"}
     url = f"https://api.paystack.co/transaction/verify/{reference}"
     resp = requests.get(url, headers=headers)
+    st.write("Verifying reference:", reference)
+    st.write("Paystack API response:", resp.text)
     if resp.ok:
         status = resp.json()["data"]["status"]
         return status == "success"
