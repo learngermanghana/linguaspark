@@ -194,28 +194,40 @@ if mode == "Practice":
         st.error("Invalid code.")
         st.stop()
 
-    # --- Usage tracking ---
-    today = datetime.now().date()
+# --- Usage tracking ---
+today = datetime.now().date()
+mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
+if not mask.any():
+    usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
+    save_usage_df(usage_df)
     mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
-    if not mask.any():
-        usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
-        save_usage_df(usage_df)
-        mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
-    row_idx = usage_df[mask].index[0]
-    trial_count = int(usage_df.at[row_idx, "trial_count"])
-    daily_count = int(usage_df.at[row_idx, "daily_count"])
+row_idx = usage_df[mask].index[0]
+trial_count = int(usage_df.at[row_idx, "trial_count"])
+daily_count = int(usage_df.at[row_idx, "daily_count"])
 
-    # --- Usage Limits with Clear Payment Instructions ---
-    if trial_mode and trial_count >= 5:
-        st.error(
-            "🔒 Your 5-message trial has ended."
-        )
-        st.info(
-            "To get unlimited access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
-            "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
-            unsafe_allow_html=True
-        )
-        st.stop()
+# --- Usage Limits with Clear Payment Instructions ---
+if trial_mode and trial_count >= 5:
+    st.error(
+        "🔒 Your 5-message trial has ended."
+    )
+    st.markdown(
+        "To get unlimited access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
+        "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
+        unsafe_allow_html=True
+    )
+    st.stop()
+
+if not trial_mode and daily_count >= 30:
+    st.warning(
+        "🚫 Daily limit reached for today."
+    )
+    st.markdown(
+        "To increase your daily limit or renew your access, send payment to <b>233245022743 (Asadu Felix)</b> and confirm with your tutor for your paid access code.<br>"
+        "For help, contact <a href='https://wa.me/233205706589' target='_blank'>WhatsApp: 233205706589</a>.",
+        unsafe_allow_html=True
+    )
+    st.stop()
+
 
     if not trial_mode and daily_count >= 30:
         st.warning(
