@@ -3,6 +3,7 @@ from openai import OpenAI
 from datetime import datetime
 import pandas as pd
 import uuid
+import random
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -136,6 +137,35 @@ if mode == "Teacher Dashboard":
 
 # --- Practice Mode ---
 if mode == "Practice":
+    # --- Random Language Tips ---
+    language_tips = [
+        "💡 **Tip:** In German, all nouns are capitalized. Example: _Das Haus_ (the house).",
+        "💡 **Tip:** In French, adjectives usually come after the noun. Example: _une voiture rouge_ (a red car).",
+        "💡 **Tip:** English questions often start with a 'Wh-' word (what, where, why, when, who, which, how).",
+        "💡 **Tip:** In German, the verb usually comes second in statements, but first in yes/no questions.",
+        "💡 **Tip:** 'Bitte' in German means 'please', 'you're welcome', and sometimes 'pardon?'.",
+        "💡 **Tip:** French nouns have genders. 'Le' is masculine, 'La' is feminine.",
+        "💡 **Tip:** Practice aloud! Speaking out loud helps you remember new words.",
+        "💡 **Tip:** Consistent short practice sessions are better than one long one. Practice every day!",
+        "💡 **Tip:** In English, don’t forget to use articles: 'a', 'an', 'the'.",
+        "💡 **Tip:** Mistakes are part of learning. Even native speakers make them—just keep practicing!",
+    ]
+    tip = random.choice(language_tips)
+    st.info(tip)
+
+    with st.expander("ℹ️ How to Use / Get Access (click to show)"):
+        st.markdown("""
+        **Trial Access:**  
+        - Enter your email below to get a *free trial code* (limited messages).
+
+        **Full Access (Paid):**  
+        - If you have a paid code, enter it below for unlimited access.
+
+        **How to get a paid code:**  
+        1. Send payment to **233245022743 (Asadu Felix)** via Mobile Money (MTN Ghana).  
+        2. After payment, confirm with your tutor or contact WhatsApp: [233205706589](https://wa.me/233205706589)
+        """)
+
     paid_codes = paid_df["code"].tolist()
     access_code = st.text_input("Enter your paid or trial code:")
 
@@ -181,24 +211,41 @@ if mode == "Practice":
 
     # --- Usage Limits with Clear Payment Instructions ---
     if trial_mode and trial_count >= 5:
-        st.error(
-            "🔒 Your 5-message trial has ended."
-        )
+        st.error("🔒 Your 5-message trial has ended.")
         st.info(
-            "To get unlimited access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. For help, contact WhatsApp: 233205706589"
+            "To get unlimited access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
+            "For help, contact WhatsApp: 233205706589"
         )
         st.stop()
 
     if not trial_mode and daily_count >= 30:
-        st.warning(
-            "🚫 Daily limit reached for today."
-        )
+        st.warning("🚫 Daily limit reached for today.")
         st.info(
-            "To increase your daily limit or renew your access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. For help, contact WhatsApp: 233205706589"
+            "To increase your daily limit or renew your access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
+            "For help, contact WhatsApp: 233205706589"
         )
         st.stop()
 
-    # --- Main logic (no extra indentation) ---
+    # --- Gamification Celebrations ---
+    gamification_message = ""
+    if trial_mode:
+        if trial_count == 0:
+            gamification_message = "🎉 Welcome! Start chatting to practice your language skills with Sir Felix."
+        elif trial_count == 1:
+            gamification_message = "🌟 You sent your first message. Keep going!"
+        elif trial_count == 3:
+            gamification_message = "🔥 You’ve sent 3 messages! You're making great progress."
+        elif trial_count == 4:
+            gamification_message = "🚀 One more message left in your free trial. Upgrade for unlimited practice!"
+    else:
+        if daily_count == 0:
+            gamification_message = "🎉 Welcome back! Sir Felix is ready to help you learn today."
+        elif daily_count in [10, 20]:
+            gamification_message = f"🌟 {daily_count} messages sent today! Fantastic dedication."
+
+    if gamification_message:
+        st.success(gamification_message)
+
     def increment_usage(is_trial: bool):
         if is_trial:
             usage_df.at[row_idx, "trial_count"] += 1
@@ -218,48 +265,14 @@ if mode == "Practice":
     else:
         display = "Student"
 
-    # --- Mobile-Optimized Welcome Banner ---
-    st.markdown(
-        f"""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@700;900&display=swap');
-        .custom-banner {{
-            font-family: 'Nunito Sans', Arial, sans-serif !important;
-            color: #153354 !important;
-            background: #e6f0fa !important;
-            padding: 12px 6px;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto 18px auto;
-            font-size: 1.08em;
-            text-align: center;
-            box-sizing: border-box;
-            word-break: break-word;
-            line-height: 1.6;
-            font-weight: 700;
-            box-shadow: 0 2px 8px rgba(20,60,120,0.04);
-        }}
-        @media only screen and (max-width: 600px) {{
-            .custom-banner {{
-                font-size: 0.97em !important;
-                padding: 8px 3px !important;
-                line-height: 1.3;
-            }}
-        }}
-        </style>
-        <div class="custom-banner">
-            👋 <span style='font-weight:900'>{display}</span> – Practice your <b>{level} {language}</b>!<br>
-            <span style='font-size:0.98em;font-weight:600;'>Start chatting below. 💬</span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # --- Chat Interface ---
+    # --- Chat Interface with Mascot ---
     for msg in st.session_state['messages']:
-        with st.chat_message(msg['role']):
-            st.markdown(msg['content'])
+        if msg['role'] == 'assistant':
+            with st.chat_message("assistant", avatar="🧑‍🏫"):
+                st.markdown(f"**Sir Felix:** {msg['content']}")
+        else:
+            with st.chat_message(msg['role']):
+                st.markdown(msg['content'])
 
     user_input = st.chat_input("💬 Type your message here...")
     if user_input:
@@ -271,7 +284,10 @@ if mode == "Practice":
             # AI conversation response
             response = client.chat.completions.create(
                 model='gpt-3.5-turbo',
-                messages=[{'role': 'system', 'content': f"You are a {level} {language} tutor."}, *st.session_state['messages']]
+                messages=[
+                    {'role': 'system', 'content': f"You are Sir Felix, a friendly language tutor. Always encourage and explain simply."},
+                    *st.session_state['messages']
+                ]
             )
             ai_reply = response.choices[0].message.content
         except Exception as e:
@@ -279,12 +295,13 @@ if mode == "Practice":
             st.error(str(e))
 
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
-        st.chat_message('assistant').markdown(ai_reply)
+        with st.chat_message("assistant", avatar="🧑‍🏫"):
+            st.markdown(f"**Sir Felix:** {ai_reply}")
 
         # --- GRAMMAR CHECK ---
         if language in ["German", "French", "English"]:
             grammar_prompt = (
-                f"You are a helpful {language} teacher. "
+                f"You are Sir Felix, a helpful {language} teacher. "
                 f"Check the following sentence for grammar, spelling, and phrasing errors. "
                 f"Give the corrected sentence and a short explanation. "
                 f"Sentence: {user_input}"
@@ -296,6 +313,6 @@ if mode == "Practice":
                     max_tokens=120
                 )
                 grammar_reply = grammar_response.choices[0].message.content.strip()
-                st.info(f"📝 **Grammar Correction:**\n{grammar_reply}")
+                st.info(f"📝 **Sir Felix's Correction:**\n{grammar_reply}")
             except Exception as e:
                 st.warning("Grammar check failed. Please try again.")
