@@ -97,6 +97,11 @@ mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard", "Pay & Sub
 
 # --- Teacher Dashboard (Add, Edit, Delete Codes) ---
 if mode == "Teacher Dashboard":
+    # Handle safe rerun using session state
+    if st.session_state.get("teacher_rerun"):
+        st.session_state["teacher_rerun"] = False
+        st.experimental_rerun()
+
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Paid Codes")
@@ -109,7 +114,8 @@ if mode == "Teacher Dashboard":
                 paid_df.loc[len(paid_df)] = [new_code, new_expiry]
                 save_paid_df(paid_df)
                 st.success(f"Added paid code {new_code}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
         for idx, row in paid_df.iterrows():
             col1, col2, col3, col4 = st.columns([3, 3, 1, 1])
             col1.text_input(f"Code_{idx}", value=row['code'], key=f"pc_code_{idx}", disabled=True)
@@ -120,12 +126,14 @@ if mode == "Teacher Dashboard":
                 paid_df.at[idx, "expiry"] = new_expiry
                 save_paid_df(paid_df)
                 st.success(f"Updated expiry for {row['code']}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
             if del_btn:
                 paid_df = paid_df.drop(idx).reset_index(drop=True)
                 save_paid_df(paid_df)
                 st.success(f"Deleted code {row['code']}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
         st.markdown("---")
         st.subheader("🎫 Manage Trial Codes")
         with st.form("add_trial_code_form"):
@@ -137,7 +145,8 @@ if mode == "Teacher Dashboard":
                 trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
                 save_trials_df(trials_df)
                 st.success(f"Issued trial code {code_val}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
         for idx, row in trials_df.iterrows():
             col1, col2, col3, col4 = st.columns([4, 3, 1, 1])
             new_email = col1.text_input(f"TrialEmail_{idx}", value=row['email'], key=f"tc_email_{idx}")
@@ -148,12 +157,14 @@ if mode == "Teacher Dashboard":
                 trials_df.at[idx, "email"] = new_email
                 save_trials_df(trials_df)
                 st.success(f"Updated trial email for {row['trial_code']}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
             if del_btn:
                 trials_df = trials_df.drop(idx).reset_index(drop=True)
                 save_trials_df(trials_df)
                 st.success(f"Deleted trial code {row['trial_code']}")
-                st.experimental_rerun()
+                st.session_state["teacher_rerun"] = True
+                st.stop()
     else:
         st.info("Enter correct teacher password.")
     st.stop()
