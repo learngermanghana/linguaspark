@@ -5,12 +5,6 @@ import pandas as pd
 import uuid
 import random
 
-# --- Audio recording (optional, handles missing package gracefully) ---
-try:
-    from streamlit_audiorec import st_audiorec
-except ImportError:
-    st_audiorec = None
-
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
@@ -143,7 +137,6 @@ if mode == "Teacher Dashboard":
 
 # --- Practice Mode ---
 if mode == "Practice":
-    # --- Language Selector (add as many as you like) ---
     language = st.selectbox(
         "Language",
         ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
@@ -215,111 +208,6 @@ if mode == "Practice":
     challenge = random.choice(daily_challenges)
     st.warning(f"🔥 **Daily Challenge:** {challenge}")
 
-    # --- Personal Progress Chart ---
-    # (Only works after code entry—so move after code validation if you want)
-    # For demo, leave here and catch errors if user hasn't entered code
-    try:
-        if not usage_df.empty and 'access_code' in locals():
-            chart_data = (
-                usage_df[usage_df["user_key"] == access_code]
-                .sort_values("date")
-                .set_index("date")
-            )
-            today = datetime.now().date()
-            last7 = [today - timedelta(days=i) for i in reversed(range(7))]
-            daily_counts = []
-            for d in last7:
-                rows = chart_data.loc[chart_data.index == pd.Timestamp(d)]
-                count = 0
-                if not rows.empty:
-                    count = int(rows["trial_count"].iloc[0] if trial_mode else rows["daily_count"].iloc[0])
-                daily_counts.append(count)
-            st.bar_chart(daily_counts, use_container_width=True)
-            st.caption("Your daily message count (last 7 days)")
-        else:
-            st.caption("No progress yet. Start chatting with Sir Felix!")
-    except Exception:
-        st.caption("Start chatting to see your progress chart!")
-
-    # --- Quiz Questions per Language ---
-    quiz_questions_by_lang = {
-        "German": [
-            {"q": "What is 'hello' in German?", "a": "hallo"},
-            {"q": "What does 'bitte' mean?", "a": "please"},
-            {"q": "Translate to German: 'thank you'", "a": "danke"},
-        ],
-        "French": [
-            {"q": "Translate to French: 'thank you'", "a": "merci"},
-            {"q": "What is 'apple' in French?", "a": "pomme"},
-        ],
-        "Spanish": [
-            {"q": "What is 'good morning' in Spanish?", "a": "buenos días"},
-            {"q": "Translate to Spanish: 'water'", "a": "agua"},
-        ],
-        "Italian": [
-            {"q": "What is 'ciao' in Italian?", "a": "hello"},
-            {"q": "Translate to Italian: 'bread'", "a": "pane"},
-        ],
-        "Portuguese": [
-            {"q": "What does 'obrigado' mean in Portuguese?", "a": "thank you"},
-            {"q": "Translate to Portuguese: 'house'", "a": "casa"},
-        ],
-        "Chinese": [
-            {"q": "What is 'hello' in Chinese (pinyin)?", "a": "ni hao"},
-            {"q": "What does 'xiexie' mean in Chinese?", "a": "thank you"},
-        ],
-        "Arabic": [
-            {"q": "How do you say 'peace' in Arabic?", "a": "salaam"},
-            {"q": "What is 'book' in Arabic?", "a": "kitaab"},
-        ],
-        "English": [
-            {"q": "What is a synonym for 'happy'?", "a": ""},
-            {"q": "Write a question using 'where'.", "a": ""},
-        ]
-    }
-    quiz_questions = quiz_questions_by_lang.get(language, [])
-    if not quiz_questions:
-        quiz_questions = [{"q": f"Type any sentence in {language}!", "a": ""}]
-
-    if "quiz_open" not in st.session_state:
-        st.session_state.quiz_open = False
-
-    if st.button("🎯 Quiz Me!"):
-        st.session_state.quiz_open = True
-        st.session_state.quiz_qs = random.sample(quiz_questions, min(3, len(quiz_questions)))
-        st.session_state.quiz_answers = [""] * len(st.session_state.quiz_qs)
-
-    if st.session_state.quiz_open:
-        st.subheader("📝 Quick Quiz with Sir Felix!")
-        for i, q in enumerate(st.session_state.quiz_qs):
-            ans = st.text_input(f"Q{i+1}: {q['q']}", key=f"quiz_q_{i}")
-            st.session_state.quiz_answers[i] = ans
-        if st.button("Submit Quiz Answers"):
-            for i, q in enumerate(st.session_state.quiz_qs):
-                user_ans = st.session_state.quiz_answers[i]
-                if q["a"]:
-                    if user_ans.strip().lower() == q["a"]:
-                        st.success(f"Q{i+1}: Correct!")
-                    else:
-                        st.warning(f"Q{i+1}: Correct answer: {q['a']}")
-                else:
-                    st.info(f"Q{i+1}: Great effort! Ask Sir Felix in chat for feedback.")
-            st.session_state.quiz_open = False
-            st.caption("Click 'Quiz Me!' for new questions.")
-
-    # --- Audio Pronunciation Practice ---
-    st.markdown("### 🎤 Practice Your Pronunciation (optional)")
-    if st_audiorec is not None:
-        audio_bytes = st_audiorec()
-        if audio_bytes:
-            st.audio(audio_bytes, format="audio/wav")
-            st.success("Recording successful! (Sir Felix will review your pronunciation soon.)")
-        else:
-            st.caption("👆 Press the microphone to record. If it does not work, update your browser, or send your voice note to WhatsApp: 233205706589.")
-    else:
-        st.warning("Audio recording is not supported in this environment or streamlit_audiorec is not installed.")
-        st.caption("You can record a voice note and send it to WhatsApp: 233205706589.")
-
     # --- Instructions/Help ---
     with st.expander("ℹ️ How to Use / Get Access (click to show)"):
         st.markdown("""
@@ -376,6 +264,23 @@ if mode == "Practice":
     row_idx = usage_df[mask].index[0]
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
+
+    # --- Personal Progress Chart ---
+    chart_data = (
+        usage_df[usage_df["user_key"] == access_code]
+        .sort_values("date")
+        .set_index("date")
+    )
+    last7 = [today - timedelta(days=i) for i in reversed(range(7))]
+    daily_counts = []
+    for d in last7:
+        rows = chart_data.loc[chart_data.index == pd.Timestamp(d)]
+        count = 0
+        if not rows.empty:
+            count = int(rows["trial_count"].iloc[0] if trial_mode else rows["daily_count"].iloc[0])
+        daily_counts.append(count)
+    st.bar_chart(daily_counts, use_container_width=True)
+    st.caption("Your daily message count (last 7 days)")
 
     # --- Usage Limits with Clear Payment Instructions ---
     if trial_mode and trial_count >= 5:
