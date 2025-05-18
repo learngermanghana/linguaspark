@@ -20,22 +20,39 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-st.title("🌟 Falowen – Your AI Conversation Partner")
+
+# Hide Streamlit logo, hamburger, and footer
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .st-emotion-cache-zq5wmm {display:none;}
+    </style>
+""", unsafe_allow_html=True)
+
+# --- CSV helpers ---
+students_file = "students.csv"
+trials_file = "trials.csv"
+usage_file = "usage.csv"
+
+def save_paid_df(df):
+    df.to_csv(students_file, index=False)
+
+def save_trials_df(df):
+    df.to_csv(trials_file, index=False)
 
 # --- Load CSV files with fallback ---
-students_file = "students.csv"
 try:
     paid_df = pd.read_csv(students_file)
 except FileNotFoundError:
     paid_df = pd.DataFrame(columns=["code", "expiry"])
 
-trials_file = "trials.csv"
 try:
     trials_df = pd.read_csv(trials_file)
 except FileNotFoundError:
     trials_df = pd.DataFrame(columns=["email", "trial_code", "created"])
 
-usage_file = "usage.csv"
 try:
     usage_df = pd.read_csv(usage_file, parse_dates=["date"])
 except FileNotFoundError:
@@ -44,28 +61,74 @@ except FileNotFoundError:
 # --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
-# --- Teacher Dashboard (Protected) ---
+# --- Teacher Dashboard (Add, Edit, Delete Codes) ---
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
-        st.subheader("🧑‍🏫 Paid Codes")
-        new_code = st.text_input("New Paid Code")
-        new_expiry = st.date_input("Expiry Date")
-        if st.button("➕ Add Paid Code"):
-            if new_code and new_code not in paid_df["code"].tolist():
+        st.subheader("🧑‍🏫 Manage Paid Codes")
+        
+        # Add New Paid Code
+        with st.form("add_paid_code_form"):
+            col1, col2 = st.columns([2, 2])
+            new_code = col1.text_input("New Paid Code")
+            new_expiry = col2.date_input("Expiry Date", value=datetime.now())
+            add_btn = st.form_submit_button("➕ Add Paid Code")
+            if add_btn and new_code and new_code not in paid_df["code"].tolist():
                 paid_df.loc[len(paid_df)] = [new_code, new_expiry]
-                paid_df.to_csv(students_file, index=False)
+                save_paid_df(paid_df)
                 st.success(f"Added paid code {new_code}")
-        st.dataframe(paid_df)
+                st.experimental_rerun()
+        
+        # Edit/Delete Paid Codes
+        for idx, row in paid_df.iterrows():
+            col1, col2, col3, col4 = st.columns([3, 3, 1, 1])
+            col1.text_input(f"Code_{idx}", value=row['code'], key=f"pc_code_{idx}", disabled=True)
+            new_expiry = col2.date_input(f"Expiry_{idx}", value=pd.to_datetime(row['expiry']), key=f"pc_exp_{idx}")
+            edit_btn = col3.button("💾", key=f"pc_save_{idx}")
+            del_btn = col4.button("🗑️", key=f"pc_del_{idx}")
+            if edit_btn:
+                paid_df.at[idx, "expiry"] = new_expiry
+                save_paid_df(paid_df)
+                st.success(f"Updated expiry for {row['code']}")
+                st.experimental_rerun()
+            if del_btn:
+                paid_df = paid_df.drop(idx).reset_index(drop=True)
+                save_paid_df(paid_df)
+                st.success(f"Deleted code {row['code']}")
+                st.experimental_rerun()
+        
+        st.markdown("---")
+        st.subheader("🎫 Manage Trial Codes")
+        
+        # Add New Trial Code
+        with st.form("add_trial_code_form"):
+            col1, col2 = st.columns([3, 2])
+            new_email = col1.text_input("New Trial Email")
+            add_trial_btn = col2.form_submit_button("Issue Trial Code")
+            if add_trial_btn and new_email:
+                code_val = uuid.uuid4().hex[:8]
+                trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
+                save_trials_df(trials_df)
+                st.success(f"Issued trial code {code_val}")
+                st.experimental_rerun()
 
-        st.subheader("🎫 Trial Codes")
-        new_email = st.text_input("New Trial Email")
-        if st.button("Issue Trial Code"):
-            code_val = uuid.uuid4().hex[:8]
-            trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
-            trials_df.to_csv(trials_file, index=False)
-            st.success(f"Issued trial code {code_val}")
-        st.dataframe(trials_df)
+        # Edit/Delete Trial Codes
+        for idx, row in trials_df.iterrows():
+            col1, col2, col3, col4 = st.columns([4, 3, 1, 1])
+            new_email = col1.text_input(f"TrialEmail_{idx}", value=row['email'], key=f"tc_email_{idx}")
+            col2.text_input(f"TrialCode_{idx}", value=row['trial_code'], key=f"tc_code_{idx}", disabled=True)
+            edit_btn = col3.button("💾", key=f"tc_save_{idx}")
+            del_btn = col4.button("🗑️", key=f"tc_del_{idx}")
+            if edit_btn:
+                trials_df.at[idx, "email"] = new_email
+                save_trials_df(trials_df)
+                st.success(f"Updated trial email for {row['trial_code']}")
+                st.experimental_rerun()
+            if del_btn:
+                trials_df = trials_df.drop(idx).reset_index(drop=True)
+                save_trials_df(trials_df)
+                st.success(f"Deleted trial code {row['trial_code']}")
+                st.experimental_rerun()
     else:
         st.info("Enter correct teacher password.")
     st.stop()
@@ -81,7 +144,7 @@ if not access_code:
         if existing.empty:
             new_code = uuid.uuid4().hex[:8]
             trials_df.loc[len(trials_df)] = [email_req, new_code, datetime.now()]
-            trials_df.to_csv(trials_file, index=False)
+            save_trials_df(trials_df)
             st.success(f"Your trial code: {new_code}")
         else:
             st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
@@ -131,32 +194,39 @@ if trial_mode:
 else:
     display = "Student"
 
-# --- Mobile-Optimized Welcome Banner ---
+# --- Mobile-Optimized Welcome Banner (custom font, dark text, modern style) ---
 st.markdown(
     f"""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@700;900&display=swap');
+    .custom-banner {{
+        font-family: 'Nunito Sans', Arial, sans-serif !important;
+        color: #153354 !important;
+        background: #e6f0fa !important;
+        padding: 12px 6px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto 18px auto;
+        font-size: 1.08em;
+        text-align: center;
+        box-sizing: border-box;
+        word-break: break-word;
+        line-height: 1.6;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(20,60,120,0.04);
+    }}
     @media only screen and (max-width: 600px) {{
         .custom-banner {{
-            font-size: 0.98em !important;
-            padding: 8px 4px !important;
+            font-size: 0.97em !important;
+            padding: 8px 3px !important;
             line-height: 1.3;
         }}
     }}
     </style>
-    <div class="custom-banner" style='
-        padding:12px 6px; 
-        border-radius:10px; 
-        background:#e0f7fa; 
-        width:100%;
-        max-width:600px;
-        margin:0 auto 16px auto;
-        font-size:1.05em;
-        text-align:center;
-        box-sizing:border-box;
-        word-break:break-word;
-        line-height:1.5;
-    '>
-        👋 <b>{display}</b> – Practice your <b>{level} {language}</b>! Start chatting below. 💬
+    <div class="custom-banner">
+        👋 <span style='font-weight:900'>{display}</span> – Practice your <b>{level} {language}</b>!<br>
+        <span style='font-size:0.98em;font-weight:600;'>Start chatting below. 💬</span>
     </div>
     """,
     unsafe_allow_html=True
