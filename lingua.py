@@ -135,6 +135,12 @@ if mode == "Teacher Dashboard":
         st.info("Enter correct teacher password.")
     st.stop()
 
+st.markdown("""
+    <h1 style='font-size:2.4em; margin-bottom: 0.2em;'>🌟 Falowen – Your AI Conversation Partner</h1>
+    <div style='font-size:1.1em; margin-bottom: 1em; color:#446;'>Practice and improve your language skills with Sir Felix!</div>
+""", unsafe_allow_html=True)
+
+
 # --- Practice Mode ---
 if mode == "Practice":
     language = st.selectbox(
