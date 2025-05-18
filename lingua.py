@@ -3,7 +3,6 @@ from openai import OpenAI
 from datetime import datetime
 import pandas as pd
 import uuid
-import os
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -140,16 +139,20 @@ if mode == "Practice":
     # --------------- MOBILE-OPTIMIZED INSTRUCTIONS/WELCOME BANNER ---------------
     st.markdown(
         """
-        <div style="background-color:#eaf6ff;padding:14px 10px;border-radius:14px;box-shadow:0 1px 8px #bed5f7;font-size:1.08em;line-height:1.65;">
-        <b>Welcome to Falowen – Your AI Language Conversation Partner! 👋</b><br><br>
+        <div style="background-color:#eaf6ff;padding:16px 8px 16px 8px;border-radius:14px;box-shadow:0 1px 8px #bed5f7;font-size:1.08em;line-height:1.65;">
+        <b>Welcome to Falowen – Your AI Language Conversation Partner! 👋</b>
+        <br><br>
         <span style="font-size:1em;">
-        🔹 <b>Trial Access:</b> Enter your email below to get a <b>free trial code</b> (limited access).<br>
-        🔹 <b>Full Access (Paid):</b> If you have a paid code, enter it below to unlock full access.<br>
-        <br>
+        🔹 <b>Trial Access</b>:<br>
+        Enter your email below to get a <b>free trial code</b> (limited access).
+        <br><br>
+        🔹 <b>Full Access (Paid)</b>:<br>
+        If you have a paid code, enter it below to unlock full access.
+        <br><br>
         <b>How to Get Full Access:</b><br>
         1️⃣ Send payment to <b>233245022743 (Asadu Felix)</b> via Mobile Money (MTN Ghana).<br>
-        2️⃣ After payment, confirm with your tutor or WhatsApp us for your paid access code.<br>
-        <br>
+        2️⃣ After payment, confirm with your tutor or WhatsApp us for your paid access code.
+        <br><br>
         <b>Contact:</b> <a href="https://wa.me/233205706589" target="_blank">WhatsApp: 233205706589</a>
         </span>
         </div>
