@@ -396,7 +396,7 @@ if mode == "Practice":
                 st.warning("Grammar check failed. Please try again.")
 
     # --- Social Sharing Button (after chat) ---
-    share_text = "I just practiced my language skills with Sir Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
+    share_text = "I just practiced my language skills with Sir Felix on Falowen! 🌟 Try it too: https://linguaspark.streamlit.app/"
     share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
     st.markdown(
         f'<a href="{share_url}" target="_blank">'
