@@ -7,21 +7,19 @@ import tempfile
 import io
 from gtts import gTTS
 
-# --- Secure API key ---
+# ---- API and data setup ----
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
     st.error("❌ API key not found. Add it to .streamlit/secrets.toml under [general]")
     st.stop()
 client = OpenAI(api_key=api_key)
 
-# --- Page setup ---
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Hide Streamlit logo, hamburger, and footer
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -34,12 +32,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Mascot + Welcome ---
 st.markdown("## 🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
 st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
-# --- Session State Initialization ---
 if "teacher_rerun" not in st.session_state:
     st.session_state["teacher_rerun"] = False
 if "messages" not in st.session_state:
@@ -47,7 +43,6 @@ if "messages" not in st.session_state:
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 
-# --- CSV helpers ---
 students_file = "students.csv"
 trials_file = "trials.csv"
 usage_file = "usage.csv"
@@ -71,11 +66,9 @@ def load_df(path, cols, date_cols=None):
 paid_df = load_df(students_file, ["code", "expiry"])
 if not paid_df.empty:
     paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
-
 trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
-# --- Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard (Add, Edit, Delete Codes) ---
@@ -147,10 +140,9 @@ if mode == "Teacher Dashboard":
         st.info("Enter correct teacher password.")
     st.stop()
 
-# --- Practice Mode ---
+# ---- Practice Mode ----
 if mode == "Practice":
-    language = st.selectbox(
-        "🌍 Choose your language", 
+    language = st.selectbox("🌍 Choose your language", 
         ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
     )
 
@@ -167,10 +159,10 @@ if mode == "Practice":
         2. After payment, confirm with your tutor or contact WhatsApp: [233205706589](https://wa.me/233205706589)
         """)
 
+    # --- Access control (nothing shown before valid code) ---
     paid_codes = paid_df["code"].tolist()
     access_code = st.text_input("🔐 Enter your paid or trial code:")
 
-    # --- Only process further after a valid code is entered! ---
     if not access_code:
         st.info("Don't have a code? Enter your email to request a free trial code.")
         email_req = st.text_input("Email for trial code")
@@ -209,22 +201,9 @@ if mode == "Practice":
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
 
-    if trial_mode and trial_count >= 5:
-        st.error("🔒 Your 5-message trial has ended.")
-        st.info(
-            "To get unlimited access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
-            "For help, contact WhatsApp: 233205706589"
-        )
-        st.stop()
+    # ---- Student widgets, progress, chat, etc. shown only after login ----
 
-    if not trial_mode and daily_count >= 30:
-        st.warning("🚫 Daily limit reached for today.")
-        st.info(
-            "To increase your daily limit or renew your access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
-            "For help, contact WhatsApp: 233205706589"
-        )
-        st.stop()
-
+    # --- Gamification (appears only after login) ---
     gamification_message = ""
     if trial_mode:
         if trial_count == 0:
@@ -244,17 +223,9 @@ if mode == "Practice":
     if gamification_message:
         st.success(gamification_message)
 
-    def increment_usage(is_trial: bool):
-        if is_trial:
-            usage_df.at[row_idx, "trial_count"] += 1
-        else:
-            usage_df.at[row_idx, "daily_count"] += 1
-        save_usage_df(usage_df)
-
     with st.expander("⚙️ Settings", expanded=True):
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
-    # --- Dynamic prompt for level ---
     if level in ["A1", "A2"]:
         ai_level_prompt = (
             "Always answer using very simple, short sentences suitable for A1 or A2 students. "
@@ -286,8 +257,6 @@ if mode == "Practice":
     typed_message = st.chat_input("💬 Or type your message here...")
 
     user_input = None
-
-    # --- AUDIO LOGIC: Show transcript and submit only when audio is uploaded ---
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         if not st.session_state.get("transcript"):
@@ -316,7 +285,7 @@ if mode == "Practice":
         if typed_message:
             user_input = typed_message
 
-    # --- Chat Interface with colored message bubbles ---
+    # --- Chat display ---
     for msg in st.session_state['messages']:
         if msg['role'] == 'assistant':
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -325,14 +294,16 @@ if mode == "Practice":
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # --- User Message Submission Logic (AI chat + audio feedback) ---
     if user_input:
-        increment_usage(trial_mode)
+        if trial_mode:
+            usage_df.at[row_idx, "trial_count"] += 1
+        else:
+            usage_df.at[row_idx, "daily_count"] += 1
+        save_usage_df(usage_df)
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
         with st.chat_message('user'):
             st.markdown(f"🗣️ {user_input}")
 
-        # -- AI conversation (dynamic level prompt) --
         try:
             ai_system_prompt = (
                 f"You are Sir Felix, a friendly {language} tutor. "
@@ -372,7 +343,6 @@ if mode == "Practice":
             except Exception:
                 st.info("Audio feedback not available for this language or an error occurred.")
 
-        # --- Grammar correction, dynamically adjusted ---
         if language in ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]:
             grammar_prompt = (
                 f"You are a {language} teacher helping {level} students. "
@@ -390,7 +360,6 @@ if mode == "Practice":
             except Exception as e:
                 st.warning("Grammar check failed. Please try again.")
 
-    # --- Social Sharing Button (after chat) ---
     share_text = "I just practiced my language skills with Sir Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
     share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
     st.markdown(
