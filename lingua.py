@@ -1,5 +1,8 @@
 import streamlit as st
 from openai import OpenAI
+from datetime import datetime
+import pandas as pd
+import uuid
 import random
 import speech_recognition as sr
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
@@ -14,7 +17,7 @@ client = OpenAI(api_key=api_key)
 
 # --- Page setup ---
 st.set_page_config(
-    page_title="Falowen – Dein KI-Sprachpartner (Deutsch)",
+    page_title="Falowen – Your AI Conversation Partner",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -26,114 +29,97 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Daily Tip ---
-daily_tips = [
-    "💡 Tipp: Übe jeden Tag 5 neue Wörter.",
-    "💡 Tipp: Wiederhole laut, um die Aussprache zu verbessern.",
-    "💡 Tipp: Schreibe kurze Sätze und bitte Sir Felix um Korrektur.",
-    "💡 Tipp: Höre einfache deutsche Podcasts für 5 Minuten.",
-    "💡 Tipp: Sprich mit dir selbst, um flüssiger zu werden."
-]
-st.info(random.choice(daily_tips))
-
-# --- Initialize chat state ---
+# --- Session State Initialization ---
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state["messages"] = []
 
 # --- Speech recognition helper ---
-def recognize_speech(audio_bytes, language="de-DE"):
+def recognize_speech(audio_bytes, language="en-US"):
     recognizer = sr.Recognizer()
     audio_data = sr.AudioData(audio_bytes, sample_rate=44100, sample_width=2)
     try:
-        return recognizer.recognize_google(audio_data, language=language)
+        text = recognizer.recognize_google(audio_data, language=language)
+        return text
     except sr.UnknownValueError:
         return "Sorry, I couldn't understand your speech."
     except sr.RequestError:
         return "Couldn't request results. Check your internet."
 
 # --- UI components ---
-st.title("🧑‍🏫 Falowen – Dein KI-Sprachpartner (Deutsch)")
+st.title("🧑‍🏫 Falowen – Your AI Conversation Partner")
+
+# Language selection
+language = st.selectbox("🌐 Choose your language", ["German", "English", "French", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"])
+language_codes = {"German": "de-DE", "English": "en-US", "French": "fr-FR", "Spanish": "es-ES",
+                  "Italian": "it-IT", "Portuguese": "pt-PT", "Chinese": "zh-CN", "Arabic": "ar-SA"}
 
 # --- Chat Interface ---
-st.subheader("💬 Chat mit Sir Felix")
-for msg in st.session_state.messages:
-    if msg['role'] == 'user':
-        st.chat_message("user").markdown(msg['content'])
-    else:
-        st.chat_message("assistant", avatar="🧑‍🏫").markdown(msg['content'])
+for msg in st.session_state['messages']:
+    role = "🧑‍🏫 Sir Felix" if msg['role'] == 'assistant' else "👤 You"
+    st.markdown(f"**{role}:** {msg['content']}")
 
-user_input = st.chat_input("Schreibe hier deine Nachricht...")
+user_input = st.chat_input("💬 Type your message...")
 if user_input:
-    st.session_state.messages.append({'role': 'user', 'content': user_input})
-    st.chat_message("user").markdown(user_input)
+    st.session_state['messages'].append({'role': 'user', 'content': user_input})
+
+    # GPT Response
     response = client.chat.completions.create(
         model='gpt-3.5-turbo',
-        messages=[{'role': 'system', 'content': 'Du bist Sir Felix, ein freundlicher Deutschlehrer. Ermutige Schüler und erkläre einfach.'}, *st.session_state.messages]
+        messages=[
+            {'role': 'system', 'content': f"You are Sir Felix, a friendly {language} tutor."},
+            *st.session_state['messages']
+        ]
     )
     ai_reply = response.choices[0].message.content
-    st.session_state.messages.append({'role': 'assistant', 'content': ai_reply})
-    st.chat_message("assistant", avatar="🧑‍🏫").markdown(ai_reply)
+    st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
 
-# --- Sidebar: Exam Preparation ---
-st.sidebar.header("📚 Goethe Prüfen (Deutsch)")
-level = st.sidebar.selectbox("Wähle Niveau", ["A1", "A2", "B1"])  
+    # Display response
+    st.markdown(f"🧑‍🏫 **Sir Felix:** {ai_reply}")
 
-# --- A1 Module ---
-if level == "A1":
-    section = st.sidebar.radio("Teil auswählen", ["Teil 1: Vorstellung", "Teil 2: Thema & Keyword", "Teil 3: Bitten"])
-    if section == "Teil 1: Vorstellung":
-        st.header("👋 A1 Teil 1 – Vorstellung")
-        name = st.text_input("Name:")
-        alter = st.text_input("Alter:")
-        ort = st.text_input("Wohnort:")
-        if st.button("✅ Überprüfen der Vorstellung"):
-            text = f"Ich heiße {name}. Ich bin {alter} Jahre alt. Ich wohne in {ort}."
-            st.success(text)
-            prompt = f"Korrigiere diesen A1-Vorstellungstext:\n{text}"
-            res = client.chat.completions.create(model='gpt-3.5-turbo', messages=[{"role":"system","content":prompt}], max_tokens=100)
-            st.info(res.choices[0].message.content.strip())
-    elif section == "Teil 2: Thema & Keyword":
-        st.header("🗣️ A1 Teil 2 – Thema & Keyword")
-        vocab = [("Geschäft","schließen"),("Uhr","Uhrzeit"),("Arbeit","Kollege"),("Hausaufgabe","machen"),("Küche","kochen"),("Freizeit","lesen"),("Telefon","anrufen"),("Reise","Hotel"),("Auto","fahren"),("Einkaufen","Obst")]
-        thema, keyw = random.choice(vocab)
-        st.info(f"Thema: **{thema}**, Keyword: **{keyw}**")
-        sentence = st.text_input("Dein Satz:")
-        if st.button("✅ Satz prüfen"):
-            prompt = f"Korrigiere diesen A1-Satz:\n{sentence}"
-            res = client.chat.completions.create(model='gpt-3.5-turbo', messages=[{"role":"system","content":prompt}], max_tokens=100)
-            st.success(res.choices[0].message.content.strip())
-    else:
-        st.header("🙏 A1 Teil 3 – Bitten")
-        prompts = ["Radio anmachen","Fenster zummachen","Licht anschalten"]
-        req = random.choice(prompts)
-        st.info(f"Prompt: **{req}**")
-        req_text = st.text_input("Deine Bitte:")
-        if st.button("✅ Bitte prüfen"):
-            prompt = f"Korrigiere diese A1-Bitte:\n{req_text}"
-            res = client.chat.completions.create(model='gpt-3.5-turbo', messages=[{"role":"system","content":prompt}], max_tokens=100)
-            st.success(res.choices[0].message.content.strip())
-# --- A2 Module ---
-elif level == "A2":
-    section = st.sidebar.radio("Teil auswählen", ["Teil 1: Vorstellung", "Teil 2: Präsentation", "Teil 3: Planung"])
-    if section == "Teil 2: Präsentation":
-        st.header("🗣️ A2 Teil 2 – Präsentation")
-        topics = ["Mein letzter Urlaub","Meine Familie"]
-        top = random.choice(topics)
-        st.info(f"Thema: **{top}**")
-        pres = st.text_area("Deine Präsentation:")
-        if st.button("✅ Präsentation prüfen"):
-            prompt = f"Korrigiere diese A2-Präsentation:\n{pres}"
-            res = client.chat.completions.create(model='gpt-3.5-turbo', messages=[{"role":"system","content":prompt}], max_tokens=150)
-            st.success(res.choices[0].message.content.strip())
-# --- B1 Module ---
-elif level == "B1":
-    st.header("🗣️ B1 Teil 2 – Präsentation")
-    topics_b1 = ["Ausbildung","Freundschaft","Umweltschutz"]
-    tb = random.choice(topics_b1)
-    st.info(f"Thema: **{tb}**")
-    speech = st.text_area("Deine Präsentation:")
-    if st.button("✅ Prüfung"):
-        prompt = f"Korrigiere diese B1-Präsentation:\n{speech}"
-        res = client.chat.completions.create(model='gpt-3.5-turbo', messages=[{"role":"system","content":prompt}], max_tokens=200)
-        st.success(res.choices[0].message.content.strip())
-st.caption("🔖 Mikrofonberechtigung für Sprechen aktivieren.")
+    # Grammar Check
+    grammar_prompt = f"Check grammar, spelling, and phrasing: '{user_input}'. Provide corrections and explanations."
+    grammar_response = client.chat.completions.create(
+        model='gpt-3.5-turbo',
+        messages=[{"role": "system", "content": grammar_prompt}],
+        max_tokens=120
+    )
+    grammar_reply = grammar_response.choices[0].message.content.strip()
+    st.info(f"📝 **Sir Felix's Correction:** {grammar_reply}")
+
+# --- Speaking (Speech Recognition) ---
+st.markdown("---")
+st.subheader("🎙️ Speak to Sir Felix")
+
+def audio_frame_callback(frame):
+    audio = frame.to_ndarray(format="flt32", layout="mono")
+    return av.AudioFrame.from_ndarray(audio, format="flt32", layout="mono")
+
+webrtc_ctx = webrtc_streamer(
+    key="speech-to-text",
+    mode=WebRtcMode.SENDRECV,
+    audio_frame_callback=audio_frame_callback,
+    media_stream_constraints={"audio": True, "video": False},
+    async_processing=True,
+)
+
+if webrtc_ctx.audio_receiver:
+    audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=2)
+    audio_bytes = b''.join([frame.to_ndarray(format="pcm_s16le").tobytes() for frame in audio_frames])
+
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/wav")
+
+        if st.button("🗣️ Transcribe and Correct"):
+            transcript = recognize_speech(audio_bytes, language_codes.get(language, "en-US"))
+            st.success(f"🎧 Transcription: {transcript}")
+
+            grammar_prompt = f"Check grammar, spelling, phrasing: '{transcript}'. Provide corrections and explanations."
+            grammar_response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[{"role": "system", "content": grammar_prompt}],
+                max_tokens=120
+            )
+            grammar_reply = grammar_response.choices[0].message.content.strip()
+            st.info(f"📝 **Correction:** {grammar_reply}")
+
+st.caption("🔖 Ensure microphone permissions are enabled. Best on Chrome or Firefox.")
