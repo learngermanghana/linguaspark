@@ -52,7 +52,7 @@ language_codes = {
 
 # --- Goethe Exam Preparation ---
 st.sidebar.header("📚 Goethe Exam Prep")
-level = st.sidebar.selectbox("Select Level", ["A1", "A2", "B1", "B2"])
+level = st.sidebar.selectbox("Select Level", ["A1", "A2", "B1"])
 
 # --- A1 Module ---
 if level == "A1":
@@ -65,12 +65,14 @@ if level == "A1":
         for field in fields:
             answers[field] = st.text_input(f"{field}:")
         if st.button("✅ Check Self-introduction"):
-            intro = "Ich heiße {}. Ich bin {} Jahre alt. Ich komme aus {}. Ich wohne in {}. Ich spreche {}. Ich arbeite als {}. Mein Hobby ist {}.".format(
-                answers['Name'], answers['Alter'], answers['Land'], answers['Wohnort'],
-                answers['Sprachen'], answers['Beruf'], answers['Hobby']
+            intro = (
+                f"Ich heiße {answers['Name']}. Ich bin {answers['Alter']} Jahre alt. "
+                f"Ich komme aus {answers['Land']}. Ich wohne in {answers['Wohnort']}. "
+                f"Ich spreche {answers['Sprachen']}. Ich arbeite als {answers['Beruf']}. "
+                f"Mein Hobby ist {answers['Hobby']}."
             )
             st.success(intro)
-            prompt = f"Correct this A1-level introduction text for grammar and simplicity:\n{intro}"
+            prompt = f"Correct this A1-level introduction for grammar and simplicity:\n{intro}"
             resp = client.chat.completions.create(
                 model='gpt-3.5-turbo',
                 messages=[{"role":"system","content":prompt}],
@@ -102,25 +104,25 @@ if level == "A1":
         if st.button("✅ Check Sentence"):
             if not sentence.strip(): st.warning("Bitte eingeben.")
             else:
-                p = f"You are a German A1 teacher. Check this sentence for correctness and simplicity:\n{sentence}"
+                p = f"You are a German A1 teacher. Correct this sentence for correctness and simplicity:\n{sentence}"
                 r = client.chat.completions.create(
                     model='gpt-3.5-turbo',
                     messages=[{"role":"system","content":p}],
                     max_tokens=120
                 )
-                st.success(f"📝 **Korrigiert:**\n{r.choices[0].message.content.strip()}")
+                st.success(f"📝 Correction:\n{r.choices[0].message.content.strip()}")
 
     else:
         st.header("🙏 A1 Teil 3 – Bitten (Requests)")
         prompts = [
-            "Radio anmachen","Fenster zummachen","Licht anschalten","Tür aufmachen","Tisch sauber machen",
+            "Radio anmachen","Fenster zumachen","Licht anschalten","Tür aufmachen","Tisch sauber machen",
             "Hausaufgaben schicken","Buch bringen","Handy ausmachen","Stuhl nehmen","Wasser holen",
             "Fenster öffnen","Musik leiser machen","Tafel sauber wischen","Kaffee kochen","Deutsch üben",
             "Auto waschen","Kind abholen","Tisch decken","Termin machen","Nachricht schreiben"
         ]
         req = random.choice(prompts)
         st.info(f"Prompt: **{req}**")
-        st.markdown("**Make a polite request using 'bitte' or modal verbs.**")
+        st.markdown("**Make a polite request using 'bitte' or a modal verb.**")
         req_text = st.text_input("Ihre Bitte:")
         if st.button("✅ Check Request"):
             if not req_text.strip(): st.warning("Bitte eingeben.")
@@ -131,7 +133,7 @@ if level == "A1":
                     messages=[{"role":"system","content":p}],
                     max_tokens=120
                 )
-                st.success(f"📝 **Korrigiert:**\n{r.choices[0].message.content.strip()}")
+                st.success(f"📝 Correction:\n{r.choices[0].message.content.strip()}")
 
 # --- A2 Module ---
 elif level == "A2":
@@ -177,7 +179,7 @@ elif level == "A2":
                     messages=[{"role":"system","content":gp}],
                     max_tokens=200
                 )
-                st.success(f"📝 Korrigiert:\n{r.choices[0].**message**.content.strip()}")
+                st.success(f"📝 Korrigiert:\n{r.choices[0].message.content.strip()}")
 
     else:
         st.header("🤝 A2 Teil 3 – Planning a Joint Activity")
