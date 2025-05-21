@@ -7,7 +7,8 @@ import tempfile
 import io
 from gtts import gTTS
 
-# ---- API and data setup ----napi_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
+# ---- API and data setup ----
+api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
     st.error("❌ API key not found. Add it to .streamlit/secrets.toml under [general]")
     st.stop()
