@@ -5,12 +5,8 @@ import pandas as pd
 import uuid
 import random
 import tempfile
-
-# --- Audio recording (optional, handles missing package gracefully) ---
-try:
-    from streamlit_audiorec import st_audiorec
-except ImportError:
-    st_audiorec = None
+import io
+from gtts import gTTS
 
 # --- Secure API key ---
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
@@ -150,50 +146,7 @@ if mode == "Practice":
         ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
     )
 
-    # ... [tips, facts, challenge, chart, quiz - unchanged] ...
-
-    # --- Audio Pronunciation Practice ---
-    st.markdown("### 🎤 Practice Your Pronunciation (optional)")
-    if st_audiorec is not None:
-        audio_bytes = st_audiorec()
-        if audio_bytes:
-            st.audio(audio_bytes, format="audio/wav")
-            st.success("Recording successful! (Sir Felix will review your pronunciation soon.)")
-        else:
-            st.caption("👆 Press the microphone to record. If it does not work, update your browser, or send your voice note to WhatsApp: 233205706589.")
-    else:
-        st.warning("Audio recording is not supported in this environment or streamlit_audiorec is not installed.")
-        st.caption("You can record a voice note and send it to WhatsApp: 233205706589.")
-
-    # --- Audio Upload Option ---
-    st.markdown("#### Or upload an audio file instead of typing:")
-    uploaded_audio = st.file_uploader(
-        "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"]
-    )
-
-    user_input = None
-    if uploaded_audio is not None:
-        st.audio(uploaded_audio)
-        # Optional: Transcribe with Whisper if available
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                tmp.write(uploaded_audio.read())
-                tmp.flush()
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=open(tmp.name, "rb")
-            )
-            st.success("**Transcription:**")
-            st.write(transcript.text)
-            # Use transcript as if it were a typed input
-            user_input = transcript.text
-        except Exception as e:
-            st.warning("Transcription failed. Please try again or type your message.")
-            user_input = None
-    else:
-        user_input = st.chat_input("💬 Type your message here...")
-
-    # --- Instructions/Help ---  [unchanged]
+    # --- Instructions/Help ---
     with st.expander("ℹ️ How to Use / Get Access (click to show)"):
         st.markdown("""
         **Trial Access:**  
@@ -224,7 +177,7 @@ if mode == "Practice":
                 st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
         st.stop()
 
-    # --- Access Code Validation ---  [unchanged]
+    # --- Access Code Validation ---
     trial_mode = False
     if access_code in paid_codes:
         code_row = paid_df[paid_df["code"] == access_code]
@@ -239,7 +192,7 @@ if mode == "Practice":
         st.error("Invalid code.")
         st.stop()
 
-    # --- Usage tracking ---  [unchanged]
+    # --- Usage tracking ---
     today = datetime.now().date()
     mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
     if not mask.any():
@@ -250,7 +203,7 @@ if mode == "Practice":
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
 
-    # --- Usage Limits with Clear Payment Instructions ---  [unchanged]
+    # --- Usage Limits with Clear Payment Instructions ---
     if trial_mode and trial_count >= 5:
         st.error("🔒 Your 5-message trial has ended.")
         st.info(
@@ -267,7 +220,7 @@ if mode == "Practice":
         )
         st.stop()
 
-    # --- Gamification Celebrations ---  [unchanged]
+    # --- Gamification Celebrations ---
     gamification_message = ""
     if trial_mode:
         if trial_count == 0:
@@ -294,16 +247,37 @@ if mode == "Practice":
             usage_df.at[row_idx, "daily_count"] += 1
         save_usage_df(usage_df)
 
-    # --- Settings ---  [unchanged]
+    # --- Settings ---
     with st.expander("⚙️ Settings", expanded=True):
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
-    # Determine display name
-    if trial_mode:
-        row = trials_df[trials_df["trial_code"] == access_code]
-        display = row["email"].values[0].split("@")[0].replace('.', ' ').title() if not row.empty else "Learner"
+    # --- Short tip and audio upload only ---
+    st.markdown("### 🎤 Upload Your Pronunciation")
+    st.caption("🎤 Tip: Record at [vocaroo.com](https://www.vocaroo.com) or with your phone's voice recorder (MP3/WAV), then upload below.")
+
+    uploaded_audio = st.file_uploader(
+        "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"]
+    )
+
+    user_input = None
+    if uploaded_audio is not None:
+        st.audio(uploaded_audio)
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                tmp.write(uploaded_audio.read())
+                tmp.flush()
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=open(tmp.name, "rb")
+            )
+            st.success("**Transcription:**")
+            st.write(transcript.text)
+            user_input = transcript.text
+        except Exception as e:
+            st.warning("Transcription failed. Please try again or type your message.")
+            user_input = None
     else:
-        display = "Student"
+        user_input = st.chat_input("💬 Type your message here...")
 
     # --- Chat Interface with Mascot ---
     for msg in st.session_state['messages']:
@@ -314,7 +288,7 @@ if mode == "Practice":
             with st.chat_message(msg['role']):
                 st.markdown(msg['content'])
 
-    # --- User Message Submission Logic ---
+    # --- User Message Submission Logic (AI chat + audio feedback) ---
     if user_input:
         increment_usage(trial_mode)
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
@@ -337,6 +311,25 @@ if mode == "Practice":
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
         with st.chat_message("assistant", avatar="🧑‍🏫"):
             st.markdown(f"**Sir Felix:** {ai_reply}")
+            # --- NEW: TTS Audio Feedback ---
+            try:
+                lang_codes = {
+                    "German": "de",
+                    "French": "fr",
+                    "Spanish": "es",
+                    "Italian": "it",
+                    "Portuguese": "pt",
+                    "Chinese": "zh-CN",
+                    "Arabic": "ar",
+                    "English": "en"
+                }
+                tts_lang = lang_codes.get(language, "en")
+                tts = gTTS(ai_reply, lang=tts_lang)
+                tts_bytes = io.BytesIO()
+                tts.write_to_fp(tts_bytes)
+                st.audio(tts_bytes.getvalue(), format="audio/mp3")
+            except Exception:
+                st.info("Audio feedback not available for this language or an error occurred.")
 
         # --- GRAMMAR CHECK ---
         if language in ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]:
