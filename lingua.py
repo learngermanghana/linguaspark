@@ -36,6 +36,7 @@ st.markdown("## 🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
 st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
+# --- Session State Management ---
 if "teacher_rerun" not in st.session_state:
     st.session_state["teacher_rerun"] = False
 if "messages" not in st.session_state:
@@ -71,7 +72,7 @@ usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"
 
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
-# --- Teacher Dashboard (Add, Edit, Delete Codes) ---
+# --- Teacher Dashboard ---
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
@@ -201,9 +202,7 @@ if mode == "Practice":
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
 
-    # ---- Student widgets, progress, chat, etc. shown only after login ----
-
-    # --- Gamification (appears only after login) ---
+    # ---- Gamification (appears only after login) ----
     gamification_message = ""
     if trial_mode:
         if trial_count == 0:
@@ -259,9 +258,12 @@ if mode == "Practice":
     user_input = None
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
+        # Only transcribe if we haven't already
         if not st.session_state.get("transcript"):
             try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                # Save uploaded audio to a temp file (correct extension)
+                suffix = "." + uploaded_audio.name.split(".")[-1].lower()
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(uploaded_audio.read())
                     tmp.flush()
                 transcript = client.audio.transcriptions.create(
@@ -278,6 +280,7 @@ if mode == "Practice":
             if st.button("Submit This Audio Message"):
                 user_input = st.session_state["transcript"]
                 st.session_state["transcript"] = ""
+                st.session_state["audio_upload"] = None
                 st.experimental_rerun()
                 st.stop()
     else:
@@ -339,7 +342,8 @@ if mode == "Practice":
                 tts = gTTS(ai_reply, lang=tts_lang)
                 tts_bytes = io.BytesIO()
                 tts.write_to_fp(tts_bytes)
-                st.audio(tts_bytes.getvalue(), format="audio/mp3")
+                tts_bytes.seek(0)
+                st.audio(tts_bytes, format="audio/mp3")
             except Exception:
                 st.info("Audio feedback not available for this language or an error occurred.")
 
