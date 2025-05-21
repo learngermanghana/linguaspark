@@ -3,7 +3,6 @@ from openai import OpenAI
 from datetime import datetime, timedelta
 import pandas as pd
 import uuid
-import random
 import tempfile
 import io
 from gtts import gTTS
@@ -18,7 +17,7 @@ client = OpenAI(api_key=api_key)
 # --- Page setup ---
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="collapsed"
 )
 
@@ -29,8 +28,16 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .st-emotion-cache-zq5wmm {display:none;}
+    .stChatMessage.user {background: #e1f5fe; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
+    .stChatMessage.assistant {background: #f0f4c3; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
+    .st-emotion-cache-1v0mbdj {background: #fffde7;}
     </style>
 """, unsafe_allow_html=True)
+
+# --- Mascot + Welcome ---
+st.markdown("## 🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
+st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
+st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
 # --- Session State Initialization ---
 if "teacher_rerun" not in st.session_state:
@@ -142,13 +149,11 @@ if mode == "Teacher Dashboard":
 
 # --- Practice Mode ---
 if mode == "Practice":
-    # --- Language Selector (add as many as you like) ---
     language = st.selectbox(
-        "Language",
+        "🌍 Choose your language", 
         ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
     )
 
-    # --- Instructions/Help ---
     with st.expander("ℹ️ How to Use / Get Access (click to show)"):
         st.markdown("""
         **Trial Access:**  
@@ -163,7 +168,7 @@ if mode == "Practice":
         """)
 
     paid_codes = paid_df["code"].tolist()
-    access_code = st.text_input("Enter your paid or trial code:")
+    access_code = st.text_input("🔐 Enter your paid or trial code:")
 
     if not access_code:
         st.info("Don't have a code? Enter your email to request a free trial code.")
@@ -179,7 +184,6 @@ if mode == "Practice":
                 st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
         st.stop()
 
-    # --- Access Code Validation ---
     trial_mode = False
     if access_code in paid_codes:
         code_row = paid_df[paid_df["code"] == access_code]
@@ -194,7 +198,6 @@ if mode == "Practice":
         st.error("Invalid code.")
         st.stop()
 
-    # --- Usage tracking ---
     today = datetime.now().date()
     mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
     if not mask.any():
@@ -205,7 +208,6 @@ if mode == "Practice":
     trial_count = int(usage_df.at[row_idx, "trial_count"])
     daily_count = int(usage_df.at[row_idx, "daily_count"])
 
-    # --- Usage Limits with Clear Payment Instructions ---
     if trial_mode and trial_count >= 5:
         st.error("🔒 Your 5-message trial has ended.")
         st.info(
@@ -222,7 +224,6 @@ if mode == "Practice":
         )
         st.stop()
 
-    # --- Gamification Celebrations ---
     gamification_message = ""
     if trial_mode:
         if trial_count == 0:
@@ -249,9 +250,31 @@ if mode == "Practice":
             usage_df.at[row_idx, "daily_count"] += 1
         save_usage_df(usage_df)
 
-    # --- Settings ---
     with st.expander("⚙️ Settings", expanded=True):
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
+
+    # --- Dynamic prompt for level ---
+    if level in ["A1", "A2"]:
+        ai_level_prompt = (
+            "Always answer using very simple, short sentences suitable for A1 or A2 students. "
+            "Use only basic words. Never use advanced vocabulary. "
+            "If the student makes a mistake, gently correct it but do not give long explanations. "
+            "For grammar, use easy English only. Respond as simply as possible."
+        )
+        grammar_level_prompt = (
+            "Check this sentence for grammar and spelling mistakes. "
+            "Correct the mistake, then give a very short and simple explanation in easy English. "
+            "Only use words an A1 or A2 student will understand."
+        )
+    else:
+        ai_level_prompt = (
+            f"Answer as a {level} language tutor. Use appropriate vocabulary and grammar for {level} level students. "
+            "Give clear explanations, but don't make it too complex. Correct mistakes and provide simple grammar notes when needed."
+        )
+        grammar_level_prompt = (
+            f"Check this sentence for grammar and spelling mistakes, and provide corrections and explanations suitable for a {level} student. "
+            "Use clear English and, if necessary, explain in the target language."
+        )
 
     # --- Short tip and both audio upload and chat input always visible ---
     st.markdown("### 🎤 Upload Your Pronunciation")
@@ -264,7 +287,6 @@ if mode == "Practice":
 
     user_input = None
 
-    # --- AUDIO LOGIC: Show transcript and submit only when audio is uploaded ---
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         if not st.session_state.get("transcript"):
@@ -285,36 +307,40 @@ if mode == "Practice":
             st.write(st.session_state["transcript"])
             if st.button("Submit This Audio Message"):
                 user_input = st.session_state["transcript"]
-                # Clear audio and transcript after submission
                 st.session_state["audio_upload"] = None
                 st.session_state["transcript"] = ""
                 st.experimental_rerun()
     else:
-        st.session_state["transcript"] = ""  # Clear transcript when file is removed
+        st.session_state["transcript"] = ""
         if typed_message:
             user_input = typed_message
 
-    # --- Chat Interface with Mascot ---
+    # --- Chat Interface with colored message bubbles ---
     for msg in st.session_state['messages']:
         if msg['role'] == 'assistant':
             with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown(f"**Sir Felix:** {msg['content']}")
+                st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Sir Felix:</span> {msg['content']}", unsafe_allow_html=True)
         else:
-            with st.chat_message(msg['role']):
-                st.markdown(msg['content'])
+            with st.chat_message("user"):
+                st.markdown(f"🗣️ {msg['content']}")
 
     # --- User Message Submission Logic (AI chat + audio feedback) ---
     if user_input:
         increment_usage(trial_mode)
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
-        st.chat_message('user').markdown(user_input)
+        with st.chat_message('user'):
+            st.markdown(f"🗣️ {user_input}")
 
+        # -- AI conversation (dynamic level prompt) --
         try:
-            # AI conversation response
+            ai_system_prompt = (
+                f"You are Sir Felix, a friendly {language} tutor. "
+                f"{ai_level_prompt}"
+            )
             response = client.chat.completions.create(
                 model='gpt-3.5-turbo',
                 messages=[
-                    {'role': 'system', 'content': f"You are Sir Felix, a friendly {language} tutor. Always encourage and explain simply."},
+                    {'role': 'system', 'content': ai_system_prompt},
                     *st.session_state['messages']
                 ]
             )
@@ -325,8 +351,7 @@ if mode == "Practice":
 
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
         with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"**Sir Felix:** {ai_reply}")
-            # --- NEW: TTS Audio Feedback ---
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Sir Felix:</span> {ai_reply}", unsafe_allow_html=True)
             try:
                 lang_codes = {
                     "German": "de",
@@ -346,12 +371,11 @@ if mode == "Practice":
             except Exception:
                 st.info("Audio feedback not available for this language or an error occurred.")
 
-        # --- GRAMMAR CHECK ---
+        # --- Grammar correction, dynamically adjusted ---
         if language in ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]:
             grammar_prompt = (
-                f"You are Sir Felix, a helpful {language} teacher. "
-                f"Check the following sentence for grammar, spelling, and phrasing errors. "
-                f"Give the corrected sentence and a short explanation. "
+                f"You are a {language} teacher helping {level} students. "
+                f"{grammar_level_prompt} "
                 f"Sentence: {user_input}"
             )
             try:
