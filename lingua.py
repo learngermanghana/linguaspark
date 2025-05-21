@@ -251,15 +251,18 @@ if mode == "Practice":
     with st.expander("⚙️ Settings", expanded=True):
         level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
 
-    # --- Short tip and audio upload only ---
+    # --- Short tip and both audio upload and chat input always visible ---
     st.markdown("### 🎤 Upload Your Pronunciation")
     st.caption("🎤 Tip: Record at [vocaroo.com](https://www.vocaroo.com) or with your phone's voice recorder (MP3/WAV), then upload below.")
 
     uploaded_audio = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"]
     )
+    typed_message = st.chat_input("💬 Or type your message here...")
 
     user_input = None
+
+    # If both are present, audio (transcription) takes priority
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         try:
@@ -276,8 +279,8 @@ if mode == "Practice":
         except Exception as e:
             st.warning("Transcription failed. Please try again or type your message.")
             user_input = None
-    else:
-        user_input = st.chat_input("💬 Type your message here...")
+    elif typed_message:
+        user_input = typed_message
 
     # --- Chat Interface with Mascot ---
     for msg in st.session_state['messages']:
