@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS to hide default menu and style chat ---
+# --- Custom CSS to hide menu and style chat ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -46,7 +46,7 @@ students_file = "students.csv"
 trials_file = "trials.csv"
 usage_file = "usage.csv"
 
-# --- Data load/save helpers ---
+# --- Data helpers ---
 def save_df(df, path):
     df.to_csv(path, index=False)
 
@@ -56,13 +56,13 @@ def load_df(path, cols, date_cols=None):
     except FileNotFoundError:
         return pd.DataFrame(columns=cols)
 
-# Load paid and trial codes, usage
+# Load datasets
 paid_df = load_df(students_file, ["code", "expiry"], date_cols=["expiry"])
 paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
 trials_df = load_df(trials_file, ["email", "trial_code", "created"], date_cols=["created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
-# --- Sidebar navigation ---
+# --- Sidebar Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard ---
@@ -71,13 +71,13 @@ if mode == "Teacher Dashboard":
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Paid Codes")
         with st.form("add_paid"):  # Add new paid code
-            c1, c2 = st.columns([2,2])
+            c1, c2 = st.columns([2, 2])
             new_code = c1.text_input("New Paid Code")
             new_expiry = c2.date_input("Expiry Date", datetime.now())
             if st.form_submit_button("Add Paid Code"):
                 paid_df.loc[len(paid_df)] = [new_code, pd.to_datetime(new_expiry)]
                 save_df(paid_df, students_file)
-                st.success(f"Added paid code: {new_code}")
+                st.success(f"Added paid code {new_code}")
         st.markdown("---")
         st.subheader("🎫 Manage Trial Codes")
         with st.form("add_trial"):  # Issue new trial code
@@ -86,28 +86,29 @@ if mode == "Teacher Dashboard":
                 code_val = uuid.uuid4().hex[:8]
                 trials_df.loc[len(trials_df)] = [email, code_val, datetime.now()]
                 save_df(trials_df, trials_file)
-                st.success(f"Issued trial code: {code_val}")
+                st.success(f"Issued trial code {code_val}")
     else:
         st.info("Enter correct teacher password.")
     st.stop()
 
 # --- Practice Mode ---
-language = st.selectbox("🌍 Choose your language", [
-    "German","French","English","Spanish","Italian","Portuguese","Chinese","Arabic"
-])
+language = st.selectbox(
+    "🌍 Choose your language",
+    ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
+)
 with st.expander("ℹ️ How to Use / Get Access"):
     st.markdown(
         """
-**Trial Access:** Enter email for free trial code.
+**Trial Access:** Enter your email for a free trial code.
 
 **Paid Access:** Enter your paid code. Contact tutor on WhatsApp after payment.
         """
     )
 
 # Access control
-access_code = st.text_input("🔐 Enter paid/trial code:")
+access_code = st.text_input("🔐 Enter paid or trial code:")
 if not access_code:
-    st.info("Enter code or email above to proceed.")
+    st.info("Enter a code to proceed.")
     st.stop()
 
 trial_mode = False
@@ -124,41 +125,48 @@ else:
 
 # Usage tracking
 today = datetime.now().date()
-row = usage_df[(usage_df.user_key==access_code) & (usage_df.date==pd.Timestamp(today))]
-if row.empty:
+mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
+if not mask.any():
     usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
     save_df(usage_df, usage_file)
-    row = usage_df[(usage_df.user_key==access_code) & (usage_df.date==pd.Timestamp(today))]
-idx = row.index[0]
+    mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
+idx = usage_df[mask].index[0]
 
 # Gamification
 count = usage_df.at[idx, "trial_count"] if trial_mode else usage_df.at[idx, "daily_count"]
-if count==0:
-    st.success("🎉 Welcome!")
+if trial_mode and count == 0:
+    st.success("🎉 Welcome to your free trial!")
+elif not trial_mode and count == 0:
+    st.success("🎉 Welcome back!")
 
 # Settings
-level = st.selectbox("Level", ["A1","A2","B1","B2","C1"])
-# Define prompts
-ai_prompt = (
-    "Use simple language." if level in ["A1","A2"] else "Use appropriate {level} level."
-)
-grammar_prompt = ai_prompt
+level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
+if level in ["A1", "A2"]:
+    ai_prompt = "Use very simple, short sentences. Only basic words."
+    grammar_prompt = "Check grammar and give simple explanation."
+else:
+    ai_prompt = f"Use appropriate {level} level language."
+    grammar_prompt = f"Check grammar for {level} level."
 
-# Conversation UI
-uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav","mp3"], key="audio_upload")
-text = st.chat_input("Or type your message...")
+# Conversation Input
+uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav", "mp3"], key="audio_upload")
+typed = st.chat_input("Or type your message...")
 
 user_input = None
 if uploaded:
     st.audio(uploaded)
     if not st.session_state["transcript"]:
         try:
-            ext = "." + uploaded.name.split('.')[-1]
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-            tmp.write(uploaded.read()); tmp.flush()
-            res = client.audio.transcriptions.create(model="whisper-1", file=open(tmp.name,'rb'))
-            st.session_state["transcript"] = res.text
-        except:
+            ext = "." + uploaded.name.split(".")[-1]
+            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+            tmp_file.write(uploaded.read())
+            tmp_file.flush()
+            resp = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=open(tmp_file.name, "rb")
+            )
+            st.session_state["transcript"] = resp.text
+        except Exception:
             st.warning("Transcription failed.")
     if st.session_state["transcript"]:
         st.write(st.session_state["transcript"])
@@ -167,52 +175,53 @@ if uploaded:
             st.session_state["transcript"] = ""
             _ = st.session_state.pop("audio_upload", None)
             st.stop()
-elif text:
-    user_input = text
+elif typed:
+    user_input = typed
 
-# Display chat history
+# Display Chat History
 for msg in st.session_state["messages"]:
-    with st.chat_message(msg['role']):
-        st.write(msg['content'])
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-# Handle new user input
+# Handle New Input
 if user_input:
     usage_col = "trial_count" if trial_mode else "daily_count"
     usage_df.at[idx, usage_col] += 1
     save_df(usage_df, usage_file)
-    st.session_state["messages"].append({'role':'user','content':user_input})
+    st.session_state["messages"].append({"role": "user", "content": user_input})
     st.chat_message("user")
     st.write(user_input)
 
-    # AI response
-    sys = f"You are a {language} tutor. {ai_prompt}"
-    res = client.chat.completions.create(
+    # AI Reply
+    system_prompt = f"You are Sir Felix, a friendly {language} tutor. {ai_prompt}"
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{'role':'system','content':sys}, *st.session_state["messages"]]
+        messages=[{"role": "system", "content": system_prompt}] + st.session_state["messages"]
     )
-    reply = res.choices[0].message.content
-    st.session_state["messages"].append({'role':'assistant','content':reply})
+    ai_text = response.choices[0].message.content
+    st.session_state["messages"].append({"role": "assistant", "content": ai_text})
     st.chat_message("assistant")
-    st.write(reply)
+    st.write(ai_text)
 
-    # TTS
+    # Text-to-Speech
     try:
-        code_map={"German":"de","English":"en"}
-        tts= gTTS(reply, lang=code_map.get(language,'en'))
-        buf=io.BytesIO(); tts.write_to_fp(buf); buf.seek(0)
-        st.audio(buf)
-    except:
+        lang_map = {"German": "de", "English": "en"}
+        tts = gTTS(ai_text, lang=lang_map.get(language, "en"))
+        audio_buf = io.BytesIO()
+        tts.write_to_fp(audio_buf)
+        audio_buf.seek(0)
+        st.audio(audio_buf)
+    except Exception:
         pass
 
-    # Grammar correction
-    gram_sys = f"Check grammar: {grammar_prompt} Sentence: {user_input}"
-    gres = client.chat.completions.create(
+    # Grammar Correction
+    gram_prompt = f"You are a {language} teacher. {grammar_prompt} Sentence: {user_input}"
+    gram_resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{'role':'system','content':gram_sys}]
+        messages=[{"role": "system", "content": gram_prompt}]
     )
-    greply = gres.choices[0].message.content
-    st.info(greply)
+    st.info(gram_resp.choices[0].message.content)
 
-# Share button
-share = "I practiced with Sir Felix!"
-st.markdown(f"[Share on WhatsApp](https://wa.me/?text={share})")
+# Share Button
+share_text = "I just practiced my language skills with Sir Felix!"
+st.markdown(f"[Share on WhatsApp](https://wa.me/?text={share_text.replace(' ', '%20')})")
