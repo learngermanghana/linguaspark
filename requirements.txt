@@ -1,5 +1,4 @@
 streamlit
 openai
-SpeechRecognition
-streamlit-webrtc
-av
+pandas
+streamlit-audiorec
