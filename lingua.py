@@ -1,6 +1,6 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import uuid
 import tempfile
@@ -310,6 +310,7 @@ if mode == "Practice":
                 user_input = st.session_state["transcript"]
                 st.session_state["transcript"] = ""
                 st.experimental_rerun()
+                st.stop()
     else:
         st.session_state["transcript"] = ""
         if typed_message:
