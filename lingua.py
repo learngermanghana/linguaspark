@@ -37,6 +37,8 @@ if "teacher_rerun" not in st.session_state:
     st.session_state["teacher_rerun"] = False
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
+if "transcript" not in st.session_state:
+    st.session_state["transcript"] = ""
 
 # --- CSV helpers ---
 students_file = "students.csv"
@@ -256,31 +258,41 @@ if mode == "Practice":
     st.caption("🎤 Tip: Record at [vocaroo.com](https://www.vocaroo.com) or with your phone's voice recorder (MP3/WAV), then upload below.")
 
     uploaded_audio = st.file_uploader(
-        "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"]
+        "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload"
     )
     typed_message = st.chat_input("💬 Or type your message here...")
 
     user_input = None
 
-    # If both are present, audio (transcription) takes priority
+    # --- AUDIO LOGIC: Show transcript and submit only when audio is uploaded ---
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                tmp.write(uploaded_audio.read())
-                tmp.flush()
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=open(tmp.name, "rb")
-            )
+        if not st.session_state.get("transcript"):
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                    tmp.write(uploaded_audio.read())
+                    tmp.flush()
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=open(tmp.name, "rb")
+                )
+                st.session_state["transcript"] = transcript.text
+            except Exception as e:
+                st.warning("Transcription failed. Please try again or type your message.")
+                st.session_state["transcript"] = ""
+        if st.session_state.get("transcript"):
             st.success("**Transcription:**")
-            st.write(transcript.text)
-            user_input = transcript.text
-        except Exception as e:
-            st.warning("Transcription failed. Please try again or type your message.")
-            user_input = None
-    elif typed_message:
-        user_input = typed_message
+            st.write(st.session_state["transcript"])
+            if st.button("Submit This Audio Message"):
+                user_input = st.session_state["transcript"]
+                # Clear audio and transcript after submission
+                st.session_state["audio_upload"] = None
+                st.session_state["transcript"] = ""
+                st.experimental_rerun()
+    else:
+        st.session_state["transcript"] = ""  # Clear transcript when file is removed
+        if typed_message:
+            user_input = typed_message
 
     # --- Chat Interface with Mascot ---
     for msg in st.session_state['messages']:
