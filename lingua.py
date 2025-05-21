@@ -170,6 +170,7 @@ if mode == "Practice":
     paid_codes = paid_df["code"].tolist()
     access_code = st.text_input("🔐 Enter your paid or trial code:")
 
+    # --- Only process further after a valid code is entered! ---
     if not access_code:
         st.info("Don't have a code? Enter your email to request a free trial code.")
         email_req = st.text_input("Email for trial code")
@@ -276,7 +277,6 @@ if mode == "Practice":
             "Use clear English and, if necessary, explain in the target language."
         )
 
-    # --- Short tip and both audio upload and chat input always visible ---
     st.markdown("### 🎤 Upload Your Pronunciation")
     st.caption("🎤 Tip: Record at [vocaroo.com](https://www.vocaroo.com) or with your phone's voice recorder (MP3/WAV), then upload below.")
 
@@ -287,6 +287,7 @@ if mode == "Practice":
 
     user_input = None
 
+    # --- AUDIO LOGIC: Show transcript and submit only when audio is uploaded ---
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         if not st.session_state.get("transcript"):
@@ -307,7 +308,6 @@ if mode == "Practice":
             st.write(st.session_state["transcript"])
             if st.button("Submit This Audio Message"):
                 user_input = st.session_state["transcript"]
-                st.session_state["audio_upload"] = None
                 st.session_state["transcript"] = ""
                 st.experimental_rerun()
     else:
