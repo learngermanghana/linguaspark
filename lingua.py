@@ -106,21 +106,19 @@ with st.expander("ℹ️ How to Use / Get Access"):
     )
 
 # Access control
-access_code = st.text_input("🔐 Enter paid or trial code:")
+access_code = st.text_input("🔐 Enter your paid or trial code:")
 if not access_code:
-    st.info("Enter a code to proceed.")
-    st.stop()
-
-trial_mode = False
-if access_code in paid_df["code"].tolist():
-    exp = paid_df.loc[paid_df["code"] == access_code, "expiry"].iloc[0]
-    if pd.isna(exp) or exp < datetime.now():
-        st.error("Paid code expired.")
-        st.stop()
-elif access_code in trials_df["trial_code"].tolist():
-    trial_mode = True
-else:
-    st.error("Invalid code.")
+    st.info("Don't have a code? Enter your email below to request a free trial code.")
+    email_req = st.text_input("Email for trial code")
+    if email_req and st.button("Request Trial Code"):
+        existing = trials_df[trials_df["email"] == email_req]
+        if existing.empty:
+            new_code = uuid.uuid4().hex[:8]
+            trials_df.loc[len(trials_df)] = [email_req, new_code, datetime.now()]
+            save_df(trials_df, trials_file)
+            st.success(f"Your trial code: {new_code}")
+        else:
+            st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
     st.stop()
 
 # Usage tracking
