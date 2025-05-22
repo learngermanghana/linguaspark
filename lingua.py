@@ -182,8 +182,9 @@ if uploaded:
         _ = st.session_state.pop("audio_upload", None)
         # remind student to clear uploaded audio if needed
         st.info("🗒️ Your audio has been processed. Delete the file from the uploader to upload new audio or type your message.")
-elif st.chat_input("Or type your message..."):
-    user_input = st.session_state.get("user_input_text") = st.chat_input("Or type your message...", key="typed_input")
+typed = st.chat_input("Or type your message...", key="typed_input")
+if not uploaded and typed:
+    user_input = typed
 
 # Display Chat History
 for msg in st.session_state["messages"]:
