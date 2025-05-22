@@ -20,20 +20,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS to hide menu, reaction widgets, and style chat ---
+# --- Custom CSS to hide menu, reactions, and style chat ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    /* Hide Streamlit reaction widgets */
     .st-emotion, .st-emotion-actions, .st-emotion-cache {visibility: hidden !important;}
     .stChatMessage.user {background: #e1f5fe; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
     .stChatMessage.assistant {background: #f0f4c3; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
     </style>
 """, unsafe_allow_html=True)
 
-st.header("🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
+st.markdown(
+    "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!</h2>",
+    unsafe_allow_html=True,
+)
 st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
@@ -254,6 +256,7 @@ uploaded_audio = st.file_uploader(
     "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload"
 )
 if uploaded_audio is not None:
+    uploaded_audio.seek(0)
     st.audio(uploaded_audio, format=uploaded_audio.type)
     st.info("🛈 To type a message instead, click the ✖️ beside the audio file to remove it.")
 typed_message = st.chat_input("💬 Or type your message here...", key="typed_input")
@@ -261,7 +264,6 @@ typed_message = st.chat_input("💬 Or type your message here...", key="typed_in
 # --- Handle input ---
 user_input = None
 if uploaded_audio is not None:
-    # Only transcribe once
     if not st.session_state.get("transcript"):
         try:
             suffix = "." + uploaded_audio.name.split(".")[-1].lower()
@@ -279,7 +281,8 @@ if uploaded_audio is not None:
     if st.session_state.get("transcript"):
         user_input = st.session_state["transcript"]
         st.session_state["transcript"] = ""
-        _ = st.session_state.pop("audio_upload", None)
+        if "audio_upload" in st.session_state:
+            del st.session_state["audio_upload"]
 else:
     st.session_state["transcript"] = ""
     if typed_message:
