@@ -257,8 +257,15 @@ uploaded_audio = st.file_uploader(
 )
 if uploaded_audio is not None:
     uploaded_audio.seek(0)
-    st.audio(uploaded_audio, format=uploaded_audio.type)
-    st.info("🛈 To type a message instead, click the ✖️ beside the audio file to remove it.")
+    audio_bytes = uploaded_audio.read()
+    st.audio(audio_bytes, format=uploaded_audio.type)
+    st.download_button(
+        label="⬇️ Download Your Uploaded Audio",
+        data=audio_bytes,
+        file_name=uploaded_audio.name,
+        mime=uploaded_audio.type
+    )
+    st.info("If audio does not play on iPhone, tap Download and play in your Files or Music app. To type, click the ✖️ beside the audio file.")
 typed_message = st.chat_input("💬 Or type your message here...", key="typed_input")
 
 # --- Handle input ---
@@ -268,7 +275,7 @@ if uploaded_audio is not None:
         try:
             suffix = "." + uploaded_audio.name.split(".")[-1].lower()
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(uploaded_audio.read())
+                tmp.write(audio_bytes)
                 tmp.flush()
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
@@ -343,9 +350,17 @@ if user_input:
             tts_bytes = io.BytesIO()
             tts.write_to_fp(tts_bytes)
             tts_bytes.seek(0)
-            st.audio(tts_bytes, format="audio/mp3")
-        except Exception:
+            tts_data = tts_bytes.read()
+            st.audio(tts_data, format="audio/mp3")
+            st.download_button(
+                label="⬇️ Download AI Response Audio",
+                data=tts_data,
+                file_name="response.mp3",
+                mime="audio/mp3"
+            )
+        except Exception as e:
             st.info("Audio feedback not available or an error occurred.")
+            st.error(str(e))
 
     # Grammar check
     grammar_prompt = (
