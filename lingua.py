@@ -265,7 +265,11 @@ if uploaded_audio is not None:
         file_name=uploaded_audio.name,
         mime=uploaded_audio.type
     )
-    st.info("If audio does not play on iPhone, tap Download and play in your Files or Music app. To type, click the ✖️ beside the audio file.")
+    st.info(
+        "ℹ️ On iPhone/iPad, audio might not play in the browser. "
+        "Please use the 'Download' button to listen in your Files or Music app. "
+        "To type, click the ✖️ beside the audio file."
+    )
 typed_message = st.chat_input("💬 Or type your message here...", key="typed_input")
 
 # --- Handle input ---
@@ -357,6 +361,10 @@ if user_input:
                 data=tts_data,
                 file_name="response.mp3",
                 mime="audio/mp3"
+            )
+            st.info(
+                "ℹ️ On iPhone/iPad, audio might not play in the browser. "
+                "Please use the 'Download' button to listen in your Files or Music app."
             )
         except Exception as e:
             st.info("Audio feedback not available or an error occurred.")
