@@ -20,12 +20,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS to hide menu and style chat ---
+# --- Custom CSS to hide menu, reaction widgets, and style chat ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    /* Hide Streamlit reaction widgets */
+    .st-emotion, .st-emotion-actions, .st-emotion-cache {visibility: hidden !important;}
     .stChatMessage.user {background: #e1f5fe; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
     .stChatMessage.assistant {background: #f0f4c3; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
     </style>
@@ -120,6 +122,13 @@ if not access_code:
         else:
             st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
     st.stop()
+
+# Determine trial vs paid mode
+trial_mode = False
+if access_code in paid_df["code"].tolist():
+    trial_mode = False
+elif access_code in trials_df["trial_code"].tolist():
+    trial_mode = True
 
 # Usage tracking
 today = datetime.now().date()
