@@ -1,57 +1,54 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import uuid
-import random
 import tempfile
 import io
 from gtts import gTTS
 
-# --- Secure API key ---
+# ---- API and data setup ----
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
     st.error("❌ API key not found. Add it to .streamlit/secrets.toml under [general]")
     st.stop()
 client = OpenAI(api_key=api_key)
 
-# --- Page setup ---
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Hide Streamlit logo, hamburger, and footer
+# --- Custom CSS to hide menu and style chat ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .st-emotion-cache-zq5wmm {display:none;}
+    .stChatMessage.user {background: #e1f5fe; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
+    .stChatMessage.assistant {background: #f0f4c3; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- Session State Initialization ---
-if "teacher_rerun" not in st.session_state:
-    st.session_state["teacher_rerun"] = False
+st.markdown("## 🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
+st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
+st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
+
+# --- Initialize session state ---
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
+if "transcript" not in st.session_state:
+    st.session_state["transcript"] = ""
 
-# --- CSV helpers ---
+# --- File paths ---
 students_file = "students.csv"
 trials_file = "trials.csv"
 usage_file = "usage.csv"
 
-def save_paid_df(df):
-    df["expiry"] = df["expiry"].astype(str)
-    df.to_csv(students_file, index=False)
-
-def save_trials_df(df):
-    df.to_csv(trials_file, index=False)
-
-def save_usage_df(df):
-    df.to_csv(usage_file, index=False)
+# --- Data helpers ---
+def save_df(df, path):
+    df.to_csv(path, index=False)
 
 def load_df(path, cols, date_cols=None):
     try:
@@ -59,306 +56,178 @@ def load_df(path, cols, date_cols=None):
     except FileNotFoundError:
         return pd.DataFrame(columns=cols)
 
-paid_df = load_df(students_file, ["code", "expiry"])
-if not paid_df.empty:
-    paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
-
-trials_df = load_df(trials_file, ["email", "trial_code", "created"])
+# Load datasets
+paid_df = load_df(students_file, ["code", "expiry"], date_cols=["expiry"])
+paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
+trials_df = load_df(trials_file, ["email", "trial_code", "created"], date_cols=["created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
-# --- Navigation ---
+# --- Sidebar Navigation ---
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
-# --- Teacher Dashboard (Add, Edit, Delete Codes) ---
+# --- Teacher Dashboard ---
 if mode == "Teacher Dashboard":
     pwd = st.text_input("🔐 Teacher Password:", type="password")
     if pwd == st.secrets.get("TEACHER_PASSWORD", "admin123"):
         st.subheader("🧑‍🏫 Manage Paid Codes")
-        with st.form("add_paid_code_form"):
-            col1, col2 = st.columns([2, 2])
-            new_code = col1.text_input("New Paid Code")
-            new_expiry = col2.date_input("Expiry Date", value=datetime.now())
-            add_btn = col2.form_submit_button("➕ Add Paid Code")
-            if add_btn and new_code and new_code not in paid_df["code"].tolist():
+        with st.form("add_paid"):  # Add new paid code
+            c1, c2 = st.columns([2, 2])
+            new_code = c1.text_input("New Paid Code")
+            new_expiry = c2.date_input("Expiry Date", datetime.now())
+            if st.form_submit_button("Add Paid Code"):
                 paid_df.loc[len(paid_df)] = [new_code, pd.to_datetime(new_expiry)]
-                save_paid_df(paid_df)
+                save_df(paid_df, students_file)
                 st.success(f"Added paid code {new_code}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
-        for idx, row in paid_df.iterrows():
-            col1, col2, col3, col4 = st.columns([3, 3, 1, 1])
-            col1.text_input(f"Code_{idx}", value=row['code'], key=f"pc_code_{idx}", disabled=True)
-            new_expiry = col2.date_input(f"Expiry_{idx}", value=row['expiry'], key=f"pc_exp_{idx}")
-            edit_btn = col3.button("💾", key=f"pc_save_{idx}")
-            del_btn = col4.button("🗑️", key=f"pc_del_{idx}")
-            if edit_btn:
-                paid_df.at[idx, "expiry"] = pd.to_datetime(new_expiry)
-                save_paid_df(paid_df)
-                st.success(f"Updated expiry for {row['code']}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
-            if del_btn:
-                paid_df = paid_df.drop(idx).reset_index(drop=True)
-                save_paid_df(paid_df)
-                st.success(f"Deleted code {row['code']}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
         st.markdown("---")
         st.subheader("🎫 Manage Trial Codes")
-        with st.form("add_trial_code_form"):
-            col1, col2 = st.columns([3, 2])
-            new_email = col1.text_input("New Trial Email")
-            add_trial_btn = col2.form_submit_button("Issue Trial Code")
-            if add_trial_btn and new_email:
+        with st.form("add_trial"):  # Issue new trial code
+            email = st.text_input("Email for Trial Code")
+            if st.form_submit_button("Issue Trial Code"):
                 code_val = uuid.uuid4().hex[:8]
-                trials_df.loc[len(trials_df)] = [new_email, code_val, datetime.now()]
-                save_trials_df(trials_df)
+                trials_df.loc[len(trials_df)] = [email, code_val, datetime.now()]
+                save_df(trials_df, trials_file)
                 st.success(f"Issued trial code {code_val}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
-        for idx, row in trials_df.iterrows():
-            col1, col2, col3, col4 = st.columns([4, 3, 1, 1])
-            new_email = col1.text_input(f"TrialEmail_{idx}", value=row['email'], key=f"tc_email_{idx}")
-            col2.text_input(f"TrialCode_{idx}", value=row['trial_code'], key=f"tc_code_{idx}", disabled=True)
-            edit_btn = col3.button("💾", key=f"tc_save_{idx}")
-            del_btn = col4.button("🗑️", key=f"tc_del_{idx}")
-            if edit_btn:
-                trials_df.at[idx, "email"] = new_email
-                save_trials_df(trials_df)
-                st.success(f"Updated trial email for {row['trial_code']}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
-            if del_btn:
-                trials_df = trials_df.drop(idx).reset_index(drop=True)
-                save_trials_df(trials_df)
-                st.success(f"Deleted trial code {row['trial_code']}")
-                st.session_state["teacher_rerun"] = True
-                st.stop()
     else:
         st.info("Enter correct teacher password.")
     st.stop()
 
 # --- Practice Mode ---
-if mode == "Practice":
-    # --- Language Selector (add as many as you like) ---
-    language = st.selectbox(
-        "Language",
-        ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
-    )
-
-    # --- Instructions/Help ---
-    with st.expander("ℹ️ How to Use / Get Access (click to show)"):
-        st.markdown("""
-        **Trial Access:**  
-        - Enter your email below to get a *free trial code* (limited messages).
-
-        **Full Access (Paid):**  
-        - If you have a paid code, enter it below for unlimited access.
-
-        **How to get a paid code:**  
-        1. Send payment to **233245022743 (Asadu Felix)** via Mobile Money (MTN Ghana).  
-        2. After payment, confirm with your tutor or contact WhatsApp: [233205706589](https://wa.me/233205706589)
-        """)
-
-    paid_codes = paid_df["code"].tolist()
-    access_code = st.text_input("Enter your paid or trial code:")
-
-    if not access_code:
-        st.info("Don't have a code? Enter your email to request a free trial code.")
-        email_req = st.text_input("Email for trial code")
-        if email_req and st.button("Request Trial Code"):
-            existing = trials_df[trials_df["email"] == email_req]
-            if existing.empty:
-                new_code = uuid.uuid4().hex[:8]
-                trials_df.loc[len(trials_df)] = [email_req, new_code, datetime.now()]
-                save_trials_df(trials_df)
-                st.success(f"Your trial code: {new_code}")
-            else:
-                st.success(f"Your existing trial code: {existing['trial_code'].iloc[0]}")
-        st.stop()
-
-    # --- Access Code Validation ---
-    trial_mode = False
-    if access_code in paid_codes:
-        code_row = paid_df[paid_df["code"] == access_code]
-        expiry = code_row["expiry"].values[0]
-        if pd.isnull(expiry) or pd.to_datetime(expiry) < datetime.now():
-            st.error("Your code has expired. Please subscribe again.")
-            st.stop()
-        trial_mode = False
-    elif access_code in trials_df["trial_code"].tolist():
-        trial_mode = True
-    else:
-        st.error("Invalid code.")
-        st.stop()
-
-    # --- Usage tracking ---
-    today = datetime.now().date()
-    mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
-    if not mask.any():
-        usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
-        save_usage_df(usage_df)
-        mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
-    row_idx = usage_df[mask].index[0]
-    trial_count = int(usage_df.at[row_idx, "trial_count"])
-    daily_count = int(usage_df.at[row_idx, "daily_count"])
-
-    # --- Usage Limits with Clear Payment Instructions ---
-    if trial_mode and trial_count >= 5:
-        st.error("🔒 Your 5-message trial has ended.")
-        st.info(
-            "To get unlimited access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
-            "For help, contact WhatsApp: 233205706589"
-        )
-        st.stop()
-
-    if not trial_mode and daily_count >= 30:
-        st.warning("🚫 Daily limit reached for today.")
-        st.info(
-            "To increase your daily limit or renew your access, send payment to 233245022743 (Asadu Felix) and confirm with your tutor for your paid access code. "
-            "For help, contact WhatsApp: 233205706589"
-        )
-        st.stop()
-
-    # --- Gamification Celebrations ---
-    gamification_message = ""
-    if trial_mode:
-        if trial_count == 0:
-            gamification_message = "🎉 Welcome! Start chatting to practice your language skills with Sir Felix."
-        elif trial_count == 1:
-            gamification_message = "🌟 You sent your first message. Keep going!"
-        elif trial_count == 3:
-            gamification_message = "🔥 You’ve sent 3 messages! You're making great progress."
-        elif trial_count == 4:
-            gamification_message = "🚀 One more message left in your free trial. Upgrade for unlimited practice!"
-    else:
-        if daily_count == 0:
-            gamification_message = "🎉 Welcome back! Sir Felix is ready to help you learn today."
-        elif daily_count in [10, 20]:
-            gamification_message = f"🌟 {daily_count} messages sent today! Fantastic dedication."
-
-    if gamification_message:
-        st.success(gamification_message)
-
-    def increment_usage(is_trial: bool):
-        if is_trial:
-            usage_df.at[row_idx, "trial_count"] += 1
-        else:
-            usage_df.at[row_idx, "daily_count"] += 1
-        save_usage_df(usage_df)
-
-    # --- Settings ---
-    with st.expander("⚙️ Settings", expanded=True):
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
-
-    # --- Short tip and both audio upload and chat input always visible ---
-    st.markdown("### 🎤 Upload Your Pronunciation")
-    st.caption("🎤 Tip: Record at [vocaroo.com](https://www.vocaroo.com) or with your phone's voice recorder (MP3/WAV), then upload below.")
-
-    uploaded_audio = st.file_uploader(
-        "Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"]
-    )
-    typed_message = st.chat_input("💬 Or type your message here...")
-
-    user_input = None
-
-    # If both are present, audio (transcription) takes priority
-    if uploaded_audio is not None:
-        st.audio(uploaded_audio)
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                tmp.write(uploaded_audio.read())
-                tmp.flush()
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=open(tmp.name, "rb")
-            )
-            st.success("**Transcription:**")
-            st.write(transcript.text)
-            user_input = transcript.text
-        except Exception as e:
-            st.warning("Transcription failed. Please try again or type your message.")
-            user_input = None
-    elif typed_message:
-        user_input = typed_message
-
-    # --- Chat Interface with Mascot ---
-    for msg in st.session_state['messages']:
-        if msg['role'] == 'assistant':
-            with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown(f"**Sir Felix:** {msg['content']}")
-        else:
-            with st.chat_message(msg['role']):
-                st.markdown(msg['content'])
-
-    # --- User Message Submission Logic (AI chat + audio feedback) ---
-    if user_input:
-        increment_usage(trial_mode)
-        st.session_state['messages'].append({'role': 'user', 'content': user_input})
-        st.chat_message('user').markdown(user_input)
-
-        try:
-            # AI conversation response
-            response = client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[
-                    {'role': 'system', 'content': f"You are Sir Felix, a friendly {language} tutor. Always encourage and explain simply."},
-                    *st.session_state['messages']
-                ]
-            )
-            ai_reply = response.choices[0].message.content
-        except Exception as e:
-            ai_reply = "Sorry, there was a problem generating a response. Please try again."
-            st.error(str(e))
-
-        st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
-        with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"**Sir Felix:** {ai_reply}")
-            # --- NEW: TTS Audio Feedback ---
-            try:
-                lang_codes = {
-                    "German": "de",
-                    "French": "fr",
-                    "Spanish": "es",
-                    "Italian": "it",
-                    "Portuguese": "pt",
-                    "Chinese": "zh-CN",
-                    "Arabic": "ar",
-                    "English": "en"
-                }
-                tts_lang = lang_codes.get(language, "en")
-                tts = gTTS(ai_reply, lang=tts_lang)
-                tts_bytes = io.BytesIO()
-                tts.write_to_fp(tts_bytes)
-                st.audio(tts_bytes.getvalue(), format="audio/mp3")
-            except Exception:
-                st.info("Audio feedback not available for this language or an error occurred.")
-
-        # --- GRAMMAR CHECK ---
-        if language in ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]:
-            grammar_prompt = (
-                f"You are Sir Felix, a helpful {language} teacher. "
-                f"Check the following sentence for grammar, spelling, and phrasing errors. "
-                f"Give the corrected sentence and a short explanation. "
-                f"Sentence: {user_input}"
-            )
-            try:
-                grammar_response = client.chat.completions.create(
-                    model='gpt-3.5-turbo',
-                    messages=[{"role": "system", "content": grammar_prompt}],
-                    max_tokens=120
-                )
-                grammar_reply = grammar_response.choices[0].message.content.strip()
-                st.info(f"📝 **Sir Felix's Correction:**\n{grammar_reply}")
-            except Exception as e:
-                st.warning("Grammar check failed. Please try again.")
-
-    # --- Social Sharing Button (after chat) ---
-    share_text = "I just practiced my language skills with Sir Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
-    share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
+language = st.selectbox(
+    "🌍 Choose your language",
+    ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
+)
+with st.expander("ℹ️ How to Use / Get Access"):
     st.markdown(
-        f'<a href="{share_url}" target="_blank">'
-        '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
-        'Share on WhatsApp 🚀</button></a>',
-        unsafe_allow_html=True
+        """
+**Trial Access:** Enter your email for a free trial code.
+
+**Paid Access:** Enter your paid code. Contact tutor on WhatsApp after payment.
+        """
     )
+
+# Access control
+access_code = st.text_input("🔐 Enter paid or trial code:")
+if not access_code:
+    st.info("Enter a code to proceed.")
+    st.stop()
+
+trial_mode = False
+if access_code in paid_df["code"].tolist():
+    exp = paid_df.loc[paid_df["code"] == access_code, "expiry"].iloc[0]
+    if pd.isna(exp) or exp < datetime.now():
+        st.error("Paid code expired.")
+        st.stop()
+elif access_code in trials_df["trial_code"].tolist():
+    trial_mode = True
+else:
+    st.error("Invalid code.")
+    st.stop()
+
+# Usage tracking
+today = datetime.now().date()
+mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
+if not mask.any():
+    usage_df.loc[len(usage_df)] = [access_code, pd.Timestamp(today), 0, 0]
+    save_df(usage_df, usage_file)
+    mask = (usage_df["user_key"] == access_code) & (usage_df["date"] == pd.Timestamp(today))
+idx = usage_df[mask].index[0]
+
+# Gamification
+count = usage_df.at[idx, "trial_count"] if trial_mode else usage_df.at[idx, "daily_count"]
+if trial_mode and count == 0:
+    st.success("🎉 Welcome to your free trial!")
+elif not trial_mode and count == 0:
+    st.success("🎉 Welcome back!")
+
+# Settings
+level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"])
+if level in ["A1", "A2"]:
+    ai_prompt = "Answer using very simple, short sentences and basic words suitable for A1/A2 students."
+    grammar_prompt = "Check grammar and give a very short explanation in easy English."
+else:
+    ai_prompt = f"Answer as a friendly {level} student tutor: use vocabulary and grammar appropriate for {level} learners."
+    grammar_prompt = f"Check grammar and provide corrections suitable for a {level} student."
+
+# Conversation Input
+uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav", "mp3"], key="audio_upload")
+if uploaded:
+    data = uploaded.read()
+    mime = uploaded.type or f"audio/{uploaded.name.split('.')[-1]}"
+    st.audio(data, format=mime)
+    st.info("🎧 Audio uploaded. To type your next message, clear the audio via the ✖️ on the uploader.")
+typed = st.chat_input("Or type your message...")
+
+user_input = None
+if uploaded:
+    if not st.session_state["transcript"]:
+        try:
+            ext = "." + uploaded.name.split(".")[-1]
+            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+            tmp_file.write(data)
+            tmp_file.flush()
+            resp = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=open(tmp_file.name, "rb")
+            )
+            st.session_state["transcript"] = resp.text
+        except Exception:
+            st.warning("Transcription failed.")
+    if st.session_state["transcript"] and st.button("Submit Audio"):
+        user_input = st.session_state["transcript"]
+        st.session_state["transcript"] = ""
+        _ = st.session_state.pop("audio_upload", None)
+        st.stop()
+elif typed:
+    user_input = typed
+
+# Display Chat History
+for msg in st.session_state["messages"]:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+
+# Handle New Input
+if user_input:
+    usage_col = "trial_count" if trial_mode else "daily_count"
+    usage_df.at[idx, usage_col] += 1
+    save_df(usage_df, usage_file)
+    st.session_state["messages"].append({"role": "user", "content": user_input})
+    st.chat_message("user")
+    st.write(user_input)
+
+    # AI Reply with level tuning
+    system_prompt = (
+        f"You are Sir Felix, a friendly {language} tutor for {level} students. {ai_prompt}"
+    )
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": system_prompt}] + st.session_state["messages"]
+    )
+    ai_text = response.choices[0].message.content
+    st.session_state["messages"].append({"role": "assistant", "content": ai_text})
+    st.chat_message("assistant")
+    st.write(ai_text)
+
+    # Text-to-Speech
+    try:
+        lang_map = {"German": "de", "English": "en"}
+        tts = gTTS(ai_text, lang=lang_map.get(language, "en"))
+        audio_buf = io.BytesIO()
+        tts.write_to_fp(audio_buf)
+        audio_buf.seek(0)
+        st.audio(audio_buf, format="audio/mp3")
+    except Exception:
+        pass
+
+    # Grammar Correction with level prompt
+    gram_system = (
+        f"You are a {language} teacher for {level} students. {grammar_prompt} Sentence: {user_input}"
+    )
+    gram_resp = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": gram_system}]
+    )
+    st.info(gram_resp.choices[0].message.content)
+
+# Share Button
+share_text = "I just practiced my language skills with Sir Felix!"
+st.markdown(f"[Share on WhatsApp](https://wa.me/?text={share_text.replace(' ', '%20')})")
