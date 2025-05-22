@@ -162,11 +162,8 @@ if uploaded:
     mime = uploaded.type or f"audio/{uploaded.name.split('.')[-1]}"
     st.audio(data, format=mime)
     st.info("🎧 Audio uploaded. To type your next message, clear the audio via the ✖️ on the uploader.")
-typed = st.chat_input("Or type your message...")
-
-user_input = None
-if uploaded:
-    if not st.session_state["transcript"]:
+    # Automatically process transcript when audio is uploaded
+    if not st.session_state.get("transcript"):
         try:
             ext = "." + uploaded.name.split(".")[-1]
             tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
@@ -179,13 +176,14 @@ if uploaded:
             st.session_state["transcript"] = resp.text
         except Exception:
             st.warning("Transcription failed.")
-    if st.session_state["transcript"] and st.button("Submit Audio"):
+    if st.session_state.get("transcript"):
         user_input = st.session_state["transcript"]
-        st.session_state["transcript"] = ""
+        # clear audio uploader so user can upload next or type
         _ = st.session_state.pop("audio_upload", None)
-        st.stop()
-elif typed:
-    user_input = typed
+        # remind student to clear uploaded audio if needed
+        st.info("🗒️ Your audio has been processed. Delete the file from the uploader to upload new audio or type your message.")
+elif st.chat_input("Or type your message..."):
+    user_input = st.session_state.get("user_input_text") = st.chat_input("Or type your message...", key="typed_input")
 
 # Display Chat History
 for msg in st.session_state["messages"]:
