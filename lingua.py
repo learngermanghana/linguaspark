@@ -33,7 +33,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("## 🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
+st.header("🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!")
 st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
@@ -156,6 +156,7 @@ else:
     grammar_prompt = f"Check grammar and provide corrections suitable for a {level} student."
 
 # Conversation Input
+user_input = None  # initialize before inputs
 uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav", "mp3"], key="audio_upload")
 if uploaded:
     data = uploaded.read()
@@ -182,7 +183,11 @@ if uploaded:
         _ = st.session_state.pop("audio_upload", None)
         # remind student to clear uploaded audio if needed
         st.info("🗒️ Your audio has been processed. Delete the file from the uploader to upload new audio or type your message.")
+
+# Text input
 typed = st.chat_input("Or type your message...", key="typed_input")
+if not uploaded and typed:
+    user_input = typed("Or type your message...", key="typed_input")
 if not uploaded and typed:
     user_input = typed
 
