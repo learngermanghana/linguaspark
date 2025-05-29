@@ -164,8 +164,6 @@ trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
 # === COOKIE MANAGER FOR ACCESS CODE ===
-from st_cookies_manager import CookiesManager
-
 cookie_manager = CookiesManager()
 access_code = st.text_input(
     "🔐 Enter your paid or trial code:",
