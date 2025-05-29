@@ -3,3 +3,4 @@ openai
 pandas
 fpdf
 gtts
+st-cookies-manager 
