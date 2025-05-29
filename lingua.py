@@ -73,6 +73,17 @@ if not paid_df.empty:
 trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
+# === INSERT COOKIE MANAGER FOR ACCESS CODE ===
+from st_cookies_manager import CookieManager
+
+cookie_manager = CookieManager()
+access_code = st.text_input(
+    "🔐 Enter your paid or trial code:",
+    value=cookie_manager.get("falowen_code", "")
+)
+if access_code:
+    cookie_manager.set("falowen_code", access_code)
+
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard ---
