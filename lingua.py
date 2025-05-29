@@ -1,6 +1,5 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime
 import tempfile
 import io
 from gtts import gTTS
@@ -38,45 +37,35 @@ fun_facts = [
 random_fact = random.choice(fun_facts)
 st.success(f"**Did you know?** {random_fact}")
 
-# --- Main App Header ---
 st.markdown(
     "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor, Herr Felix!</h2>",
     unsafe_allow_html=True,
 )
-st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
+st.markdown("> Practice your German speaking or writing. Get simple AI feedback and audio answers!")
 
-# === Motivational Exam Bootcamp ===
 st.info(
     """
     🎤 **This is not just chat—it's your personal exam preparation bootcamp!**
-
     Every time you talk to Herr Felix, imagine you are **in the exam hall**.
     Expect realistic A2 and B1 speaking questions, surprise prompts, and real exam tips.
     Sometimes, you’ll even get questions from last year’s exam!
-
     Let’s make exam training engaging, surprising, and impactful.  
     **Are you ready? Let’s go! 🚀**
     """, icon="💡"
 )
 
-# === Expander with Exam Info and PDFs ===
 with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Practice Topics (click to expand)"):
     st.markdown("""
     ### 🗣️ **A2 Sprechen (Goethe-Zertifikat) – Structure**
-    **Teil 1:** Fragen zu Schlüsselwörtern (Questions based on key words)
-    - Wohnort, Beruf, Geburtstag, Hobby, Familie, Reisen, Lieblingsessen, Wetter, etc.
-
-    **Teil 2:** Bildbeschreibung & Diskussion (Picture description & discussion)
-    - Example: *Was machen Sie mit Ihrem Geld?* – Kleidung, Reisen, sparen...
-
-    **Teil 3:** Gemeinsam planen (Planning together)
-    - E.g., Kino, Picknick, Party, Freund besuchen.
+    **Teil 1:** Fragen zu Schlüsselwörtern  
+    **Teil 2:** Bildbeschreibung & Diskussion  
+    **Teil 3:** Gemeinsam planen  
 
     ---
     ### 🗣️ **B1 Sprechen (Goethe-Zertifikat) – Structure**
-    **Teil 1:** Planning together (Dialogue)
-    **Teil 2:** Individual Presentation
-    **Teil 3:** Give feedback and ask questions
+    **Teil 1:** Gemeinsam planen (Dialogue)  
+    **Teil 2:** Präsentation (Monologue)  
+    **Teil 3:** Feedback & Fragen stellen  
 
     ---
     **Download full topic sheets for practice:**  
@@ -84,47 +73,144 @@ with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Pract
     [B1 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/Sprechen%20B1%20(Goethe%20Exams).pdf)
     """)
 
-# === Level Selection (German only) ===
-level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"], key="level")
-exam_level = st.selectbox("Choose your exam level for random topic:", ["A2 Sprechen", "B1 Sprechen"], key="exam_level")
-
-# === Topic Lists ===
-a2_topics = [
+# ==== Official Exam Topics ====
+A2_TEIL1 = [
     "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
     "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
     "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
 ]
-b1_topics = [
-    "Ausbildung", "Berufswahl", "Bio-Essen", "Chatten", "Einkaufen", "Facebook",
-    "Freiwillige Arbeit", "Haustiere", "Heiraten", "Leben auf dem Land oder in der Stadt",
-    "Mode", "Musikinstrument lernen", "Reisen", "Sport treiben", "Umweltschutz",
-    "Vegetarische Ernährung", "Zeitungslesen"
+A2_TEIL2 = [
+    "Was machen Sie mit Ihrem Geld?",
+    "Was machen Sie am Wochenende?",
+    "Wie verbringen Sie Ihren Urlaub?",
+    "Wie oft gehen Sie einkaufen und was kaufen Sie?",
+    "Was für Musik hören Sie gern?",
+    "Wie feiern Sie Ihren Geburtstag?",
+    "Welche Verkehrsmittel nutzen Sie?",
+    "Wie bleiben Sie gesund?",
+    "Was machen Sie gern mit Ihrer Familie?",
+    "Wie sieht Ihr Traumhaus aus?",
+    "Welche Filme oder Serien mögen Sie?",
+    "Wie oft gehen Sie ins Restaurant?",
+    "Was ist Ihr Lieblingsfeiertag?",
+    "Was machen Sie morgens als Erstes?",
+    "Wie lange schlafen Sie normalerweise?",
+    "Welche Hobbys hatten Sie als Kind?",
+    "Machen Sie lieber Urlaub am Meer oder in den Bergen?",
+    "Wie sieht Ihr Lieblingszimmer aus?",
+    "Was ist Ihr Lieblingsgeschäft?",
+    "Wie sieht ein perfekter Tag für Sie aus?"
+]
+A2_TEIL3 = [
+    "Zusammen ins Kino gehen", "Ein Café besuchen", "Gemeinsam einkaufen gehen",
+    "Ein Picknick im Park organisieren", "Eine Fahrradtour planen",
+    "Zusammen in die Stadt gehen", "Einen Ausflug ins Schwimmbad machen",
+    "Eine Party organisieren", "Zusammen Abendessen gehen",
+    "Gemeinsam einen Freund/eine Freundin besuchen", "Zusammen ins Museum gehen",
+    "Einen Spaziergang im Park machen", "Ein Konzert besuchen",
+    "Zusammen eine Ausstellung besuchen", "Einen Wochenendausflug planen",
+    "Ein Theaterstück ansehen", "Ein neues Restaurant ausprobieren",
+    "Einen Kochabend organisieren", "Einen Sportevent besuchen", "Eine Wanderung machen"
 ]
 
-# ========== Chat/Practice Logic ==========
+B1_TEIL1 = [
+    "Mithilfe beim Sommerfest", "Eine Reise nach Köln planen",
+    "Überraschungsparty organisieren", "Kulturelles Ereignis (Konzert, Ausstellung) planen",
+    "Museumsbesuch organisieren"
+]
+B1_TEIL2 = [
+    "Ausbildung", "Auslandsaufenthalt", "Behinderten-Sport", "Berufstätige Eltern",
+    "Berufswahl", "Bio-Essen", "Chatten", "Computer für jeden Kursraum", "Das Internet",
+    "Einkaufen in Einkaufszentren", "Einkaufen im Internet", "Extremsport", "Facebook",
+    "Fertigessen", "Freiwillige Arbeit", "Freundschaft", "Gebrauchte Kleidung",
+    "Getrennter Unterricht für Jungen und Mädchen", "Haushalt", "Haustiere", "Heiraten",
+    "Hotel Mama", "Ich bin reich genug", "Informationen im Internet", "Kinder und Fernsehen",
+    "Kinder und Handys", "Kinos sterben", "Kreditkarten", "Leben auf dem Land oder in der Stadt",
+    "Makeup für Kinder", "Marken-Kleidung", "Mode", "Musikinstrument lernen",
+    "Musik im Zeitalter des Internets", "Rauchen", "Reisen", "Schokolade macht glücklich",
+    "Sport treiben", "Sprachenlernen", "Sprachenlernen mit dem Internet",
+    "Stadtzentrum ohne Autos", "Studenten und Arbeit in den Ferien", "Studium", "Tattoos",
+    "Teilzeitarbeit", "Unsere Idole", "Umweltschutz", "Vegetarische Ernährung", "Zeitungslesen"
+]
+B1_TEIL3 = [
+    "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
+    "Etwas überraschend finden", "Weitere Details erfragen"
+]
+
+# ========== TEIL-AWARE Exam Trainer ==========
+
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 
-# --- Random Exam Topic (Primes chat) ---
-if st.button("🎤 Give me a random exam topic!"):
-    if exam_level == "A2 Sprechen":
-        topic = random.choice(a2_topics)
-        instruction = f"📝 **A2 Exam Topic:** `{topic}`\n\nImagine the examiner just asked you about this topic. Please type a question you would ask and your answer in German!"
-    else:
-        topic = random.choice(b1_topics)
-        instruction = f"📝 **B1 Exam Topic:** `{topic}`\n\nImagine you are in the exam hall. Please give a short presentation: Introduction, experience, pros/cons, and your conclusion in German!"
-    st.session_state["messages"].append({
-        "role": "assistant",
-        "content": instruction
-    })
+exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
 
-st.caption("You can always ask for more topics, or use the chat for your own practice.")
+if exam_level == "A2":
+    teil_options = [
+        "Teil 1 – Fragen zu Schlüsselwörtern",
+        "Teil 2 – Bildbeschreibung & Diskussion",
+        "Teil 3 – Gemeinsam planen"
+    ]
+else:
+    teil_options = [
+        "Teil 1 – Gemeinsam planen (Dialogue)",
+        "Teil 2 – Präsentation (Monologue)",
+        "Teil 3 – Feedback & Fragen stellen"
+    ]
+
+teil = st.selectbox("Welchen Teil möchtest du üben?", teil_options, key="teil")
+
+# --- What to expect
+desc = ""
+if exam_level == "A2":
+    if teil.startswith("Teil 1"):
+        desc = "Du bekommst ein Schlüsselwort (wie 'Familie', 'Freizeit', 'Wohnort'). Stelle eine passende Frage und beantworte eine Frage dazu – auf Deutsch."
+    elif teil.startswith("Teil 2"):
+        desc = "Beschreibe eine Situation oder beantworte Fragen zu einem Alltagsthema (z.B. 'Was machen Sie am Wochenende?')."
+    elif teil.startswith("Teil 3"):
+        desc = "Plane mit deinem Partner etwas gemeinsam (z.B. einen Ausflug, Kino, Party). Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
+else:
+    if teil.startswith("Teil 1"):
+        desc = "Plane gemeinsam mit deinem Partner etwas (z.B. eine Reise, ein Fest). Mache Vorschläge, antworte, und treffe eine Entscheidung – alles auf Deutsch."
+    elif teil.startswith("Teil 2"):
+        desc = "Halte eine kurze Präsentation zu einem zufälligen Thema: Begrüße, nenne das Thema, gib deine Meinung, Vor- und Nachteile, und fasse zusammen. Alles auf B1-Niveau."
+    elif teil.startswith("Teil 3"):
+        desc = "Stelle nach der Präsentation deines Partners 1–2 Fragen und gib positives, konstruktives Feedback – auf Deutsch."
+
+st.info(f"**Was erwartet dich in {teil}?** {desc}")
+
+if st.button("Start Practice!"):
+    # Clear chat and give Teil-appropriate prompt
+    st.session_state["messages"] = []
+    if exam_level == "A2":
+        if teil.startswith("Teil 1"):
+            topic = random.choice(A2_TEIL1)
+            prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
+        elif teil.startswith("Teil 2"):
+            topic = random.choice(A2_TEIL2)
+            prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
+        else:
+            topic = random.choice(A2_TEIL3)
+            prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
+    else:
+        if teil.startswith("Teil 1"):
+            topic = random.choice(B1_TEIL1)
+            prompt = f"**B1 Teil 1:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
+        elif teil.startswith("Teil 2"):
+            topic = random.choice(B1_TEIL2)
+            prompt = f"**B1 Teil 2:** Halte eine Präsentation über das Thema: **{topic}**. Begrüße, nenne das Thema, gib deine Meinung, teile Vor- und Nachteile, fasse zusammen."
+        else:
+            topic = random.choice(B1_TEIL3)
+            prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
+
+    st.session_state["messages"].append({"role": "assistant", "content": prompt})
+
+st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
 
 # -- User input (chat or audio) --
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
-typed_message = st.chat_input("💬 Or type your message here...", key="typed_input")
+typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="typed_input")
 
 user_input = None
 if uploaded_audio is not None:
@@ -170,8 +256,11 @@ if user_input:
 
     try:
         ai_system_prompt = (
-            f"You are Herr Felix, a friendly German tutor. "
-            f"Always answer in exam mood for level {level} unless told otherwise."
+            "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
+            "You must always keep an exam mood. For every student answer: "
+            "1. React as a real examiner (follow-up, next task, or friendly encouragement). "
+            "2. Give a specific grammar correction, feedback, or suggestion based on their answer. "
+            "Do not answer for the student. Do not break character. Always support progress in exam German."
         )
         client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
         response = client.chat.completions.create(
@@ -204,3 +293,4 @@ if user_input:
             )
         except Exception:
             st.info("Audio feedback not available or an error occurred.")
+
