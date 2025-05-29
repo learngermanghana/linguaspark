@@ -7,6 +7,21 @@ import tempfile
 import io
 from gtts import gTTS
 
+
+# --- Access Code Persistence using URL Query Parameters (modern way) ---
+query_params = st.query_params
+access_code_default = query_params.get("code", [""])[0] if "code" in query_params else ""
+
+access_code = st.text_input(
+    "🔐 Enter your paid or trial code:",
+    value=access_code_default,
+    key="access_code_main"
+)
+
+if access_code and access_code != access_code_default:
+    st.query_params = {"code": access_code}
+
+
 # ---- API and data setup ----
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
@@ -162,19 +177,6 @@ if not paid_df.empty:
     paid_df["expiry"] = pd.to_datetime(paid_df["expiry"], errors="coerce")
 trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
-
-# --- Access Code Persistence using URL Query Parameters (modern way) ---
-query_params = st.query_params
-access_code_default = query_params.get("code", [""])[0] if "code" in query_params else ""
-
-access_code = st.text_input(
-    "🔐 Enter your paid or trial code:",
-    value=access_code_default,
-    key="access_code_main"
-)
-
-if access_code and access_code != access_code_default:
-    st.query_params = {"code": access_code}
 
 mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
