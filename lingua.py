@@ -8,11 +8,11 @@ import hashlib
 import pandas as pd
 from datetime import datetime, timedelta
 import uuid
-
 import io
 import csv
 from fpdf import FPDF
 
+# ---- Download helpers ----
 def get_chat_csv(messages):
     output = io.StringIO()
     writer = csv.writer(output)
@@ -39,8 +39,6 @@ def get_chat_pdf(messages):
     return pdf.output(dest="S").encode("latin-1")
 
 # --- Secure API key ---
-# Try environment variable first, then Streamlit secrets
-import os
 api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("general", {}).get("OPENAI_API_KEY")
 if not api_key:
     st.error("❌ API key not found. Set the OPENAI_API_KEY environment variable or add it to .streamlit/secrets.toml under [general].")
@@ -56,11 +54,9 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-      /* Hide default Streamlit branding */
       #MainMenu {visibility: hidden;}
       footer {visibility: hidden;}
       header {visibility: hidden;}
-      /* Scrollable chat container */
       .chat-container {height: 60vh; overflow-y: auto;}
     </style>
     """,
@@ -119,25 +115,7 @@ if "user_email" not in st.session_state:
                 st.stop()
     st.stop()
 
-# --- Sidebar Profile & Settings ---
-st.sidebar.markdown(f"**Logged in as:** {st.session_state['user_email']}")
-if st.sidebar.button("🔓 Log out"):
-    del st.session_state["user_email"]
-    st.stop()
-
-# Load usage
-df_usage = load_usage()
-
-def increment_usage():
-    today = pd.Timestamp(datetime.now().date())
-    mask = (df_usage.user_email == st.session_state['user_email']) & (df_usage.date == today)
-    if not mask.any():
-        df_usage.loc[len(df_usage)] = [st.session_state['user_email'], today, 0]
-    idx = df_usage.index[mask][0] if mask.any() else len(df_usage)-1
-    df_usage.at[idx, 'count'] += 1
-    save_usage(df_usage)
-
-# Tutor definitions & scenarios
+# --- Tutors and Roleplays ---
 tutors = {
     "German": "Herr Felix",
     "French": "Madame Dupont",
@@ -210,9 +188,9 @@ roleplays = {
         "Chinese": "你在售票处。买一张明天早上去上海的火车票。",
         "Arabic": "أنت في شباك التذاكر. اشترِ تذكرة قطار إلى القاهرة صباح الغد."
     }
-}  
+}
 
-# Cultural Fun Facts per Language
+# --- Cultural Fun Facts per Language ---
 cultural_facts = {
     "German": [
         "In Germany, bread is a big part of the culture—there are over 300 kinds of bread!",
@@ -272,54 +250,50 @@ cultural_facts = {
     ]
 }
 
-
-# Initialize chat
+# --- Initialize chat session ---
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
 
-# Sidebar controls
+# --- Sidebar controls ---
 language = st.sidebar.selectbox("Language", list(tutors.keys()), index=2)
 level = st.sidebar.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"], index=0)
 mode = st.sidebar.selectbox("Mode", ["Free Talk"] + list(roleplays.keys()))
-
 show_grammar = st.sidebar.checkbox("Show grammar corrections", value=True)
 
-# --- Cultural Fun Fact Display ---
+# --- Cultural Fun Fact Display (Safe Indexing) ---
+facts = cultural_facts[language]
 if 'fact_idx' not in st.session_state or st.session_state.get('last_fact_lang') != language:
-    # On new login or language change, pick a new fact index
-    st.session_state['fact_idx'] = random.randint(0, len(cultural_facts[language])-1)
+    st.session_state['fact_idx'] = random.randint(0, len(facts) - 1)
     st.session_state['last_fact_lang'] = language
-
-# Show fact in sidebar (or main page if you prefer)
-fact = cultural_facts[language][st.session_state['fact_idx']]
-st.sidebar.markdown(f"💡 **Did you know?**\n\n{fact}")
-
-# Button to get another fun fact
+if st.session_state['fact_idx'] >= len(facts):
+    st.session_state['fact_idx'] = 0
+st.sidebar.markdown(f"💡 **Did you know?**\n\n{facts[st.session_state['fact_idx']]}")
 if st.sidebar.button("🔄 New Cultural Fact"):
-    st.session_state['fact_idx'] = random.randint(0, len(cultural_facts[language])-1)
-    fact = cultural_facts[language][st.session_state['fact_idx']]
-    st.sidebar.markdown(f"💡 **Did you know?**\n\n{fact}")
+    st.session_state['fact_idx'] = random.randint(0, len(facts) - 1)
+    st.sidebar.markdown(f"💡 **Did you know?**\n\n{facts[st.session_state['fact_idx']]}")
 
+# --- Tutor/scenario selection ---
 tutor = tutors[language]
 scenario_prompt = '' if mode == 'Free Talk' else roleplays[mode][language]
 
-
-# Main headers
+# --- Main headers ---
 st.markdown("<h1 style='font-size:2.4em;'>🌟 Falowen – Your AI Conversation Partner</h1>", unsafe_allow_html=True)
 st.markdown(f"<h2>Practice {language} ({level}) {'free conversation' if not scenario_prompt else 'role-play: '+scenario_prompt}</h2>", unsafe_allow_html=True)
 
-# Fun fact carousel
-if 'fact_idx' not in st.session_state: st.session_state['fact_idx']=0
-facts = [f"{tutor} speaks multiple languages!", f"{tutor} loves teaching.", f"{tutor}'s favorite word is possibility!", f"{tutor} stays alert with virtual coffee."]
-st.sidebar.markdown(facts[st.session_state['fact_idx']])
-if st.sidebar.button('🔃 Next Fact'):
-    st.session_state['fact_idx'] = (st.session_state['fact_idx']+1)%len(facts)
+# --- Chat container ---
+st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+for msg in st.session_state['messages']:
+    avatar = '🧑‍🏫' if msg['role'] == 'assistant' else None
+    with st.chat_message(msg['role'], avatar=avatar):
+        st.markdown(msg['content'])
+st.markdown("</div>", unsafe_allow_html=True)
 
 # Chat container
 st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
 for msg in st.session_state['messages']:
-    avatar = '🧑‍🏫' if msg['role']=='assistant' else None
-    with st.chat_message(msg['role'], avatar=avatar): st.markdown(msg['content'])
+    avatar = '🧑‍🏫' if msg['role'] == 'assistant' else None
+    with st.chat_message(msg['role'], avatar=avatar):
+        st.markdown(msg['content'])
 st.markdown("</div>", unsafe_allow_html=True)
 
 # Chat input & response
@@ -338,7 +312,7 @@ if user_input:
             reply = "Sorry, there was a problem."
     st.session_state['messages'].append({'role': 'assistant', 'content': reply})
     st.chat_message('assistant', avatar='🧑‍🏫').markdown(f"**{tutor}:** {reply}")
-    
+
     # Grammar check only if enabled in sidebar
     if show_grammar:
         grammar_msgs = [
@@ -365,13 +339,39 @@ if user_input:
 
 # Gamification
 today = pd.Timestamp(datetime.now().date())
-mask = (df_usage.user_email==st.session_state['user_email'])&(df_usage.date==today)
-count = int(df_usage.loc[mask,'count'].iloc[0]) if mask.any() else 0
-prog = min(count/10,1)
+mask = (df_usage.user_email == st.session_state['user_email']) & (df_usage.date == today)
+count = int(df_usage.loc[mask, 'count'].iloc[0]) if mask.any() else 0
+prog = min(count / 10, 1)
 st.progress(prog)
 st.caption(f"{count}/10 messages today")
-if count in [5,10]: st.balloons()
+if count in [5, 10]:
+    st.balloons()
 
 # Share button
 share = f"I just practiced {language} with {tutor}!"
-st.markdown(f'<a href="https://wa.me/?text={share.replace(" ","%20")}" target="_blank"><button style="width:100%;padding:10px;border:none;border-radius:8px;background:#25D366;color:white;">Share on WhatsApp 🚀</button></a>', unsafe_allow_html=True)
+st.markdown(f'''
+    <a href="https://wa.me/?text={share.replace(" ","%20")}" target="_blank">
+        <button style="width:100%;padding:10px;border:none;border-radius:8px;background:#25D366;color:white;">
+            Share on WhatsApp 🚀
+        </button>
+    </a>
+''', unsafe_allow_html=True)
+
+# Download Chat Section
+if st.session_state.get('messages'):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            label="⬇️ Download Chat as CSV",
+            data=get_chat_csv(st.session_state['messages']),
+            file_name="Falowen_Chat.csv",
+            mime="text/csv"
+        )
+    with col2:
+        st.download_button(
+            label="⬇️ Download Chat as PDF",
+            data=get_chat_pdf(st.session_state['messages']),
+            file_name="Falowen_Chat.pdf",
+            mime="application/pdf"
+        )
+
