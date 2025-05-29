@@ -4,6 +4,7 @@ import tempfile
 import io
 from gtts import gTTS
 import random
+import re
 
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
@@ -143,6 +144,8 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
+if "corrections" not in st.session_state:
+    st.session_state["corrections"] = []
 
 exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
 
@@ -205,6 +208,7 @@ if st.button("Start Practice!"):
             prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
 
     st.session_state["messages"].append({"role": "assistant", "content": prompt})
+    st.session_state["corrections"] = []  # Reset corrections when new Teil is started
 
 st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
 
@@ -257,10 +261,8 @@ if user_input:
     try:
         ai_system_prompt = (
             "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
-            "You must always keep an exam mood. For every student answer: "
-            "1. React as a real examiner (follow-up, next task, or friendly encouragement). "
-            "2. Give a specific grammar correction, feedback, or suggestion based on their answer. "
-            "Do not answer for the student. Do not break character. Always support progress in exam German."
+            "Always answer as an examiner, then on a new line write 'Grammatik-Tipp: [correction/tip]' based on the student's last answer. "
+            "Never break character."
         )
         client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
         response = client.chat.completions.create(
@@ -278,6 +280,12 @@ if user_input:
     st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
     with st.chat_message("assistant", avatar="🧑‍🏫"):
         st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
+        # Extract and store grammar tip
+        tip_match = re.search(r"Grammatik-Tipp\s*:\s*(.+)", ai_reply)
+        if tip_match:
+            tip = tip_match.group(1).strip()
+            if tip and tip not in st.session_state["corrections"]:
+                st.session_state["corrections"].append(tip)
         try:
             tts = gTTS(ai_reply, lang="de")
             tts_bytes = io.BytesIO()
@@ -294,3 +302,18 @@ if user_input:
         except Exception:
             st.info("Audio feedback not available or an error occurred.")
 
+# --- Show tracked grammar tips
+if st.session_state["corrections"]:
+    st.markdown("### 📋 **Your Grammar Corrections & Tips so far**")
+    for tip in st.session_state["corrections"]:
+        st.write(f"- {tip}")
+
+# --- WhatsApp Share Button ---
+share_text = "Ich habe mit Herr Felix auf Falowen Deutsch gesprochen! 🌟 Probier es aus: https://falowen.streamlit.app"
+share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
+st.markdown(
+    f'<a href="{share_url}" target="_blank">'
+    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
+    'Share on WhatsApp 🚀</button></a>',
+    unsafe_allow_html=True
+)
