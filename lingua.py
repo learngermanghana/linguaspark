@@ -176,6 +176,7 @@ access_code = st.text_input(
 if access_code and access_code != access_code_default:
     st.query_params = {"code": access_code}
 
+mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
 
 # --- Teacher Dashboard ---
 if mode == "Teacher Dashboard":
