@@ -39,6 +39,96 @@ st.markdown(
 st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
+# === About Herr Felix & Motivational Exam Bootcamp ===
+st.info(
+    """
+    ### 👋 About Herr Felix
+
+    - 🇬🇭 Born in Ghana, learned German up to C1, and studied in Germany!
+    - 🎓 Studied International Management at IU International University.
+    - 🏫 Runs Learn Language Education Academy – helping students pass real Goethe exams.
+    - 💡 Used to manage a record label and produce music. Now making German learning fun and exam-focused!
+    - 🥇 Passionate about your success and making learning entertaining.
+
+    ---
+    **🎤 This is not just chat—it's your personal exam preparation bootcamp!**
+    - Every time you talk to Herr Felix, imagine you are **in the exam hall**.
+    - Expect realistic A2 and B1 speaking questions, surprise prompts, and real exam tips.
+    - Sometimes, you’ll even get questions from last year’s exam!
+
+    **Let’s make exam training engaging, surprising, and impactful.**  
+    Are you ready? Let’s go! 🚀
+    """, icon="💡"
+)
+
+# === Expander with A2/B1 Exam Info, Sample Topics, and Downloadable PDFs ===
+with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Practice Topics (click to expand)"):
+    st.markdown("""
+    ### 🗣️ **A2 Sprechen (Goethe-Zertifikat) – Structure**
+    **Teil 1:** Fragen zu Schlüsselwörtern (Questions based on key words)
+    - You and your partner ask and answer questions using cards with keywords.
+    - Examples: Wohnort, Beruf, Geburtstag, Hobby, Familie, Reisen, Lieblingsessen, Wetter, etc.
+
+    **Teil 2:** Bildbeschreibung & Diskussion (Picture description & discussion)
+    - Speak about a situation using keywords. Example: *Was machen Sie mit Ihrem Geld?* (What do you do with your money?) – Kleidung, Reisen, sparen...
+
+    **Teil 3:** Gemeinsam planen (Planning together)
+    - You and your partner plan something together (e.g., Kino, Picknick, Party, Freund besuchen).
+
+    ---
+    ### 🗣️ **B1 Sprechen (Goethe-Zertifikat) – Structure**
+    **Teil 1:** Planning together (Dialogue): Sommerfest, Reise nach Köln, Museumsbesuch organisieren...
+    **Teil 2:** Individual Presentation: Ausbildung, Bio-Essen, Mode, Reisen, Sprachenlernen, Sport, Umweltschutz...
+    **Teil 3:** Give feedback and ask questions (e.g., "Ich habe eine Frage: Warum ...?").
+
+    ---
+    ### 📄 **Sample A2 Teil 1 Topics**
+    Wohnort, Tagesablauf, Freizeit, Sprachen, Essen & Trinken, Haustiere, Lieblingsmonat, Jahreszeit, Sport, Kleidung, Familie, Beruf, Hobbys, Feiertage, Reisen, Lieblingsessen, Schule, Wetter, Auto oder Fahrrad, Perfekter Tag
+
+    ### 📄 **Sample B1 Presentation Topics**
+    Ausbildung, Bio-Essen, Chatten, Einkaufen, Facebook, Freiwillige Arbeit, Freundschaft, Haushalt, Haustiere, Heiraten, Leben auf dem Land oder in der Stadt, Mode, Musik, Rauchen, Reisen, Sport treiben, Umweltschutz, Vegetarische Ernährung, etc.
+
+    ---
+    **Download full topic sheets for practice:**  
+    [A2 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/A2%20sprechen.pdf)  
+    [B1 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/Sprechen%20B1%20(Goethe%20Exams).pdf)
+
+    *All materials: Learn Language Education Academy*
+    """)
+
+# === Entertaining, Impactful Random Exam Topic Trainer ===
+import random
+
+a2_topics = [
+    "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
+    "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
+    "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
+]
+b1_topics = [
+    "Ausbildung", "Berufswahl", "Bio-Essen", "Chatten", "Einkaufen", "Facebook",
+    "Freiwillige Arbeit", "Haustiere", "Heiraten", "Leben auf dem Land oder in der Stadt",
+    "Mode", "Musikinstrument lernen", "Reisen", "Sport treiben", "Umweltschutz",
+    "Vegetarische Ernährung", "Zeitungslesen"
+]
+
+st.markdown("---")
+st.markdown("## 🎲 **Train Like the Real Exam!**")
+
+exam_level = st.selectbox("Choose exam level for random topic:", ["A2 Sprechen", "B1 Sprechen"], key="exam_level")
+if exam_level == "A2 Sprechen":
+    if st.button("🎤 Give me a random A2 topic!", key="random_a2"):
+        topic = random.choice(a2_topics)
+        st.success(f"📝 **Your A2 Sprechen exam topic:**\n\n`{topic}`\n\nImagine you're in the exam! Ask and answer questions about this topic for 1–2 minutes.")
+elif exam_level == "B1 Sprechen":
+    if st.button("🎤 Give me a random B1 topic!", key="random_b1"):
+        topic = random.choice(b1_topics)
+        st.success(f"📝 **Your B1 Sprechen exam topic:**\n\n`{topic}`\n\nImagine you're in the exam! Give a short presentation (intro, experience, pros/cons, conclusion).")
+
+st.caption("Keep clicking for more surprise exam-style topics. Every practice session makes you more confident for the real day!")
+
+# === (Your open chat/practice/AI logic continues below as before!) ===
+
+
 # --- Session State Management ---
 if "teacher_rerun" not in st.session_state:
     st.session_state["teacher_rerun"] = False
