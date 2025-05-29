@@ -231,7 +231,7 @@ if trial_mode:
         gamification_message = "🚀 One more message left in your free trial. Upgrade for unlimited practice!"
 else:
     if daily_count == 0:
-        gamification_message = "🎉 Welcome back! Sir Felix is ready to help you learn today."
+        gamification_message = "🎉 Welcome back! Herr Felix is ready to help you learn today."
     elif daily_count in [10, 20]:
         gamification_message = f"🌟 {daily_count} messages sent today! Fantastic dedication."
 
@@ -317,7 +317,7 @@ else:
 for msg in st.session_state['messages']:
     if msg['role'] == 'assistant':
         with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Sir Felix:</span> {msg['content']}", unsafe_allow_html=True)
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {msg['content']}", unsafe_allow_html=True)
     else:
         with st.chat_message("user"):
             st.markdown(f"🗣️ {msg['content']}")
@@ -334,7 +334,7 @@ if user_input:
 
     try:
         ai_system_prompt = (
-            f"You are Sir Felix, a friendly {language} tutor. "
+            f"You are Herr Felix, a friendly {language} tutor. "
             f"{ai_level_prompt}"
         )
         response = client.chat.completions.create(
@@ -401,7 +401,7 @@ if user_input:
     except Exception:
         st.warning("Grammar check failed. Please try again.")
 
-share_text = "I just practiced my language skills with Sir Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
+share_text = "I just practiced my language skills with Herr Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
 share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
 st.markdown(
     f'<a href="{share_url}" target="_blank">'
