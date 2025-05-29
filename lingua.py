@@ -163,9 +163,9 @@ if not paid_df.empty:
 trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
-# --- Access Code Persistence using URL Query Parameters ---
-query_params = st.experimental_get_query_params()
-access_code_default = query_params.get("code", [""])[0]
+# --- Access Code Persistence using URL Query Parameters (modern way) ---
+query_params = st.query_params
+access_code_default = query_params.get("code", [""])[0] if "code" in query_params else ""
 
 access_code = st.text_input(
     "🔐 Enter your paid or trial code:",
@@ -174,7 +174,7 @@ access_code = st.text_input(
 )
 
 if access_code and access_code != access_code_default:
-    st.experimental_set_query_params(code=access_code)
+    st.query_params = {"code": access_code}
 
 
 # --- Teacher Dashboard ---
