@@ -51,17 +51,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.markdown(
-    """
+st.markdown("""
     <style>
       #MainMenu {visibility: hidden;}
       footer {visibility: hidden;}
       header {visibility: hidden;}
       .chat-container {height: 60vh; overflow-y: auto;}
     </style>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
 # --- User and Usage Helpers ---
 USER_DB = "users.json"
@@ -84,14 +81,25 @@ def load_usage():
 def save_usage(df):
     df.to_csv(USAGE_FILE, index=False)
 
+df_usage = load_usage()
+
+def increment_usage():
+    today = pd.Timestamp(datetime.now().date())
+    mask = (df_usage.user_email == st.session_state['user_email']) & (df_usage.date == today)
+    if not mask.any():
+        df_usage.loc[len(df_usage)] = [st.session_state['user_email'], today, 0]
+    idx = df_usage.index[mask][0] if mask.any() else len(df_usage)-1
+    df_usage.at[idx, 'count'] += 1
+    save_usage(df_usage)
+
 # --- Authentication ---
 if "user_email" not in st.session_state:
     st.sidebar.title("🔐 Sign Up / Log In")
-    mode = st.sidebar.radio("", ["Sign Up", "Log In"])
+    auth_mode = st.sidebar.radio("", ["Sign Up", "Log In"])
     users = load_users()
     email = st.sidebar.text_input("Email")
     password = st.sidebar.text_input("Password", type="password")
-    if mode == "Sign Up":
+    if auth_mode == "Sign Up":
         confirm = st.sidebar.text_input("Confirm Password", type="password")
         if st.sidebar.button("Create Account"):
             if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
@@ -115,185 +123,169 @@ if "user_email" not in st.session_state:
                 st.stop()
     st.stop()
 
-# --- Tutors and Roleplays ---
+# --- Tutors, Roleplays & Fun Facts ---
 tutors = {
-    "German": "Herr Felix",
-    "French": "Madame Dupont",
-    "English": "Sir Felix",
-    "Spanish": "Señora García",
-    "Italian": "Signor Rossi",
-    "Portuguese": "Senhora Silva",
-    "Chinese": "老师李",
-    "Arabic": "الأستاذ أحمد"
+    "German":"Herr Felix","French":"Madame Dupont","English":"Sir Felix",
+    "Spanish":"Señora García","Italian":"Signor Rossi","Portuguese":"Senhora Silva",
+    "Chinese":"老师李","Arabic":"الأستاذ أحمد"
 }
 
 roleplays = {
     "Ordering at a Restaurant": {
-        "German": "Du bist Gast in einem Restaurant. Bestelle ein Essen und ein Getränk beim Kellner.",
-        "French": "Vous êtes au restaurant. Commandez un plat et une boisson auprès du serveur.",
-        "English": "You are in a restaurant. Order a meal and a drink from the waiter.",
-        "Spanish": "Estás en un restaurante. Pide una comida y una bebida al camarero.",
-        "Italian": "Sei al ristorante. Ordina un pasto e una bevanda al cameriere.",
-        "Portuguese": "Você está em um restaurante. Peça uma refeição e uma bebida ao garçom.",
-        "Chinese": "你在餐厅。向服务员点一份餐和一杯饮料。",
-        "Arabic": "أنت في مطعم. اطلب وجبة ومشروبًا من النادل."
+        "German":"Du bist Gast in einem Restaurant. Bestelle ein Essen und ein Getränk beim Kellner.",
+        "French":"Vous êtes au restaurant. Commandez un plat et une boisson auprès du serveur.",
+        "English":"You are in a restaurant. Order a meal and a drink from the waiter.",
+        "Spanish":"Estás en un restaurante. Pide una comida y una bebida al camarero.",
+        "Italian":"Sei al ristorante. Ordina un pasto e una bevanda al cameriere.",
+        "Portuguese":"Você está em um restaurante. Peça uma refeição e uma bebida ao garçom.",
+        "Chinese":"你在餐厅。向服务员点一份餐和一杯饮料。",
+        "Arabic":"أنت في مطعم. اطلب وجبة ومشروبًا من النادل."
     },
     "Checking into a Hotel": {
-        "German": "Du bist an der Hotelrezeption. Melde dich an und frage nach Frühstückszeiten.",
-        "French": "Vous êtes à la réception de l'hôtel. Enregistrez-vous et demandez les horaires du petit-déjeuner.",
-        "English": "You are at a hotel reception. Check in and ask about breakfast times.",
-        "Spanish": "Estás en la recepción de un hotel. Regístrate y pregunta por los horarios del desayuno.",
-        "Italian": "Sei alla reception dell'hotel. Fai il check-in e chiedi gli orari della colazione.",
-        "Portuguese": "Você está na recepção do hotel. Faça o check-in e pergunte sobre os horários do café da manhã.",
-        "Chinese": "你在酒店前台。办理入住并询问早餐时间。",
-        "Arabic": "أنت في استقبال الفندق. سجّل دخولك واسأل عن مواعيد الإفطار."
+        "German":"Du bist an der Hotelrezeption. Melde dich an und frage nach Frühstückszeiten.",
+        "French":"Vous êtes à la réception de l'hôtel. Enregistrez-vous et demandez les horaires du petit-déjeuner.",
+        "English":"You are at a hotel reception. Check in and ask about breakfast times.",
+        "Spanish":"Estás en la recepción de un hotel. Regístrate y pregunta por los horarios del desayuno.",
+        "Italian":"Sei alla reception dell'hotel. Fai il check-in e chiedi gli orari della colazione.",
+        "Portuguese":"Você está na recepção do hotel. Faça o check-in e pergunte sobre os horários do café da manhã.",
+        "Chinese":"你在酒店前台。办理入住并询问早餐时间。",
+        "Arabic":"أنت في استقبال الفندق. سجّل دخولك واسأل عن مواعيد الإفطار."
     },
     "Asking for Directions": {
-        "German": "Du hast dich verlaufen. Frage jemanden auf der Straße nach dem Weg zum Bahnhof.",
-        "French": "Vous êtes perdu. Demandez à quelqu'un dans la rue le chemin pour aller à la gare.",
-        "English": "You are lost. Ask someone in the street for directions to the train station.",
-        "Spanish": "Estás perdido. Pregunta a alguien en la calle cómo llegar a la estación de tren.",
-        "Italian": "Ti sei perso. Chiedi a qualcuno per strada come arrivare alla stazione.",
-        "Portuguese": "Você está perdido. Pergunte a alguém na rua como chegar à estação de trem.",
-        "Chinese": "你迷路了。向路人询问去火车站怎么走。",
-        "Arabic": "لقد ضللت الطريق. اسأل شخصًا في الشارع عن الطريق إلى محطة القطار."
+        "German":"Du hast dich verlaufen. Frage jemanden auf der Straße nach dem Weg zum Bahnhof.",
+        "French":"Vous êtes perdu. Demandez à quelqu'un dans la rue le chemin pour aller à la gare.",
+        "English":"You are lost. Ask someone in the street for directions to the train station.",
+        "Spanish":"Estás perdido. Pregunta a alguien en la calle cómo llegar a la estación de tren.",
+        "Italian":"Ti sei perso. Chiedi a qualcuno per strada come arrivare alla stazione.",
+        "Portuguese":"Você está perdido. Pergunte a alguém na rua como chegar à estação de trem.",
+        "Chinese":"你迷路了。向路人询问去火车站怎么走。",
+        "Arabic":"لقد ضللت الطريق. اسأل شخصًا في الشارع عن الطريق إلى محطة القطار."
     },
     "Shopping for Clothes": {
-        "German": "Du bist in einem Bekleidungsgeschäft. Frage nach einer anderen Größe und dem Preis.",
-        "French": "Vous êtes dans un magasin de vêtements. Demandez une autre taille et le prix.",
-        "English": "You are in a clothing store. Ask for another size and the price.",
-        "Spanish": "Estás en una tienda de ropa. Pide otra talla y pregunta el precio.",
-        "Italian": "Sei in un negozio di abbigliamento. Chiedi un'altra taglia e il prezzo.",
-        "Portuguese": "Você está em uma loja de roupas. Peça outro tamanho e pergunte o preço.",
-        "Chinese": "你在服装店。请问有没有别的尺码，多少钱？",
-        "Arabic": "أنت في متجر ملابس. اطلب مقاسًا آخر واسأل عن السعر."
+        "German":"Du bist in einem Bekleidungsgeschäft. Frage nach einer anderen Größe und dem Preis.",
+        "French":"Vous êtes dans un magasin de vêtements. Demandez une autre taille et le prix.",
+        "English":"You are in a clothing store. Ask for another size and the price.",
+        "Spanish":"Estás en una tienda de ropa. Pide otra talla y pregunta el precio.",
+        "Italian":"Sei in un negozio di abbigliamento. Chiedi un'altra taglia e il prezzo.",
+        "Portuguese":"Você está em uma loja de roupas. Peça outro tamanho e pergunte o preço.",
+        "Chinese":"你在服装店。请问有没有别的尺码，多少钱？",
+        "Arabic":"أنت في متجر ملابس. اطلب مقاسًا آخر واسأل عن السعر."
     },
     "Making a Doctor's Appointment": {
-        "German": "Du möchtest einen Arzttermin vereinbaren. Erkläre deine Beschwerden.",
-        "French": "Vous souhaitez prendre rendez-vous chez le médecin. Expliquez vos symptômes.",
-        "English": "You want to make a doctor's appointment. Explain your symptoms.",
-        "Spanish": "Quieres pedir cita con el médico. Explica tus síntomas.",
-        "Italian": "Vuoi prendere un appuntamento dal medico. Spiega i tuoi sintomi.",
-        "Portuguese": "Você quer marcar uma consulta médica. Explique seus sintomas.",
-        "Chinese": "你想预约医生。说明你的症状。",
-        "Arabic": "تريد حجز موعد عند الطبيب. اشرح أعراضك."
+        "German":"Du möchtest einen Arzttermin vereinbaren. Erkläre deine Beschwerden.",
+        "French":"Vous souhaitez prendre rendez-vous chez le médecin. Expliquez vos symptômes.",
+        "English":"You want to make a doctor's appointment. Explain your symptoms.",
+        "Spanish":"Quieres pedir cita con el médico. Explica tus síntomas.",
+        "Italian":"Vuoi prendere un appuntamento dal medico. Spiega i tuoi sintomi.",
+        "Portuguese":"Você quer marcar uma consulta médica. Explique seus sintomas.",
+        "Chinese":"你想预约医生。说明你的症状。",
+        "Arabic":"تريد حجز موعد عند الطبيب. اشرح أعراضك."
     },
     "Booking Travel Tickets": {
-        "German": "Du bist am Ticketschalter. Kaufe ein Zugticket nach Berlin für morgen früh.",
-        "French": "Vous êtes au guichet. Achetez un billet de train pour Paris pour demain matin.",
-        "English": "You are at the ticket counter. Buy a train ticket to London for tomorrow morning.",
-        "Spanish": "Estás en la taquilla. Compra un billete de tren a Madrid para mañana por la mañana.",
-        "Italian": "Sei alla biglietteria. Acquista un biglietto del treno per Roma per domani mattina.",
-        "Portuguese": "Você está na bilheteria. Compre uma passagem de trem para Lisboa para amanhã de manhã.",
-        "Chinese": "你在售票处。买一张明天早上去上海的火车票。",
-        "Arabic": "أنت في شباك التذاكر. اشترِ تذكرة قطار إلى القاهرة صباح الغد."
+        "German":"Du bist am Ticketschalter. Kaufe ein Zugticket nach Berlin für morgen früh.",
+        "French":"Vous êtes au guichet. Achetez un billet de train pour Paris pour demain matin.",
+        "English":"You are at the ticket counter. Buy a train ticket to London for tomorrow morning.",
+        "Spanish":"Estás en la taquilla. Compra un billete de tren a Madrid para mañana por la mañana.",
+        "Italian":"Sei alla biglietteria. Acquista un biglietto del treno per Roma per domani mattina.",
+        "Portuguese":"Você está na bilheteria. Compre uma passagem de trem para Lisboa para amanhã de manhã.",
+        "Chinese":"你在售票处。买一张明天早上去上海的火车票。",
+        "Arabic":"أنت في شباك التذاكر. اشترِ تذكرة قطار إلى القاهرة صباح الغد."
     }
 }
 
-# --- Cultural Fun Facts per Language ---
 cultural_facts = {
-    "German": [
-        "In Germany, bread is a big part of the culture—there are over 300 kinds of bread!",
-        "Most Germans separate their garbage into at least five categories for recycling.",
-        "The Autobahn is famous for having stretches with no speed limit.",
-        "Christmas markets originated in Germany and are a big tradition.",
-        "Germans love their sausages—there are more than 1,500 types!"
-    ],
-    "French": [
-        "France is the most visited country in the world.",
-        "Baguettes are so important in France, there are laws regulating their price and ingredients.",
-        "The French eat around 30,000 tons of snails every year.",
-        "The Eiffel Tower was supposed to be a temporary structure.",
-        "In France, lunch breaks often last up to two hours!"
-    ],
-    "English": [
-        "English is the official language of the air—pilots worldwide must communicate in English.",
-        "The UK is home to over 1,500 castles.",
-        "Tea is a central part of British culture.",
-        "The United States has no official national language, but English is the most widely spoken.",
-        "Australia is the only continent covered by a single country that speaks English."
-    ],
-    "Spanish": [
-        "Spanish is the second-most spoken language in the world by native speakers.",
-        "The tooth fairy in Spain is actually a mouse called 'El Ratón Pérez.'",
-        "In Spain, people often eat dinner as late as 10 p.m.",
-        "There are 21 countries with Spanish as an official language.",
-        "Spanish has two words for 'to be': 'ser' and 'estar.'"
-    ],
-    "Italian": [
-        "Italy is home to the most UNESCO World Heritage sites in the world.",
-        "Italians eat more pasta than anyone else in the world.",
-        "Italians invented the thermometer in 1612.",
-        "The Italian language has over 250,000 words.",
-        "Opera was born in Italy at the end of the 16th century."
-    ],
-    "Portuguese": [
-        "Portuguese is the official language of nine countries.",
-        "Brazil is the largest Portuguese-speaking country in the world.",
-        "The longest word in Portuguese is 'anticonstitucionalissimamente.'",
-        "Portugal is the oldest nation-state in Europe.",
-        "The famous Portuguese tiles are called 'azulejos.'"
-    ],
-    "Chinese": [
-        "Chinese is the most spoken language in the world.",
-        "Mandarin uses four tones to change meaning.",
-        "Red is a very lucky color in Chinese culture.",
-        "China is home to the world’s largest high-speed rail network.",
-        "The Chinese New Year is also called the Spring Festival."
-    ],
-    "Arabic": [
-        "Arabic is written from right to left.",
-        "The word ‘algebra’ comes from Arabic.",
-        "There are more than 400 million Arabic speakers worldwide.",
-        "Arabic has no capital letters.",
-        "In Arabic culture, hospitality is extremely important."
-    ]
-}
+    lang: facts for lang, facts in {
+        "German": [
+            "In Germany, bread is a big part of the culture—there are over 300 kinds of bread!",
+            "Most Germans separate their garbage into at least five categories for recycling.",
+            "The Autobahn is famous for having stretches with no speed limit.",
+            "Christmas markets originated in Germany and are a big tradition.",
+            "Germans love their sausages—there are more than 1,500 types!"
+        ],
+        "French": [
+            "France is the most visited country in the world.",
+            "Baguettes are so important in France, there are laws regulating their price and ingredients.",
+            "The French eat around 30,000 tons of snails every year.",
+            "The Eiffel Tower was supposed to be a temporary structure.",
+            "In France, lunch breaks often last up to two hours!"
+        ],
+        "English": [
+            "English is the official language of the air—pilots worldwide must communicate in English.",
+            "The UK is home to over 1,500 castles.",
+            "Tea is a central part of British culture.",
+            "The United States has no official national language, but English is the most widely spoken.",
+            "Australia is the only continent covered by a single country that speaks English."
+        ],
+        "Spanish": [
+            "Spanish is the second-most spoken language in the world by native speakers.",
+            "The tooth fairy in Spain is actually a mouse called 'El Ratón Pérez.'",
+            "In Spain, people often eat dinner as late as 10 p.m.",
+            "There are 21 countries with Spanish as an official language.",
+            "Spanish has two words for 'to be': 'ser' and 'estar.'"
+        ],
+        "Italian": [
+            "Italy is home to the most UNESCO World Heritage sites in the world.",
+            "Italians eat more pasta than anyone else in the world.",
+            "Italians invented the thermometer in 1612.",
+            "The Italian language has over 250,000 words.",
+            "Opera was born in Italy at the end of the 16th century."
+        ],
+        "Portuguese": [
+            "Portuguese is the official language of nine countries.",
+            "Brazil is the largest Portuguese-speaking country in the world.",
+            "The longest word in Portuguese is 'anticonstitucionalissimamente.'",
+            "Portugal is the oldest nation-state in Europe.",
+            "The famous Portuguese tiles are called 'azulejos.'"
+        ],
+        "China
 
-# --- Initialize chat session ---
+# Initialize chat
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
 
-# --- Sidebar controls ---
+# Sidebar controls
 language = st.sidebar.selectbox("Language", list(tutors.keys()), index=2)
 level = st.sidebar.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"], index=0)
 mode = st.sidebar.selectbox("Mode", ["Free Talk"] + list(roleplays.keys()))
+
 show_grammar = st.sidebar.checkbox("Show grammar corrections", value=True)
 
-# --- Cultural Fun Fact Display (Safe Indexing) ---
-facts = cultural_facts[language]
+# --- Cultural Fun Fact Display ---
 if 'fact_idx' not in st.session_state or st.session_state.get('last_fact_lang') != language:
-    st.session_state['fact_idx'] = random.randint(0, len(facts) - 1)
+    # On new login or language change, pick a new fact index
+    st.session_state['fact_idx'] = random.randint(0, len(cultural_facts[language])-1)
     st.session_state['last_fact_lang'] = language
-if st.session_state['fact_idx'] >= len(facts):
-    st.session_state['fact_idx'] = 0
-st.sidebar.markdown(f"💡 **Did you know?**\n\n{facts[st.session_state['fact_idx']]}")
-if st.sidebar.button("🔄 New Cultural Fact"):
-    st.session_state['fact_idx'] = random.randint(0, len(facts) - 1)
-    st.sidebar.markdown(f"💡 **Did you know?**\n\n{facts[st.session_state['fact_idx']]}")
 
-# --- Tutor/scenario selection ---
+# Show fact in sidebar (or main page if you prefer)
+fact = cultural_facts[language][st.session_state['fact_idx']]
+st.sidebar.markdown(f"💡 **Did you know?**\n\n{fact}")
+
+# Button to get another fun fact
+if st.sidebar.button("🔄 New Cultural Fact"):
+    st.session_state['fact_idx'] = random.randint(0, len(cultural_facts[language])-1)
+    fact = cultural_facts[language][st.session_state['fact_idx']]
+    st.sidebar.markdown(f"💡 **Did you know?**\n\n{fact}")
+
 tutor = tutors[language]
 scenario_prompt = '' if mode == 'Free Talk' else roleplays[mode][language]
 
-# --- Main headers ---
+
+# Main headers
 st.markdown("<h1 style='font-size:2.4em;'>🌟 Falowen – Your AI Conversation Partner</h1>", unsafe_allow_html=True)
 st.markdown(f"<h2>Practice {language} ({level}) {'free conversation' if not scenario_prompt else 'role-play: '+scenario_prompt}</h2>", unsafe_allow_html=True)
 
-# --- Chat container ---
-st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
-for msg in st.session_state['messages']:
-    avatar = '🧑‍🏫' if msg['role'] == 'assistant' else None
-    with st.chat_message(msg['role'], avatar=avatar):
-        st.markdown(msg['content'])
-st.markdown("</div>", unsafe_allow_html=True)
+# Fun fact carousel
+if 'fact_idx' not in st.session_state: st.session_state['fact_idx']=0
+facts = [f"{tutor} speaks multiple languages!", f"{tutor} loves teaching.", f"{tutor}'s favorite word is possibility!", f"{tutor} stays alert with virtual coffee."]
+st.sidebar.markdown(facts[st.session_state['fact_idx']])
+if st.sidebar.button('🔃 Next Fact'):
+    st.session_state['fact_idx'] = (st.session_state['fact_idx']+1)%len(facts)
 
 # Chat container
 st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
 for msg in st.session_state['messages']:
-    avatar = '🧑‍🏫' if msg['role'] == 'assistant' else None
-    with st.chat_message(msg['role'], avatar=avatar):
-        st.markdown(msg['content'])
+    avatar = '🧑‍🏫' if msg['role']=='assistant' else None
+    with st.chat_message(msg['role'], avatar=avatar): st.markdown(msg['content'])
 st.markdown("</div>", unsafe_allow_html=True)
 
 # Chat input & response
@@ -312,7 +304,7 @@ if user_input:
             reply = "Sorry, there was a problem."
     st.session_state['messages'].append({'role': 'assistant', 'content': reply})
     st.chat_message('assistant', avatar='🧑‍🏫').markdown(f"**{tutor}:** {reply}")
-
+    
     # Grammar check only if enabled in sidebar
     if show_grammar:
         grammar_msgs = [
@@ -339,39 +331,13 @@ if user_input:
 
 # Gamification
 today = pd.Timestamp(datetime.now().date())
-mask = (df_usage.user_email == st.session_state['user_email']) & (df_usage.date == today)
-count = int(df_usage.loc[mask, 'count'].iloc[0]) if mask.any() else 0
-prog = min(count / 10, 1)
+mask = (df_usage.user_email==st.session_state['user_email'])&(df_usage.date==today)
+count = int(df_usage.loc[mask,'count'].iloc[0]) if mask.any() else 0
+prog = min(count/10,1)
 st.progress(prog)
 st.caption(f"{count}/10 messages today")
-if count in [5, 10]:
-    st.balloons()
+if count in [5,10]: st.balloons()
 
 # Share button
 share = f"I just practiced {language} with {tutor}!"
-st.markdown(f'''
-    <a href="https://wa.me/?text={share.replace(" ","%20")}" target="_blank">
-        <button style="width:100%;padding:10px;border:none;border-radius:8px;background:#25D366;color:white;">
-            Share on WhatsApp 🚀
-        </button>
-    </a>
-''', unsafe_allow_html=True)
-
-# Download Chat Section
-if st.session_state.get('messages'):
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            label="⬇️ Download Chat as CSV",
-            data=get_chat_csv(st.session_state['messages']),
-            file_name="Falowen_Chat.csv",
-            mime="text/csv"
-        )
-    with col2:
-        st.download_button(
-            label="⬇️ Download Chat as PDF",
-            data=get_chat_pdf(st.session_state['messages']),
-            file_name="Falowen_Chat.pdf",
-            mime="application/pdf"
-        )
-
+st.markdown(f'<a href="https://wa.me/?text={share.replace(" ","%20")}" target="_blank"><button style="width:100%;padding:10px;border:none;border-radius:8px;background:#25D366;color:white;">Share on WhatsApp 🚀</button></a>', unsafe_allow_html=True)
