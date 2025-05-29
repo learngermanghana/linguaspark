@@ -66,18 +66,11 @@ st.markdown(
 )
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
-# === About Herr Felix & Motivational Exam Bootcamp ===
+# ===  Motivational Exam Bootcamp ===
 st.info(
     """
-    ### 👋 About Herr Felix
-
-    - 🇬🇭 Born in Ghana, learned German up to C1, and studied in Germany!
-    - 🎓 Studied International Management at IU International University.
-    - 🏫 Runs Learn Language Education Academy – helping students pass real Goethe exams.
-    - 💡 Used to manage a record label and produce music. Now making German learning fun and exam-focused!
-    - 🥇 Passionate about your success and making learning entertaining.
-
-    ---
+    ### 👋 Prepare to pass your exams
+    
     **🎤 This is not just chat—it's your personal exam preparation bootcamp!**
     - Every time you talk to Herr Felix, imagine you are **in the exam hall**.
     - Expect realistic A2 and B1 speaking questions, surprise prompts, and real exam tips.
