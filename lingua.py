@@ -210,6 +210,7 @@ roleplays = {
         "Chinese": "你在售票处。买一张明天早上去上海的火车票。",
         "Arabic": "أنت في شباك التذاكر. اشترِ تذكرة قطار إلى القاهرة صباح الغد."
     }
+}  
 
 # Cultural Fun Facts per Language
 cultural_facts = {
