@@ -163,19 +163,19 @@ if not paid_df.empty:
 trials_df = load_df(trials_file, ["email", "trial_code", "created"])
 usage_df = load_df(usage_file, ["user_key", "date", "trial_count", "daily_count"], date_cols=["date"])
 
-# === COOKIE MANAGER FOR ACCESS CODE ===
-cookie_manager = CookiesManager()
+# --- Access Code Persistence using URL Query Parameters ---
+query_params = st.experimental_get_query_params()
+access_code_default = query_params.get("code", [""])[0]
+
 access_code = st.text_input(
     "🔐 Enter your paid or trial code:",
-    value=cookie_manager.get("falowen_code", ""),
+    value=access_code_default,
     key="access_code_main"
 )
-if access_code:
-    cookie_manager["falowen_code"] = access_code
 
-mode = st.sidebar.radio("Navigate", ["Practice", "Teacher Dashboard"])
+if access_code and access_code != access_code_default:
+    st.experimental_set_query_params(code=access_code)
 
-# ... your Practice mode and Teacher Dashboard logic continues here ...
 
 # --- Teacher Dashboard ---
 if mode == "Teacher Dashboard":
