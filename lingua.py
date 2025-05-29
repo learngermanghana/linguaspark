@@ -204,24 +204,3 @@ if user_input:
             )
         except Exception:
             st.info("Audio feedback not available or an error occurred.")
-
-# --- WhatsApp Share Button ---
-share_text = "I just practiced my German speaking with Herr Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
-share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
-st.markdown(
-    f'<a href="{share_url}" target="_blank">'
-    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
-    'Share on WhatsApp 🚀</button></a>',
-    unsafe_allow_html=True
-)
-
-
-# --- WhatsApp Share Button ---
-share_text = "I just practiced my language skills with Herr Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
-share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
-st.markdown(
-    f'<a href="{share_url}" target="_blank">'
-    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
-    'Share on WhatsApp 🚀</button></a>',
-    unsafe_allow_html=True
-)
