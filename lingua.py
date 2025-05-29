@@ -7,20 +7,24 @@ import tempfile
 import io
 from gtts import gTTS
 
+import streamlit as st
 
-# --- Access Code Persistence using URL Query Parameters (modern way) ---
+# --- ACCESS CODE PAGE ---
+def show_login():
+    st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
+    st.title("🔐 Welcome! Enter Your Code")
+    st.write("Please enter your paid or trial code to access Falowen.")
+    code = st.text_input("Enter code:", key="access_code_main")
+    if code:
+        # Save to URL (so after reload, still auto-fills)
+        st.query_params = {"code": code}
+    return code
+
 query_params = st.query_params
-access_code_default = query_params.get("code", [""])[0] if "code" in query_params else ""
-
-access_code = st.text_input(
-    "🔐 Enter your paid or trial code:",
-    value=access_code_default,
-    key="access_code_main"
-)
-
-if access_code and access_code != access_code_default:
-    st.query_params = {"code": access_code}
-
+access_code = query_params.get("code", [""])[0] if "code" in query_params else ""
+if not access_code:
+    access_code = show_login()
+    st.stop()  # Prevents the rest of the app from running until code is entered
 
 # ---- API and data setup ----
 api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
