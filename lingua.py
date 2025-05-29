@@ -6,17 +6,16 @@ import uuid
 import tempfile
 import io
 from gtts import gTTS
+import random
 
-import streamlit as st
+# ================== LOGIN PAGE ==================
 
-# --- ACCESS CODE PAGE ---
 def show_login():
     st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
     st.title("🔐 Welcome! Enter Your Code")
     st.write("Please enter your paid or trial code to access Falowen.")
     code = st.text_input("Enter code:", key="access_code_main")
     if code:
-        # Save to URL (so after reload, still auto-fills)
         st.query_params = {"code": code}
     return code
 
@@ -24,14 +23,9 @@ query_params = st.query_params
 access_code = query_params.get("code", [""])[0] if "code" in query_params else ""
 if not access_code:
     access_code = show_login()
-    st.stop()  # Prevents the rest of the app from running until code is entered
+    st.stop()  # Blocks rest of app until code entered
 
-# ---- API and data setup ----
-api_key = st.secrets.get("general", {}).get("OPENAI_API_KEY")
-if not api_key:
-    st.error("❌ API key not found. Add it to .streamlit/secrets.toml under [general]")
-    st.stop()
-client = OpenAI(api_key=api_key)
+# ================== MAIN APP ==================
 
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
@@ -39,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS to hide menu, reactions, and style chat ---
+# --- Custom CSS ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -51,11 +45,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ---- Fun Fact: Show one at random after login ----
+fun_facts = [
+    "🇬🇭 Herr Felix was born in Ghana and mastered German up to C1 level!",
+    "🎓 Herr Felix studied International Management at IU International University in Germany.",
+    "🏫 He founded Learn Language Education Academy to help students pass Goethe exams.",
+    "💡 Herr Felix used to run a record label and produce music before becoming a language coach!",
+    "🥇 He loves making language learning fun, personal, and exam-focused.",
+    "📚 Herr Felix speaks English, German, and loves teaching in both.",
+    "🚀 Sometimes Herr Felix will throw in a real Goethe exam question—are you ready?",
+    "🤖 Herr Felix built this app himself—so every session is personalized!"
+]
+random_fact = random.choice(fun_facts)
+st.success(f"**Did you know?** {random_fact}")
+
+# --- Main App Header ---
 st.markdown(
-    "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor!</h2>",
+    "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor, Herr Felix!</h2>",
     unsafe_allow_html=True,
 )
-st.image("https://cdn.pixabay.com/photo/2013/07/13/12/47/student-146981_960_720.png", width=100)
 st.markdown("> Practice your speaking or writing. Get simple AI feedback and audio answers!")
 
 # === About Herr Felix & Motivational Exam Bootcamp ===
@@ -116,8 +124,6 @@ with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Pract
     """)
 
 # === Entertaining, Impactful Random Exam Topic Trainer ===
-import random
-
 a2_topics = [
     "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
     "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
@@ -145,8 +151,7 @@ elif exam_level == "B1 Sprechen":
 
 st.caption("Keep clicking for more surprise exam-style topics. Every practice session makes you more confident for the real day!")
 
-# === (Your open chat/practice/AI logic continues below as before!) ===
-
+# === (The rest of your app: chat, dashboard, etc., can go here) ===
 
 # --- Session State Management ---
 if "teacher_rerun" not in st.session_state:
