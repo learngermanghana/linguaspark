@@ -1,8 +1,6 @@
 import streamlit as st
 from openai import OpenAI
 from datetime import datetime
-import pandas as pd
-import uuid
 import tempfile
 import io
 from gtts import gTTS
@@ -85,8 +83,12 @@ with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Pract
     [A2 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/A2%20sprechen.pdf)  
     [B1 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/Sprechen%20B1%20(Goethe%20Exams).pdf)
     """)
-    
-# === Random Exam Topic Trainer ===
+
+# === Level Selection (German only) ===
+level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"], key="level")
+exam_level = st.selectbox("Choose your exam level for random topic:", ["A2 Sprechen", "B1 Sprechen"], key="exam_level")
+
+# === Topic Lists ===
 a2_topics = [
     "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
     "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
@@ -99,31 +101,26 @@ b1_topics = [
     "Vegetarische Ernährung", "Zeitungslesen"
 ]
 
-st.markdown("---")
-st.markdown("## 🎲 **Train Like the Real Exam!**")
-exam_level = st.selectbox("Choose exam level for random topic:", ["A2 Sprechen", "B1 Sprechen"], key="exam_level")
-if exam_level == "A2 Sprechen":
-    if st.button("🎤 Give me a random A2 topic!", key="random_a2"):
-        topic = random.choice(a2_topics)
-        st.success(f"📝 **Your A2 Sprechen exam topic:**\n\n`{topic}`\n\nImagine you're in the exam! Ask and answer questions about this topic for 1–2 minutes.")
-elif exam_level == "B1 Sprechen":
-    if st.button("🎤 Give me a random B1 topic!", key="random_b1"):
-        topic = random.choice(b1_topics)
-        st.success(f"📝 **Your B1 Sprechen exam topic:**\n\n`{topic}`\n\nImagine you're in the exam! Give a short presentation (intro, experience, pros/cons, conclusion).")
-
-st.caption("Keep clicking for more surprise exam-style topics. Every practice session makes you more confident for the real day!")
-
 # ========== Chat/Practice Logic ==========
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 
-# -- Language + Level selection (optional) --
-language = st.selectbox("🌍 Choose your language", 
-    ["German", "French", "English", "Spanish", "Italian", "Portuguese", "Chinese", "Arabic"]
-)
-level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1"], key="level")
+# --- Random Exam Topic (Primes chat) ---
+if st.button("🎤 Give me a random exam topic!"):
+    if exam_level == "A2 Sprechen":
+        topic = random.choice(a2_topics)
+        instruction = f"📝 **A2 Exam Topic:** `{topic}`\n\nImagine the examiner just asked you about this topic. Please type a question you would ask and your answer in German!"
+    else:
+        topic = random.choice(b1_topics)
+        instruction = f"📝 **B1 Exam Topic:** `{topic}`\n\nImagine you are in the exam hall. Please give a short presentation: Introduction, experience, pros/cons, and your conclusion in German!"
+    st.session_state["messages"].append({
+        "role": "assistant",
+        "content": instruction
+    })
+
+st.caption("You can always ask for more topics, or use the chat for your own practice.")
 
 # -- User input (chat or audio) --
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
@@ -173,7 +170,7 @@ if user_input:
 
     try:
         ai_system_prompt = (
-            f"You are Herr Felix, a friendly {language} tutor. "
+            f"You are Herr Felix, a friendly German tutor. "
             f"Always answer in exam mood for level {level} unless told otherwise."
         )
         client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
@@ -193,18 +190,7 @@ if user_input:
     with st.chat_message("assistant", avatar="🧑‍🏫"):
         st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
         try:
-            lang_codes = {
-                "German": "de",
-                "French": "fr",
-                "Spanish": "es",
-                "Italian": "it",
-                "Portuguese": "pt",
-                "Chinese": "zh-CN",
-                "Arabic": "ar",
-                "English": "en"
-            }
-            tts_lang = lang_codes.get(language, "en")
-            tts = gTTS(ai_reply, lang=tts_lang)
+            tts = gTTS(ai_reply, lang="de")
             tts_bytes = io.BytesIO()
             tts.write_to_fp(tts_bytes)
             tts_bytes.seek(0)
@@ -218,6 +204,17 @@ if user_input:
             )
         except Exception:
             st.info("Audio feedback not available or an error occurred.")
+
+# --- WhatsApp Share Button ---
+share_text = "I just practiced my German speaking with Herr Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
+share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
+st.markdown(
+    f'<a href="{share_url}" target="_blank">'
+    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
+    'Share on WhatsApp 🚀</button></a>',
+    unsafe_allow_html=True
+)
+
 
 # --- WhatsApp Share Button ---
 share_text = "I just practiced my language skills with Herr Felix on Falowen! 🌟 Try it too: https://falowen.streamlit.app"
