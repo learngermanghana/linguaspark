@@ -24,7 +24,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Random Fun Fact ---
+# --- Fun Fact & Header ---
 fun_facts = [
     "🇬🇭 Herr Felix was born in Ghana and mastered German up to C1 level!",
     "🎓 Herr Felix studied International Management at IU International University in Germany.",
@@ -138,79 +138,101 @@ B1_TEIL3 = [
     "Etwas überraschend finden", "Weitere Details erfragen"
 ]
 
-# ========== TEIL-AWARE Exam Trainer ==========
-
+# ========== APP SESSION STATE ==========
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 if "corrections" not in st.session_state:
     st.session_state["corrections"] = []
+if "turn_count" not in st.session_state:
+    st.session_state["turn_count"] = 0
 
-exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
+# ========== MODE SELECTOR ==========
+mode = st.radio(
+    "Wie möchtest du üben?",
+    ["Geführte Prüfungssimulation (Exam Mode)", "Eigenes Thema/Frage (Custom Topic Chat)"],
+    index=0
+)
 
-if exam_level == "A2":
-    teil_options = [
-        "Teil 1 – Fragen zu Schlüsselwörtern",
-        "Teil 2 – Bildbeschreibung & Diskussion",
-        "Teil 3 – Gemeinsam planen"
-    ]
-else:
-    teil_options = [
-        "Teil 1 – Gemeinsam planen (Dialogue)",
-        "Teil 2 – Präsentation (Monologue)",
-        "Teil 3 – Feedback & Fragen stellen"
-    ]
+max_turns = 6
 
-teil = st.selectbox("Welchen Teil möchtest du üben?", teil_options, key="teil")
+# ========== TEIL-AWARE Exam Trainer ==========
+if mode == "Geführte Prüfungssimulation (Exam Mode)":
+    exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
+    if exam_level == "A2":
+        teil_options = [
+            "Teil 1 – Fragen zu Schlüsselwörtern",
+            "Teil 2 – Bildbeschreibung & Diskussion",
+            "Teil 3 – Gemeinsam planen"
+        ]
+    else:
+        teil_options = [
+            "Teil 1 – Gemeinsam planen (Dialogue)",
+            "Teil 2 – Präsentation (Monologue)",
+            "Teil 3 – Feedback & Fragen stellen"
+        ]
+    teil = st.selectbox("Welchen Teil möchtest du üben?", teil_options, key="teil")
 
-# --- What to expect
-desc = ""
-if exam_level == "A2":
-    if teil.startswith("Teil 1"):
-        desc = "Du bekommst ein Schlüsselwort (wie 'Familie', 'Freizeit', 'Wohnort'). Stelle eine passende Frage und beantworte eine Frage dazu – auf Deutsch."
-    elif teil.startswith("Teil 2"):
-        desc = "Beschreibe eine Situation oder beantworte Fragen zu einem Alltagsthema (z.B. 'Was machen Sie am Wochenende?')."
-    elif teil.startswith("Teil 3"):
-        desc = "Plane mit deinem Partner etwas gemeinsam (z.B. einen Ausflug, Kino, Party). Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
-else:
-    if teil.startswith("Teil 1"):
-        desc = "Plane gemeinsam mit deinem Partner etwas (z.B. eine Reise, ein Fest). Mache Vorschläge, antworte, und treffe eine Entscheidung – alles auf Deutsch."
-    elif teil.startswith("Teil 2"):
-        desc = "Halte eine kurze Präsentation zu einem zufälligen Thema: Begrüße, nenne das Thema, gib deine Meinung, Vor- und Nachteile, und fasse zusammen. Alles auf B1-Niveau."
-    elif teil.startswith("Teil 3"):
-        desc = "Stelle nach der Präsentation deines Partners 1–2 Fragen und gib positives, konstruktives Feedback – auf Deutsch."
-
-st.info(f"**Was erwartet dich in {teil}?** {desc}")
-
-if st.button("Start Practice!"):
-    # Clear chat and give Teil-appropriate prompt
-    st.session_state["messages"] = []
+    # --- What to expect
+    desc = ""
     if exam_level == "A2":
         if teil.startswith("Teil 1"):
-            topic = random.choice(A2_TEIL1)
-            prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
+            desc = "Du bekommst ein Schlüsselwort (wie 'Familie', 'Freizeit', 'Wohnort'). Stelle eine passende Frage und beantworte eine Frage dazu – auf Deutsch."
         elif teil.startswith("Teil 2"):
-            topic = random.choice(A2_TEIL2)
-            prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
-        else:
-            topic = random.choice(A2_TEIL3)
-            prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
+            desc = "Beschreibe eine Situation oder beantworte Fragen zu einem Alltagsthema (z.B. 'Was machen Sie am Wochenende?')."
+        elif teil.startswith("Teil 3"):
+            desc = "Plane mit deinem Partner etwas gemeinsam (z.B. einen Ausflug, Kino, Party). Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
     else:
         if teil.startswith("Teil 1"):
-            topic = random.choice(B1_TEIL1)
-            prompt = f"**B1 Teil 1:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
+            desc = "Plane gemeinsam mit deinem Partner etwas (z.B. eine Reise, ein Fest). Mache Vorschläge, antworte, und treffe eine Entscheidung – alles auf Deutsch."
         elif teil.startswith("Teil 2"):
-            topic = random.choice(B1_TEIL2)
-            prompt = f"**B1 Teil 2:** Halte eine Präsentation über das Thema: **{topic}**. Begrüße, nenne das Thema, gib deine Meinung, teile Vor- und Nachteile, fasse zusammen."
+            desc = "Halte eine kurze Präsentation zu einem zufälligen Thema: Begrüße, nenne das Thema, gib deine Meinung, Vor- und Nachteile, und fasse zusammen. Alles auf B1-Niveau."
+        elif teil.startswith("Teil 3"):
+            desc = "Stelle nach der Präsentation deines Partners 1–2 Fragen und gib positives, konstruktives Feedback – auf Deutsch."
+    st.info(f"**Was erwartet dich in {teil}?** {desc}")
+
+    if st.button("Start Practice!"):
+        st.session_state["messages"] = []
+        st.session_state["corrections"] = []
+        st.session_state["turn_count"] = 0
+        if exam_level == "A2":
+            if teil.startswith("Teil 1"):
+                topic = random.choice(A2_TEIL1)
+                prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
+            elif teil.startswith("Teil 2"):
+                topic = random.choice(A2_TEIL2)
+                prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
+            else:
+                topic = random.choice(A2_TEIL3)
+                prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
         else:
-            topic = random.choice(B1_TEIL3)
-            prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
+            if teil.startswith("Teil 1"):
+                topic = random.choice(B1_TEIL1)
+                prompt = f"**B1 Teil 1:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
+            elif teil.startswith("Teil 2"):
+                topic = random.choice(B1_TEIL2)
+                prompt = f"**B1 Teil 2:** Halte eine Präsentation über das Thema: **{topic}**. Begrüße, nenne das Thema, gib deine Meinung, teile Vor- und Nachteile, fasse zusammen."
+            else:
+                topic = random.choice(B1_TEIL3)
+                prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
+        st.session_state["messages"].append({"role": "assistant", "content": prompt})
 
-    st.session_state["messages"].append({"role": "assistant", "content": prompt})
-    st.session_state["corrections"] = []  # Reset corrections when new Teil is started
+    st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
 
-st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
+else:
+    # ====== CUSTOM TOPIC CHAT ======
+    custom_topic = st.text_input("Schreibe hier dein eigenes Thema oder deine Frage (z.B. aus Google Classroom, Hausaufgabe, freies Gespräch)...")
+    if st.button("Starte das Gespräch zu meinem Thema!"):
+        st.session_state["messages"] = []
+        st.session_state["corrections"] = []
+        st.session_state["turn_count"] = 0
+        if custom_topic.strip():
+            st.session_state["messages"].append({
+                "role": "user",
+                "content": custom_topic.strip()
+            })
+    st.caption("Du bestimmst das Thema – Herr Felix hilft dir beim Üben, gibt Tipps und korrigiert deine Fehler!")
 
 # -- User input (chat or audio) --
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
@@ -253,17 +275,38 @@ for msg in st.session_state['messages']:
         with st.chat_message("user"):
             st.markdown(f"🗣️ {msg['content']}")
 
-if user_input:
+# --- Only accept messages while not at max turns ---
+session_ended = st.session_state["turn_count"] >= max_turns
+
+if user_input and not session_ended:
     st.session_state['messages'].append({'role': 'user', 'content': user_input})
-    with st.chat_message('user'):
-        st.markdown(f"🗣️ {user_input}")
+    st.session_state["turn_count"] += 1
 
     try:
-        ai_system_prompt = (
-            "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
-            "Always answer as an examiner, then on a new line write 'Grammatik-Tipp: [correction/tip]' based on the student's last answer. "
-            "Never break character."
-        )
+        if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
+            extra_end = (
+                "After 6 student answers, give a short, positive summary, "
+                "suggest a new topic or a break, and do NOT answer further unless restarted."
+                if st.session_state["turn_count"] >= max_turns else ""
+            )
+            ai_system_prompt = (
+                "You are Herr Felix, an expert German teacher and exam trainer. "
+                "Help the student have a conversation about their chosen topic, answer questions, correct mistakes, "
+                "and always give a short 'Grammatik-Tipp:' or suggestion after each reply. "
+                "Be friendly, explain in simple German when needed, and encourage the student to practice more. "
+                + extra_end
+            )
+        else:
+            extra_end = (
+                "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
+                if st.session_state["turn_count"] >= max_turns else ""
+            )
+            ai_system_prompt = (
+                "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
+                "Always answer as an examiner, then on a new line write 'Grammatik-Tipp: [correction/tip]' based on the student's last answer. "
+                + extra_end +
+                " Never break character."
+            )
         client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model='gpt-3.5-turbo',
@@ -301,6 +344,14 @@ if user_input:
             )
         except Exception:
             st.info("Audio feedback not available or an error occurred.")
+
+# --- Session ending and restart option ---
+if session_ended:
+    st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
+    if st.button("Neue Session starten"):
+        st.session_state["messages"] = []
+        st.session_state["corrections"] = []
+        st.session_state["turn_count"] = 0
 
 # --- Show tracked grammar tips
 if st.session_state["corrections"]:
