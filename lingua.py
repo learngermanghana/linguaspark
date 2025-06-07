@@ -404,32 +404,51 @@ with tab1:
         for tip in st.session_state["corrections"]:
             st.write(f"- {tip}")
 
-# ============ TEACHER DASHBOARD TAB ============
 with tab2:
     st.header("👩‍🏫 Teacher Dashboard – Manage Student Codes")
-    df_codes = load_codes()
-    st.subheader("Current Codes")
-    st.write(df_codes)
 
-    new_code = st.text_input("Add a new student code")
-    if st.button("Add Code"):
-        new_code = new_code.strip().lower()
-        if new_code and new_code not in df_codes["code"].values:
-            df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code]})], ignore_index=True)
-            save_codes(df_codes)
-            st.success(f"Code '{new_code}' added!")
-            st.experimental_rerun()
-        elif not new_code:
-            st.warning("Enter a code to add.")
-        else:
-            st.warning("Code already exists.")
+    if "teacher_authenticated" not in st.session_state:
+        st.session_state["teacher_authenticated"] = False
 
-    remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
-    if st.button("Remove Selected Code"):
-        if remove_code:
-            df_codes = df_codes[df_codes["code"] != remove_code]
-            save_codes(df_codes)
-            st.success(f"Code '{remove_code}' removed!")
+    if not st.session_state["teacher_authenticated"]:
+        pwd = st.text_input("Teacher Password:", type="password", key="teacher_pwd")
+        if st.button("Login", key="teacher_login_btn"):
+            if pwd == TEACHER_PASSWORD:
+                st.session_state["teacher_authenticated"] = True
+                st.success("Access granted!")
+                st.experimental_rerun()
+            else:
+                st.error("Incorrect password. Please try again.")
+        st.stop()
+    else:
+        # Teacher Dashboard content as before:
+        df_codes = load_codes()
+        st.subheader("Current Codes")
+        st.write(df_codes)
+
+        new_code = st.text_input("Add a new student code")
+        if st.button("Add Code"):
+            new_code = new_code.strip().lower()
+            if new_code and new_code not in df_codes["code"].values:
+                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code]})], ignore_index=True)
+                save_codes(df_codes)
+                st.success(f"Code '{new_code}' added!")
+                st.experimental_rerun()
+            elif not new_code:
+                st.warning("Enter a code to add.")
+            else:
+                st.warning("Code already exists.")
+
+        remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
+        if st.button("Remove Selected Code"):
+            if remove_code:
+                df_codes = df_codes[df_codes["code"] != remove_code]
+                save_codes(df_codes)
+                st.success(f"Code '{remove_code}' removed!")
+                st.experimental_rerun()
+            else:
+                st.warning("Choose a code to remove.")
+        
+        if st.button("Log out (Teacher)"):
+            st.session_state["teacher_authenticated"] = False
             st.experimental_rerun()
-        else:
-            st.warning("Choose a code to remove.")
