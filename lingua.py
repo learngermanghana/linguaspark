@@ -17,6 +17,7 @@ st.set_page_config(
 
 # ======= CODE MANAGEMENT FUNCTIONS =======
 CODES_FILE = "student_codes(1).csv"
+TEACHER_PASSWORD = "yourpassword123"  # Change to your secure password!
 
 def load_codes():
     if os.path.exists(CODES_FILE):
@@ -29,8 +30,6 @@ def load_codes():
 
 def save_codes(df):
     df.to_csv(CODES_FILE, index=False)
-
-TEACHER_PASSWORD = "yourpassword123"  # Set your real password here!
 
 # ======= TABS: PRACTICE & TEACHER DASHBOARD =======
 tab1, tab2 = st.tabs(["Practice", "Teacher Dashboard"])
@@ -264,7 +263,6 @@ with tab1:
         st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
 
     else:
-        # ====== CUSTOM TOPIC CHAT ======
         custom_topic = st.text_input("Type your own topic or question here (e.g. from Google Classroom, homework, or any free conversation)...")
         if st.button("Start the conversation on my topic!"):
             st.session_state["messages"] = []
@@ -277,7 +275,6 @@ with tab1:
                 })
         st.caption("You choose the topic – Herr Felix will help you, give tips, and correct your mistakes!")
 
-    # -- User input (chat or audio) --
     uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
     typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="typed_input")
 
@@ -309,7 +306,6 @@ with tab1:
         if typed_message:
             user_input = typed_message
 
-    # --- Chat display ---
     for msg in st.session_state['messages']:
         if msg['role'] == 'assistant':
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -318,7 +314,6 @@ with tab1:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # --- Only accept messages while not at max turns and daily usage ---
     session_ended = st.session_state["turn_count"] >= max_turns
     used_today = st.session_state["daily_usage"][usage_key]
     if user_input and not session_ended:
@@ -370,7 +365,6 @@ with tab1:
             st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
             with st.chat_message("assistant", avatar="🧑‍🏫"):
                 st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
-                # Extract and store grammar tip
                 tip_match = re.search(r"Grammatik-Tipp\s*:\s*(.+)", ai_reply)
                 if tip_match:
                     tip = tip_match.group(1).strip()
@@ -392,7 +386,6 @@ with tab1:
                 except Exception:
                     st.info("Audio feedback not available or an error occurred.")
 
-    # --- Session ending and restart option ---
     if session_ended:
         st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
         if st.button("Neue Session starten"):
@@ -400,13 +393,11 @@ with tab1:
             st.session_state["corrections"] = []
             st.session_state["turn_count"] = 0
 
-    # --- Show tracked grammar tips
     if st.session_state["corrections"]:
         st.markdown("### 📋 **Your Grammar Corrections & Tips so far**")
         for tip in st.session_state["corrections"]:
             st.write(f"- {tip}")
 
-    # --- WhatsApp Share Button ---
     share_text = "Ich habe mit Herr Felix auf Falowen Deutsch gesprochen! 🌟 Probier es aus: https://falowen.streamlit.app"
     share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
     st.markdown(
@@ -416,13 +407,13 @@ with tab1:
         unsafe_allow_html=True
     )
 
+# ============ TEACHER DASHBOARD TAB ============
 with tab2:
     st.header("👩‍🏫 Teacher Dashboard – Manage Student Codes")
 
     if "teacher_authenticated" not in st.session_state:
         st.session_state["teacher_authenticated"] = False
 
-    # Show the password field until authenticated
     if not st.session_state["teacher_authenticated"]:
         pwd = st.text_input("Teacher Password:", type="password")
         login_btn = st.button("Login")
@@ -433,10 +424,8 @@ with tab2:
                 st.experimental_rerun()
             else:
                 st.error("Incorrect password. Please try again.")
-        # Stop rendering the dashboard if not logged in
         st.stop()
 
-    # After successful login, show dashboard UI:
     df_codes = load_codes()
     st.subheader("Current Codes")
     st.write(df_codes)
