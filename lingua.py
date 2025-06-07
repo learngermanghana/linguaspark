@@ -91,7 +91,7 @@ if not st.session_state["student_code"]:
         code = code.strip().lower()
         if code in df_codes["code"].values:
             st.session_state["student_code"] = code
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("This code is not recognized. Please check with your tutor.")
     st.stop()
