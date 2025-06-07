@@ -9,6 +9,8 @@ import pandas as pd
 import os
 from datetime import date
 
+TEACHER_PASSWORD = "Felix029"  
+
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
