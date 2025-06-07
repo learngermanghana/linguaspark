@@ -9,8 +9,6 @@ import pandas as pd
 import os
 from datetime import date
 
-TEACHER_PASSWORD = "Felix029"  
-
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
@@ -32,6 +30,8 @@ def load_codes():
 def save_codes(df):
     df.to_csv(CODES_FILE, index=False)
 
+TEACHER_PASSWORD = "yourpassword123"  # Set your real password here!
+
 # ======= TABS: PRACTICE & TEACHER DASHBOARD =======
 tab1, tab2 = st.tabs(["Practice", "Teacher Dashboard"])
 
@@ -47,7 +47,7 @@ with tab1:
             code = code.strip().lower()
             if code in df_codes["code"].values:
                 st.session_state["student_code"] = code
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("This code is not recognized. Please check with your tutor.")
         st.stop()
@@ -69,7 +69,7 @@ with tab1:
     if col2.button("Log out"):
         for key in ["student_code", "messages", "corrections", "turn_count"]:
             if key in st.session_state: del st.session_state[key]
-        st.rerun()
+        st.experimental_rerun()
 
     # --- Fun Fact & Header ---
     fun_facts = [
@@ -406,6 +406,17 @@ with tab1:
         for tip in st.session_state["corrections"]:
             st.write(f"- {tip}")
 
+    # --- WhatsApp Share Button ---
+    share_text = "Ich habe mit Herr Felix auf Falowen Deutsch gesprochen! 🌟 Probier es aus: https://falowen.streamlit.app"
+    share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
+    st.markdown(
+        f'<a href="{share_url}" target="_blank">'
+        '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
+        'Share on WhatsApp 🚀</button></a>',
+        unsafe_allow_html=True
+    )
+
+# ============ TEACHER DASHBOARD TAB ============
 with tab2:
     st.header("👩‍🏫 Teacher Dashboard – Manage Student Codes")
 
@@ -414,16 +425,17 @@ with tab2:
 
     if not st.session_state["teacher_authenticated"]:
         pwd = st.text_input("Teacher Password:", type="password", key="teacher_pwd")
-        if st.button("Login", key="teacher_login_btn"):
+        login_btn = st.button("Login", key="teacher_login_btn")
+        if login_btn:
             if pwd == TEACHER_PASSWORD:
                 st.session_state["teacher_authenticated"] = True
                 st.success("Access granted!")
                 st.experimental_rerun()
-            else:
+            elif pwd != "":
                 st.error("Incorrect password. Please try again.")
-        st.stop()
+        # Show nothing else until authenticated
+
     else:
-        # Teacher Dashboard content as before:
         df_codes = load_codes()
         st.subheader("Current Codes")
         st.write(df_codes)
@@ -450,7 +462,7 @@ with tab2:
                 st.experimental_rerun()
             else:
                 st.warning("Choose a code to remove.")
-        
+
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
             st.experimental_rerun()
