@@ -72,7 +72,7 @@ with st.sidebar:
                 df_codes = df_codes[df_codes["code"] != remove_code]
                 save_codes(df_codes)
                 st.success(f"Code '{remove_code}' removed!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Choose a code to remove.")
 
