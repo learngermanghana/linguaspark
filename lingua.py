@@ -21,7 +21,7 @@ if not st.session_state["student_code"]:
     code = st.text_input("🔑 Enter your student code to begin:", key="code_entry")
     if code:
         st.session_state["student_code"] = code.strip().lower()
-        st.experimental_rerun()
+        st.rerun()
     st.stop()  # block rest of UI until code is entered
 
 student_code = st.session_state["student_code"]
@@ -42,7 +42,7 @@ col1.info(f"Student code: `{student_code}`  |  Today's practice: {st.session_sta
 if col2.button("Log out"):
     for key in ["student_code", "messages", "corrections", "turn_count"]:
         if key in st.session_state: del st.session_state[key]
-    st.experimental_rerun()
+    st.rerun()
 
 # --- END LOGIN/USAGE LIMIT ---
 
