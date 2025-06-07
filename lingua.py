@@ -17,7 +17,7 @@ st.set_page_config(
 
 # ======= CODE MANAGEMENT FUNCTIONS =======
 CODES_FILE = "student_codes(1).csv"
-TEACHER_PASSWORD = "yourpassword123"  # Change to your real password!
+TEACHER_PASSWORD = "Felix029"  # Change to your real password!
 
 def load_codes():
     if os.path.exists(CODES_FILE):
