@@ -222,8 +222,8 @@ if mode == "Geführte Prüfungssimulation (Exam Mode)":
 
 else:
     # ====== CUSTOM TOPIC CHAT ======
-    custom_topic = st.text_input("Schreibe hier dein eigenes Thema oder deine Frage (z.B. aus Google Classroom, Hausaufgabe, freies Gespräch)...")
-    if st.button("Starte das Gespräch zu meinem Thema!"):
+    custom_topic = st.text_input("Type your own topic or question here (e.g. from Google Classroom, homework, or any free conversation)...")
+    if st.button("Click here to begin. Have fun!"):
         st.session_state["messages"] = []
         st.session_state["corrections"] = []
         st.session_state["turn_count"] = 0
