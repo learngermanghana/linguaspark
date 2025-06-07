@@ -45,7 +45,7 @@ with st.sidebar:
             if pwd == TEACHER_PASSWORD:
                 st.session_state["teacher_authenticated"] = True
                 st.success("Access granted!")
-                st.experimental_rerun()
+                st.rerun()
             elif pwd != "":
                 st.error("Incorrect password. Please try again.")
     else:
