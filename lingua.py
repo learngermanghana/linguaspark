@@ -5,6 +5,7 @@ import io
 from gtts import gTTS
 import random
 import re
+from datetime import date
 
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
@@ -12,17 +13,39 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS ---
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .st-emotion, .st-emotion-actions, .st-emotion-cache {visibility: hidden !important;}
-    .stChatMessage.user {background: #e1f5fe; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
-    .stChatMessage.assistant {background: #f0f4c3; border-radius: 12px; margin-bottom: 5px; padding: 8px;}
-    </style>
-""", unsafe_allow_html=True)
+# ========== STUDENT CODE LOGIN & USAGE LIMIT ==========
+if "student_code" not in st.session_state:
+    st.session_state["student_code"] = ""
+
+if not st.session_state["student_code"]:
+    code = st.text_input("🔑 Enter your student code to begin:", key="code_entry")
+    if code:
+        st.session_state["student_code"] = code.strip().lower()
+        st.experimental_rerun()
+    st.stop()  # block rest of UI until code is entered
+
+student_code = st.session_state["student_code"]
+
+if "daily_usage" not in st.session_state:
+    st.session_state["daily_usage"] = {}
+
+today_str = str(date.today())
+usage_key = f"{student_code}_{today_str}"
+if usage_key not in st.session_state["daily_usage"]:
+    st.session_state["daily_usage"][usage_key] = 0
+
+DAILY_LIMIT = 10  # adjust this number to set your daily limit
+
+# --- Show code and usage, with logout ---
+col1, col2 = st.columns([4, 1])
+col1.info(f"Student code: `{student_code}`  |  Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}")
+if col2.button("Log out"):
+    for key in ["student_code", "messages", "corrections", "turn_count"]:
+        if key in st.session_state: del st.session_state[key]
+    st.experimental_rerun()
+
+# --- END LOGIN/USAGE LIMIT ---
+
 
 # --- Fun Fact & Header ---
 fun_facts = [
@@ -138,7 +161,6 @@ B1_TEIL3 = [
     "Etwas überraschend finden", "Weitere Details erfragen"
 ]
 
-# ========== APP SESSION STATE ==========
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "transcript" not in st.session_state:
@@ -148,7 +170,6 @@ if "corrections" not in st.session_state:
 if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
 
-# ========== MODE SELECTOR ==========
 mode = st.radio(
     "Wie möchtest du üben?",
     ["Geführte Prüfungssimulation (Exam Mode)", "Eigenes Thema/Frage (Custom Topic Chat)"],
@@ -157,7 +178,6 @@ mode = st.radio(
 
 max_turns = 6
 
-# ========== TEIL-AWARE Exam Trainer ==========
 if mode == "Geführte Prüfungssimulation (Exam Mode)":
     exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
     if exam_level == "A2":
@@ -174,7 +194,6 @@ if mode == "Geführte Prüfungssimulation (Exam Mode)":
         ]
     teil = st.selectbox("Welchen Teil möchtest du üben?", teil_options, key="teil")
 
-    # --- What to expect
     desc = ""
     if exam_level == "A2":
         if teil.startswith("Teil 1"):
@@ -223,7 +242,7 @@ if mode == "Geführte Prüfungssimulation (Exam Mode)":
 else:
     # ====== CUSTOM TOPIC CHAT ======
     custom_topic = st.text_input("Type your own topic or question here (e.g. from Google Classroom, homework, or any free conversation)...")
-    if st.button("Click here to begin. Have fun!"):
+    if st.button("Start the conversation on my topic!"):
         st.session_state["messages"] = []
         st.session_state["corrections"] = []
         st.session_state["turn_count"] = 0
@@ -232,7 +251,7 @@ else:
                 "role": "user",
                 "content": custom_topic.strip()
             })
-    st.caption("Du bestimmst das Thema – Herr Felix hilft dir beim Üben, gibt Tipps und korrigiert deine Fehler!")
+    st.caption("You choose the topic – Herr Felix will help you, give tips, and correct your mistakes!")
 
 # -- User input (chat or audio) --
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
@@ -275,75 +294,79 @@ for msg in st.session_state['messages']:
         with st.chat_message("user"):
             st.markdown(f"🗣️ {msg['content']}")
 
-# --- Only accept messages while not at max turns ---
+# --- Only accept messages while not at max turns and daily usage ---
 session_ended = st.session_state["turn_count"] >= max_turns
-
+used_today = st.session_state["daily_usage"][usage_key]
 if user_input and not session_ended:
-    st.session_state['messages'].append({'role': 'user', 'content': user_input})
-    st.session_state["turn_count"] += 1
+    if used_today >= DAILY_LIMIT:
+        st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
+    else:
+        st.session_state['messages'].append({'role': 'user', 'content': user_input})
+        st.session_state["turn_count"] += 1
+        st.session_state["daily_usage"][usage_key] += 1
 
-    try:
-        if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
-            extra_end = (
-                "After 6 student answers, give a short, positive summary, "
-                "suggest a new topic or a break, and do NOT answer further unless restarted."
-                if st.session_state["turn_count"] >= max_turns else ""
-            )
-            ai_system_prompt = (
-                "You are Herr Felix, an expert German teacher and exam trainer. "
-                "Help the student have a conversation about their chosen topic, answer questions, correct mistakes, "
-                "and always give a short 'Grammatik-Tipp:' or suggestion after each reply. "
-                "Be friendly, explain in simple German when needed, and encourage the student to practice more. "
-                + extra_end
-            )
-        else:
-            extra_end = (
-                "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
-                if st.session_state["turn_count"] >= max_turns else ""
-            )
-            ai_system_prompt = (
-                "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
-                "Always answer as an examiner, then on a new line write 'Grammatik-Tipp: [correction/tip]' based on the student's last answer. "
-                + extra_end +
-                " Never break character."
-            )
-        client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model='gpt-3.5-turbo',
-            messages=[
-                {'role': 'system', 'content': ai_system_prompt},
-                *st.session_state['messages']
-            ]
-        )
-        ai_reply = response.choices[0].message.content
-    except Exception as e:
-        ai_reply = "Sorry, there was a problem generating a response. Please try again."
-        st.error(str(e))
-
-    st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
-    with st.chat_message("assistant", avatar="🧑‍🏫"):
-        st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
-        # Extract and store grammar tip
-        tip_match = re.search(r"Grammatik-Tipp\s*:\s*(.+)", ai_reply)
-        if tip_match:
-            tip = tip_match.group(1).strip()
-            if tip and tip not in st.session_state["corrections"]:
-                st.session_state["corrections"].append(tip)
         try:
-            tts = gTTS(ai_reply, lang="de")
-            tts_bytes = io.BytesIO()
-            tts.write_to_fp(tts_bytes)
-            tts_bytes.seek(0)
-            tts_data = tts_bytes.read()
-            st.audio(tts_data, format="audio/mp3")
-            st.download_button(
-                label="⬇️ Download AI Response Audio",
-                data=tts_data,
-                file_name="response.mp3",
-                mime="audio/mp3"
+            if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
+                extra_end = (
+                    "After 6 student answers, give a short, positive summary, "
+                    "suggest a new topic or a break, and do NOT answer further unless restarted."
+                    if st.session_state["turn_count"] >= max_turns else ""
+                )
+                ai_system_prompt = (
+                    "You are Herr Felix, an expert German teacher and exam trainer. "
+                    "Help the student have a conversation about their chosen topic, answer questions, correct mistakes, "
+                    "and always give a short 'Grammatik-Tipp:' or suggestion after each reply. "
+                    "Be friendly, explain in simple German when needed, and encourage the student to practice more. "
+                    + extra_end
+                )
+            else:
+                extra_end = (
+                    "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
+                    if st.session_state["turn_count"] >= max_turns else ""
+                )
+                ai_system_prompt = (
+                    "You are Herr Felix, a highly intelligent, friendly, but strict Goethe-Prüfer (examiner) for German A2/B1. "
+                    "Always answer as an examiner, then on a new line write 'Grammatik-Tipp: [correction/tip]' based on the student's last answer. "
+                    + extra_end +
+                    " Never break character."
+                )
+            client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[
+                    {'role': 'system', 'content': ai_system_prompt},
+                    *st.session_state['messages']
+                ]
             )
-        except Exception:
-            st.info("Audio feedback not available or an error occurred.")
+            ai_reply = response.choices[0].message.content
+        except Exception as e:
+            ai_reply = "Sorry, there was a problem generating a response. Please try again."
+            st.error(str(e))
+
+        st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
+        with st.chat_message("assistant", avatar="🧑‍🏫"):
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
+            # Extract and store grammar tip
+            tip_match = re.search(r"Grammatik-Tipp\s*:\s*(.+)", ai_reply)
+            if tip_match:
+                tip = tip_match.group(1).strip()
+                if tip and tip not in st.session_state["corrections"]:
+                    st.session_state["corrections"].append(tip)
+            try:
+                tts = gTTS(ai_reply, lang="de")
+                tts_bytes = io.BytesIO()
+                tts.write_to_fp(tts_bytes)
+                tts_bytes.seek(0)
+                tts_data = tts_bytes.read()
+                st.audio(tts_data, format="audio/mp3")
+                st.download_button(
+                    label="⬇️ Download AI Response Audio",
+                    data=tts_data,
+                    file_name="response.mp3",
+                    mime="audio/mp3"
+                )
+            except Exception:
+                st.info("Audio feedback not available or an error occurred.")
 
 # --- Session ending and restart option ---
 if session_ended:
@@ -358,13 +381,3 @@ if st.session_state["corrections"]:
     st.markdown("### 📋 **Your Grammar Corrections & Tips so far**")
     for tip in st.session_state["corrections"]:
         st.write(f"- {tip}")
-
-# --- WhatsApp Share Button ---
-share_text = "Ich habe mit Herr Felix auf Falowen Deutsch gesprochen! 🌟 Probier es aus: https://falowen.streamlit.app"
-share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
-st.markdown(
-    f'<a href="{share_url}" target="_blank">'
-    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
-    'Share on WhatsApp 🚀</button></a>',
-    unsafe_allow_html=True
-)
