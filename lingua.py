@@ -16,25 +16,24 @@ st.set_page_config(
 )
 
 # ======= CODE MANAGEMENT FUNCTIONS =======
-CODES_FILE = "student_codes(1).csv"
-TEACHER_PASSWORD = "Felix029"  # Change to your real password!
+CODES_FILE = "student_codes"  # <-- CSV file with NO .csv extension
+TEACHER_PASSWORD = "Felix029"
 
 def load_codes():
     if os.path.exists(CODES_FILE):
         df = pd.read_csv(CODES_FILE)
         if "code" not in df.columns:
             df = pd.DataFrame(columns=["code"])
-        # Always clean codes: lowercase & strip spaces
         df["code"] = df["code"].astype(str).str.strip().str.lower()
     else:
         df = pd.DataFrame(columns=["code"])
     return df
 
 def save_codes(df):
-    # Always save codes cleaned
     df["code"] = df["code"].astype(str).str.strip().str.lower()
     df.to_csv(CODES_FILE, index=False)
 
+# ========== TEACHER DASHBOARD (SIDEBAR) ==========
 with st.sidebar:
     st.header("👩‍🏫 Teacher Dashboard")
 
@@ -62,7 +61,6 @@ with st.sidebar:
                 df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
                 save_codes(df_codes)
                 st.success(f"Code '{new_code_clean}' added!")
-                # No rerun needed; the UI will refresh naturally.
             elif not new_code_clean:
                 st.warning("Enter a code to add.")
             else:
@@ -74,14 +72,11 @@ with st.sidebar:
                 df_codes = df_codes[df_codes["code"] != remove_code]
                 save_codes(df_codes)
                 st.success(f"Code '{remove_code}' removed!")
-                # No rerun needed.
             else:
                 st.warning("Choose a code to remove.")
 
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
-            # No rerun needed.
-
 
 # ======= STUDENT PRACTICE LOGIC (MAIN PAGE) =======
 df_codes = load_codes()
@@ -95,7 +90,7 @@ if not st.session_state["student_code"]:
         valid_codes = df_codes["code"].dropna().tolist()
         if code_clean in valid_codes:
             st.session_state["student_code"] = code_clean
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("This code is not recognized. Please check with your tutor.")
     st.stop()
