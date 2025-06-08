@@ -81,7 +81,7 @@ B1_TEIL2 = [
 ]
 B1_TEIL3 = [
     "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
-    "Etwas überraschend finden", "Weitere Details erfragen"
+    "Etwas überraschend finden oder planen", "Weitere Details erfragen"
 ]
 
 def load_codes():
@@ -298,7 +298,7 @@ elif st.session_state["step"] == 4:
             st.session_state["step"] = 5
 
 if st.session_state["step"] == 5:
-    # ==== Ensure daily_usage exists ====
+    # --- Setup daily_usage
     if "daily_usage" not in st.session_state:
         st.session_state["daily_usage"] = {}
     today_str = str(date.today())
@@ -307,14 +307,33 @@ if st.session_state["step"] == 5:
     if usage_key not in st.session_state["daily_usage"]:
         st.session_state["daily_usage"][usage_key] = 0
 
-    # ==== Info header ====
     st.info(
         f"Student code: `{student_code}` | "
         f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
     )
 
-    # ==== Insert first message if needed (AI always starts for custom topic) ====
-    if not st.session_state["messages"]:
+    # --- B1 Teil 3: Special "role-play" prompt ---
+    is_b1_teil3 = (
+        st.session_state.get("selected_mode", "").startswith("Geführte") and
+        st.session_state.get("selected_exam_level", "") == "B1" and
+        st.session_state.get("selected_teil", "").startswith("Teil 3")
+    )
+
+    # Insert first message for B1 Teil 3
+    if is_b1_teil3 and not st.session_state["messages"]:
+        topic = random.choice(B1_TEIL2)
+        st.session_state["current_b1_teil3_topic"] = topic
+        initial_prompt = (
+            f"Ich habe gerade eine kurze Präsentation über **{topic}** gehalten.\n\n"
+            "Deine Aufgabe jetzt:\n"
+            "- Stelle mir **zwei Fragen** zu meiner Präsentation (auf Deutsch).\n"
+            "- Gib mir **eine positive Rückmeldung** auf Englisch oder Deutsch.\n\n"
+            "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
+        )
+        st.session_state["messages"].append({"role": "assistant", "content": initial_prompt})
+
+    # Insert first message for all other modes
+    elif not st.session_state["messages"]:
         if st.session_state.get("selected_mode", "").startswith("Geführte"):
             prompt = st.session_state.get("initial_prompt", "Stelle bitte eine Frage oder beginne mit deiner Präsentation.")
             st.session_state["messages"].append({"role": "assistant", "content": prompt})
@@ -322,7 +341,7 @@ if st.session_state["step"] == 5:
             custom_topic = st.session_state.get("custom_topic", "")
             if custom_topic:
                 st.session_state["messages"].append({"role": "user", "content": custom_topic})
-                # Immediately generate AI reply to custom topic
+                # For custom topic, AI begins the conversation as before
                 try:
                     ai_system_prompt = (
                         "You are Herr Felix, an expert German teacher and presentation coach. "
@@ -345,7 +364,7 @@ if st.session_state["step"] == 5:
                     st.error(str(e))
                 st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
 
-    # ==== Student input ====
+    # --- Student input ---
     uploaded_audio = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav", "mp3", "ogg", "m4a"],
@@ -376,12 +395,11 @@ if st.session_state["step"] == 5:
     elif typed_message:
         user_input = typed_message
 
-    # ==== Chat & AI turn handling ====
     session_ended = st.session_state["turn_count"] >= max_turns
     used_today = st.session_state["daily_usage"][usage_key]
     ai_just_replied = False
 
-    # When user replies, get AI reply right away, show both in chat
+    # --- B1 Teil 3 AI prompt logic ---
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
@@ -391,11 +409,19 @@ if st.session_state["step"] == 5:
             st.session_state["daily_usage"][usage_key] += 1
 
             try:
-                extra_end = (
-                    "After 6 student answers, give a short summary and suggest a new topic or break."
-                    if st.session_state["turn_count"] >= max_turns else ""
-                )
-                if st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)":
+                if is_b1_teil3:
+                    b1_topic = st.session_state.get("current_b1_teil3_topic", random.choice(B1_TEIL2))
+                    ai_system_prompt = (
+                        "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
+                        f"The topic of your presentation is: {b1_topic}. "
+                        "The student is supposed to ask you TWO questions about your presentation and give you ONE positive feedback. "
+                        "1. Read the student's message. "
+                        "2. Tell the student if they have written two valid questions about the topic and one positive feedback (praise them if so, otherwise say politely what is missing). "
+                        "3. If the questions are good, answer them briefly (in simple German). "
+                        "4. Always end with clear encouragement in English. "
+                        "Be friendly, supportive, and exam-like. Never break character."
+                    )
+                elif st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)":
                     ai_system_prompt = (
                         "You are Herr Felix, an expert German teacher and exam trainer. "
                         "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
@@ -404,8 +430,7 @@ if st.session_state["step"] == 5:
                         "After that, give a very short 'Grammatik-Tipp:' in English using simple language to explain the main issue. "
                         "If the student's answer is perfect, say so and still give a tip in English. "
                         "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
-                        + extra_end +
-                        " Never break character."
+                        "Never break character."
                     )
                 else:
                     exam_level = st.session_state.get("selected_exam_level", "A2")
@@ -419,8 +444,7 @@ if st.session_state["step"] == 5:
                             "If the answer is perfect, say so and still give a tip in English. "
                             "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                             "Never use advanced vocabulary. "
-                            + extra_end +
-                            " Never break character."
+                            "Never break character."
                         )
                     else:
                         ai_system_prompt = (
@@ -431,8 +455,7 @@ if st.session_state["step"] == 5:
                             "After that, give a very short 'Grammatik-Tipp:' in English with a brief explanation. "
                             "If the answer is perfect, say so and still give a tip in English. "
                             "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
-                            + extra_end +
-                            " Never break character."
+                            "Never break character."
                         )
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
                 response = client.chat.completions.create(
@@ -447,7 +470,7 @@ if st.session_state["step"] == 5:
             st.session_state["ai_audio"] = ai_reply
             ai_just_replied = True
 
-    # ==== Display chat history ====
+    # --- Show chat history ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -456,7 +479,7 @@ if st.session_state["step"] == 5:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # ==== Play audio for last AI message (if new) ====
+    # --- Play audio for last AI message (if new) ---
     if ai_just_replied and "ai_audio" in st.session_state:
         try:
             tts = gTTS(st.session_state["ai_audio"], lang="de")
@@ -467,7 +490,7 @@ if st.session_state["step"] == 5:
         except:
             st.info("Audio feedback not available.")
 
-    # ==== Navigation ====
+    # --- Navigation ---
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
