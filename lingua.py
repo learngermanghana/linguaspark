@@ -385,7 +385,7 @@ for msg in st.session_state['messages']:
         reply_to_show = parts[0].strip()
         with st.chat_message("assistant", avatar="🧑‍🏫"):
             st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {reply_to_show}", unsafe_allow_html=True)
-        # Store the Grammatik-Tipp for summary only
+        # Store the Grammatik-Tipp (not shown, but kept for possible future use)
         if len(parts) > 2:
             grammatik_tipp = parts[2].strip()
             if grammatik_tipp and grammatik_tipp not in st.session_state["corrections"]:
@@ -418,6 +418,7 @@ if user_input and not session_ended:
                     "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                     "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
                     "If the student's answer is perfect, say so and still give a tip. "
+                    "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                     + extra_end +
                     " Never break character."
                 )
@@ -434,6 +435,7 @@ if user_input and not session_ended:
                         "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                         "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
                         "If the answer is perfect, say so and still give a tip. "
+                        "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                         "Never use advanced vocabulary. "
                         + extra_end +
                         " Never break character."
@@ -446,6 +448,7 @@ if user_input and not session_ended:
                         "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                         "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
                         "If the answer is perfect, say so and still give a tip. "
+                        "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                         + extra_end +
                         " Never break character."
                     )
@@ -482,9 +485,3 @@ if session_ended:
         st.session_state["messages"] = []
         st.session_state["corrections"] = []
         st.session_state["turn_count"] = 0
-
-if st.session_state["corrections"]:
-    st.markdown("### 📋 **Your Grammar Corrections & Tips so far**")
-    for tip in st.session_state["corrections"]:
-        st.write(f"- {tip}")
-
