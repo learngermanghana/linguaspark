@@ -143,9 +143,13 @@ st.markdown("> Practice your German speaking or writing. Get simple AI feedback 
 st.info(
     """
     🎤 **This is not just chat—it's your personal exam preparation bootcamp!**
+
     Every time you talk to Herr Felix, imagine you are **in the exam hall**.
-    Expect realistic A2 and B1 speaking questions, surprise prompts, and real exam tips.
-    Sometimes, you’ll even get questions from last year’s exam!
+    Expect realistic A2 and B1 speaking questions, surprise prompts, and real exam tips—sometimes, you’ll even get questions from last year’s exam!
+
+    **Want to prepare for a class presentation or your next homework?**
+    👉 You can also enter your **own question or topic** at any time—perfect for practicing real classroom situations or special assignments!
+
     Let’s make exam training engaging, surprising, and impactful.  
     **Are you ready? Let’s go! 🚀**
     """, icon="💡"
