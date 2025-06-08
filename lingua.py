@@ -327,6 +327,29 @@ else:
                 "role": "user",
                 "content": custom_topic.strip()
             })
+
+            # Immediately generate AI response to the custom topic
+            ai_system_prompt = (
+                "You are Herr Felix, an expert German teacher and presentation coach. "
+                "The student has just given you a topic or question for practice (e.g. class presentation, homework, or exam training). "
+                "Start the conversation right away: reply directly to the student's topic, ask a relevant follow-up question, and give an example answer if it fits. "
+                "Be engaging and supportive, like a real exam partner or teacher, and always give a 'Grammatik-Tipp:' or brief correction if needed. "
+                "Keep your responses short (max. 2–3 sentences). "
+                "If the student's message is already a good presentation, praise it and help them go deeper or extend the topic. "
+                "Never say 'How can I help you?'. Instead, react directly to the topic and keep the conversation going. "
+                "Never break character."
+            )
+            client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[
+                    {'role': 'system', 'content': ai_system_prompt},
+                    *st.session_state['messages']
+                ]
+            )
+            ai_reply = response.choices[0].message.content
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+
     st.caption("You choose the topic – Herr Felix will help you, give tips, and correct your mistakes!")
 
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
@@ -337,12 +360,6 @@ if uploaded_audio is not None:
     uploaded_audio.seek(0)
     audio_bytes = uploaded_audio.read()
     st.audio(audio_bytes, format=uploaded_audio.type)
-    st.download_button(
-        label="⬇️ Download Your Uploaded Audio",
-        data=audio_bytes,
-        file_name=uploaded_audio.name,
-        mime=uploaded_audio.type
-    )
     try:
         suffix = "." + uploaded_audio.name.split(".")[-1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -360,6 +377,7 @@ else:
     if typed_message:
         user_input = typed_message
 
+# --- Display chat history immediately, so every user message shows at once ---
 for msg in st.session_state['messages']:
     if msg['role'] == 'assistant':
         with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -379,7 +397,6 @@ if user_input and not session_ended:
         st.session_state["daily_usage"][usage_key] += 1
 
         try:
-            # ==== Explicit correction logic ====
             if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
                 extra_end = (
                     "After 6 student answers, give a short, positive summary, "
@@ -388,14 +405,10 @@ if user_input and not session_ended:
                 )
                 ai_system_prompt = (
                     "You are Herr Felix, an expert German teacher and exam trainer. "
-                    "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
-                    "If the sentence is correct, say so. "
-                    "Then give a very short 'Grammatik-Tipp:' with a brief explanation. "
-                    "Always keep your answer short (no more than 2–3 sentences). "
-                    "Example:\n"
-                    "Student: ich lesen ein Buch\n"
-                    "Correction: Ich lese ein Buch.\n"
-                    "Grammatik-Tipp: 'lesen' must be 'lese' with 'ich'."
+                    "First, answer the student's question or statement naturally as a German tutor (max 2–3 sentences). "
+                    "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
+                    "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
+                    "If the student's answer is perfect, say so and still give a tip. "
                     + extra_end +
                     " Never break character."
                 )
@@ -404,37 +417,27 @@ if user_input and not session_ended:
                     "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
                     if st.session_state["turn_count"] >= max_turns else ""
                 )
-                # --- Level-based exam prompt (concise, correction, and controlled) ---
                 if exam_level == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
-                        "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
-                        "If the sentence is correct, say so. "
-                        "Then give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
-                        "Use only words and grammar allowed at A2 level, and keep all answers very short (max. 2–3 sentences). "
+                        "First, answer the student's question or statement in very simple A2-level German (max 2–3 sentences). "
+                        "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
+                        "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
+                        "If the answer is perfect, say so and still give a tip. "
                         "Never use advanced vocabulary. "
-                        "Example:\n"
-                        "Student: ich lesen ein Buch\n"
-                        "Correction: Ich lese ein Buch.\n"
-                        "Grammatik-Tipp: 'lesen' must be conjugated as 'lese' with 'ich'."
                         + extra_end +
                         " Never break character."
                     )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                        "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
-                        "If the sentence is correct, say so. "
-                        "Then give a very short 'Grammatik-Tipp:' with a brief explanation. "
-                        "Keep your answer short (max. 2–3 sentences) and use B1-level language. "
-                        "Example:\n"
-                        "Student: ich lesen ein Buch\n"
-                        "Correction: Ich lese ein Buch.\n"
-                        "Grammatik-Tipp: The verb must match the subject: 'ich lese'."
+                        "First, answer the student's question or statement in B1-level German (max 2–3 sentences). "
+                        "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
+                        "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
+                        "If the answer is perfect, say so and still give a tip. "
                         + extra_end +
                         " Never break character."
                     )
-            # ==== END SYSTEM PROMPT UPDATE ====
 
             client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
             response = client.chat.completions.create(
@@ -457,6 +460,7 @@ if user_input and not session_ended:
                 tip = tip_match.group(1).strip()
                 if tip and tip not in st.session_state["corrections"]:
                     st.session_state["corrections"].append(tip)
+            # --- Play audio, but NO download button ---
             try:
                 tts = gTTS(ai_reply, lang="de")
                 tts_bytes = io.BytesIO()
@@ -464,12 +468,6 @@ if user_input and not session_ended:
                 tts_bytes.seek(0)
                 tts_data = tts_bytes.read()
                 st.audio(tts_data, format="audio/mp3")
-                st.download_button(
-                    label="⬇️ Download AI Response Audio",
-                    data=tts_data,
-                    file_name="response.mp3",
-                    mime="audio/mp3"
-                )
             except Exception:
                 st.info("Audio feedback not available or an error occurred.")
 
