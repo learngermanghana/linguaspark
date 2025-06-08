@@ -284,14 +284,4 @@ def chat_window():
         set_step(3)
         clear_conversation()
 
-# ========== MAIN APP FLOW ==========
-if "step" not in st.session_state:
-    st.session_state["step"] = 1
-if st.session_state["step"] == 1:
-    student_login()
-elif st.session_state["step"] == 2:
-    welcome_screen()
-elif st.session_state["step"] == 3:
-    practice_mode_selector()
-elif st.session_state["step"] == 4:
-    chat_window()
+
