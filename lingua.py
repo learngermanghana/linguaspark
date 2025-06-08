@@ -96,11 +96,15 @@ def load_codes():
 
 # ========== TEACHER DASHBOARD (SIDEBAR) ==========
 with st.sidebar:
-    st.header("👩‍🏫 Teacher Dashboard")
     if "teacher_authenticated" not in st.session_state:
         st.session_state["teacher_authenticated"] = False
+
+    # --- Teacher login prompt if not authenticated ---
     if not st.session_state["teacher_authenticated"]:
-        pwd = st.text_input("Teacher Password:", type="password")
+        st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)  # Blank space
+        # Optionally, uncomment below to show a logo
+        # st.image("your_logo.png", width=120)
+        pwd = st.text_input("Teacher Login (for admin only)", type="password")
         login_btn = st.button("Login (Teacher)")
         if login_btn:
             if pwd == TEACHER_PASSWORD:
@@ -108,10 +112,14 @@ with st.sidebar:
                 st.success("Access granted!")
             elif pwd != "":
                 st.error("Incorrect password. Please try again.")
+
+    # --- Teacher dashboard (settings) ---
     else:
+        st.header("👩‍🏫 Teacher Dashboard")
         df_codes = load_codes()
         st.subheader("Current Codes")
         st.dataframe(df_codes, use_container_width=True)
+
         new_code = st.text_input("Add a new student code")
         if st.button("Add Code"):
             new_code_clean = new_code.strip().lower()
@@ -123,6 +131,7 @@ with st.sidebar:
                 st.warning("Enter a code to add.")
             else:
                 st.warning("Code already exists.")
+
         remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
         if st.button("Remove Selected Code"):
             if remove_code:
@@ -131,8 +140,10 @@ with st.sidebar:
                 st.success(f"Code '{remove_code}' removed!")
             else:
                 st.warning("Choose a code to remove.")
+
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
+
 
 # ====== STEPPER STAGES ======
 if "step" not in st.session_state:
