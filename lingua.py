@@ -248,7 +248,7 @@ if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
 
 mode = st.radio(
-    "Wie möchtest du üben?",
+    "Wie möchtest du üben (What would you like to practice)?",
     ["Geführte Prüfungssimulation (Exam Mode)", "Eigenes Thema/Frage (Custom Topic Chat)"],
     index=0
 )
@@ -331,9 +331,9 @@ else:
             # Immediately generate AI response to the custom topic
             ai_system_prompt = (
                 "You are Herr Felix, an expert German teacher and presentation coach. "
-                "The student has just given you a topic or question for practice (e.g. class presentation, homework, or exam training). "
+                "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                 "Start the conversation right away: reply directly to the student's topic, ask a relevant follow-up question, and give an example answer if it fits. "
-                "Be engaging and supportive, like a real exam partner or teacher, and always give a 'Grammatik-Tipp:' or brief correction if needed. "
+                "Be engaging and supportive, like a real exam partner or teacher. "
                 "Keep your responses short (max. 2–3 sentences). "
                 "If the student's message is already a good presentation, praise it and help them go deeper or extend the topic. "
                 "Never say 'How can I help you?'. Instead, react directly to the topic and keep the conversation going. "
@@ -377,11 +377,19 @@ else:
     if typed_message:
         user_input = typed_message
 
-# --- Display chat history immediately, so every user message shows at once ---
+# --- Display all messages as they come in, user's message shows instantly ---
 for msg in st.session_state['messages']:
     if msg['role'] == 'assistant':
+        # Only show Herr Felix's answer and correction in chat, not the grammar tip
+        parts = re.split(r'(Grammatik-Tipp\s*:)', msg['content'], maxsplit=1)
+        reply_to_show = parts[0].strip()
         with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {msg['content']}", unsafe_allow_html=True)
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {reply_to_show}", unsafe_allow_html=True)
+        # Store the Grammatik-Tipp for summary only
+        if len(parts) > 2:
+            grammatik_tipp = parts[2].strip()
+            if grammatik_tipp and grammatik_tipp not in st.session_state["corrections"]:
+                st.session_state["corrections"].append(grammatik_tipp)
     else:
         with st.chat_message("user"):
             st.markdown(f"🗣️ {msg['content']}")
@@ -405,6 +413,7 @@ if user_input and not session_ended:
                 )
                 ai_system_prompt = (
                     "You are Herr Felix, an expert German teacher and exam trainer. "
+                    "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                     "First, answer the student's question or statement naturally as a German tutor (max 2–3 sentences). "
                     "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                     "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
@@ -420,6 +429,7 @@ if user_input and not session_ended:
                 if exam_level == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                        "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                         "First, answer the student's question or statement in very simple A2-level German (max 2–3 sentences). "
                         "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                         "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
@@ -431,6 +441,7 @@ if user_input and not session_ended:
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
+                        "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                         "First, answer the student's question or statement in B1-level German (max 2–3 sentences). "
                         "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
                         "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
@@ -453,23 +464,17 @@ if user_input and not session_ended:
             st.error(str(e))
 
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
-        with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {ai_reply}", unsafe_allow_html=True)
-            tip_match = re.search(r"Grammatik-Tipp\s*:\s*(.+)", ai_reply)
-            if tip_match:
-                tip = tip_match.group(1).strip()
-                if tip and tip not in st.session_state["corrections"]:
-                    st.session_state["corrections"].append(tip)
-            # --- Play audio, but NO download button ---
-            try:
-                tts = gTTS(ai_reply, lang="de")
-                tts_bytes = io.BytesIO()
-                tts.write_to_fp(tts_bytes)
-                tts_bytes.seek(0)
-                tts_data = tts_bytes.read()
-                st.audio(tts_data, format="audio/mp3")
-            except Exception:
-                st.info("Audio feedback not available or an error occurred.")
+        # The display loop above will show the answer instantly on next rerun!
+        # Play audio, no download
+        try:
+            tts = gTTS(ai_reply, lang="de")
+            tts_bytes = io.BytesIO()
+            tts.write_to_fp(tts_bytes)
+            tts_bytes.seek(0)
+            tts_data = tts_bytes.read()
+            st.audio(tts_data, format="audio/mp3")
+        except Exception:
+            st.info("Audio feedback not available or an error occurred.")
 
 if session_ended:
     st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
