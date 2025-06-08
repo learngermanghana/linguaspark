@@ -355,6 +355,7 @@ else:
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
 typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="typed_input")
 
+# --- Get the input (typed or audio) ---
 user_input = None
 if uploaded_audio is not None:
     uploaded_audio.seek(0)
@@ -377,107 +378,107 @@ else:
     if typed_message:
         user_input = typed_message
 
-# --- Display all messages as they come in, user's message shows instantly ---
-for msg in st.session_state['messages']:
-    if msg['role'] == 'assistant':
-        # Only show Herr Felix's answer and correction in chat, not the grammar tip
-        parts = re.split(r'(Grammatik-Tipp\s*:)', msg['content'], maxsplit=1)
-        reply_to_show = parts[0].strip()
-        with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {reply_to_show}", unsafe_allow_html=True)
-        # Store the Grammatik-Tipp (not shown, but kept for possible future use)
-        if len(parts) > 2:
-            grammatik_tipp = parts[2].strip()
-            if grammatik_tipp and grammatik_tipp not in st.session_state["corrections"]:
-                st.session_state["corrections"].append(grammatik_tipp)
-    else:
-        with st.chat_message("user"):
-            st.markdown(f"🗣️ {msg['content']}")
-
 session_ended = st.session_state["turn_count"] >= max_turns
 used_today = st.session_state["daily_usage"][usage_key]
+
+# 1. --- Append and display the student message instantly ---
 if user_input and not session_ended:
     if used_today >= DAILY_LIMIT:
         st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
     else:
+        # Add student input before display so it shows up instantly
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
-        try:
-            if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
-                extra_end = (
-                    "After 6 student answers, give a short, positive summary, "
-                    "suggest a new topic or a break, and do NOT answer further unless restarted."
-                    if st.session_state["turn_count"] >= max_turns else ""
-                )
+# 2. --- Display all chat history, always up to date ---
+for msg in st.session_state['messages']:
+    if msg['role'] == 'assistant':
+        # Show Herr Felix's reply (with correction and tip if present)
+        parts = re.split(r'(Grammatik-Tipp\s*:)', msg['content'], maxsplit=1)
+        reply_to_show = parts[0].strip()
+        with st.chat_message("assistant", avatar="🧑‍🏫"):
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {reply_to_show}", unsafe_allow_html=True)
+    else:
+        with st.chat_message("user"):
+            st.markdown(f"🗣️ {msg['content']}")
+
+# 3. --- Generate and append AI reply, so it will show in the next rerun (audio and text) ---
+if user_input and not session_ended and used_today < DAILY_LIMIT:
+    try:
+        if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
+            extra_end = (
+                "After 6 student answers, give a short, positive summary, "
+                "suggest a new topic or a break, and do NOT answer further unless restarted."
+                if st.session_state["turn_count"] >= max_turns else ""
+            )
+            ai_system_prompt = (
+                "You are Herr Felix, an expert German teacher and exam trainer. "
+                "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
+                "First, answer the student's question or statement naturally as a German tutor (max 2–3 sentences). "
+                "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
+                "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
+                "If the student's answer is perfect, say so and still give a tip. "
+                "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
+                + extra_end +
+                " Never break character."
+            )
+        else:
+            extra_end = (
+                "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
+                if st.session_state["turn_count"] >= max_turns else ""
+            )
+            if exam_level == "A2":
                 ai_system_prompt = (
-                    "You are Herr Felix, an expert German teacher and exam trainer. "
+                    "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
                     "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
-                    "First, answer the student's question or statement naturally as a German tutor (max 2–3 sentences). "
+                    "First, answer the student's question or statement in very simple A2-level German (max 2–3 sentences). "
                     "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                    "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
-                    "If the student's answer is perfect, say so and still give a tip. "
+                    "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
+                    "If the answer is perfect, say so and still give a tip. "
                     "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
+                    "Never use advanced vocabulary. "
                     + extra_end +
                     " Never break character."
                 )
             else:
-                extra_end = (
-                    "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
-                    if st.session_state["turn_count"] >= max_turns else ""
+                ai_system_prompt = (
+                    "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
+                    "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
+                    "First, answer the student's question or statement in B1-level German (max 2–3 sentences). "
+                    "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
+                    "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
+                    "If the answer is perfect, say so and still give a tip. "
+                    "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
+                    + extra_end +
+                    " Never break character."
                 )
-                if exam_level == "A2":
-                    ai_system_prompt = (
-                        "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
-                        "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
-                        "First, answer the student's question or statement in very simple A2-level German (max 2–3 sentences). "
-                        "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                        "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
-                        "If the answer is perfect, say so and still give a tip. "
-                        "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
-                        "Never use advanced vocabulary. "
-                        + extra_end +
-                        " Never break character."
-                    )
-                else:
-                    ai_system_prompt = (
-                        "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                        "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
-                        "First, answer the student's question or statement in B1-level German (max 2–3 sentences). "
-                        "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                        "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
-                        "If the answer is perfect, say so and still give a tip. "
-                        "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
-                        + extra_end +
-                        " Never break character."
-                    )
 
-            client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
-            response = client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[
-                    {'role': 'system', 'content': ai_system_prompt},
-                    *st.session_state['messages']
-                ]
-            )
-            ai_reply = response.choices[0].message.content
-        except Exception as e:
-            ai_reply = "Sorry, there was a problem generating a response. Please try again."
-            st.error(str(e))
+        client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model='gpt-3.5-turbo',
+            messages=[
+                {'role': 'system', 'content': ai_system_prompt},
+                *st.session_state['messages']
+            ]
+        )
+        ai_reply = response.choices[0].message.content
+    except Exception as e:
+        ai_reply = "Sorry, there was a problem generating a response. Please try again."
+        st.error(str(e))
 
-        st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
-        # The display loop above will show the answer instantly on next rerun!
-        # Play audio, no download
-        try:
-            tts = gTTS(ai_reply, lang="de")
-            tts_bytes = io.BytesIO()
-            tts.write_to_fp(tts_bytes)
-            tts_bytes.seek(0)
-            tts_data = tts_bytes.read()
-            st.audio(tts_data, format="audio/mp3")
-        except Exception:
-            st.info("Audio feedback not available or an error occurred.")
+    st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
+
+    # Play AI audio for every AI reply, but always show the text too
+    try:
+        tts = gTTS(ai_reply, lang="de")
+        tts_bytes = io.BytesIO()
+        tts.write_to_fp(tts_bytes)
+        tts_bytes.seek(0)
+        tts_data = tts_bytes.read()
+        st.audio(tts_data, format="audio/mp3")
+    except Exception:
+        st.info("Audio feedback not available or an error occurred.")
 
 if session_ended:
     st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
@@ -485,3 +486,4 @@ if session_ended:
         st.session_state["messages"] = []
         st.session_state["corrections"] = []
         st.session_state["turn_count"] = 0
+
