@@ -15,10 +15,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ======= CODE MANAGEMENT FUNCTIONS =======
 CODES_FILE = "student_codes.csv"
+DAILY_LIMIT = 25
+max_turns = 6
 TEACHER_PASSWORD = "Felix029"
 
+# === UTILS ===
 def load_codes():
     if os.path.exists(CODES_FILE):
         df = pd.read_csv(CODES_FILE)
@@ -29,39 +31,36 @@ def load_codes():
         df = pd.DataFrame(columns=["code"])
     return df
 
-# Step control
-if "step" not in st.session_state:
-    st.session_state["step"] = 1
+def ai_tts(text):
+    try:
+        tts = gTTS(text, lang="de")
+        tts_bytes = io.BytesIO()
+        tts.write_to_fp(tts_bytes)
+        tts_bytes.seek(0)
+        tts_data = tts_bytes.read()
+        st.audio(tts_data, format="audio/mp3")
+    except Exception:
+        st.info("Audio feedback not available or an error occurred.")
 
-if "student_code" not in st.session_state:
-    st.session_state["student_code"] = ""
+def get_ai_response(messages, prompt):
+    client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
+    response = client.chat.completions.create(
+        model='gpt-3.5-turbo',
+        messages=[{'role': 'system', 'content': prompt}, *messages]
+    )
+    return response.choices[0].message.content
 
-if "selected_mode" not in st.session_state:
-    st.session_state["selected_mode"] = "Geführte Prüfungssimulation (Exam Mode)"
+# === STEPPER CONTROL ===
+def set_step(step):
+    st.session_state["step"] = step
 
-if "custom_topic" not in st.session_state:
-    st.session_state["custom_topic"] = ""
-
-if "messages" not in st.session_state:
+def clear_conversation():
     st.session_state["messages"] = []
-if "corrections" not in st.session_state:
-    st.session_state["corrections"] = []
-if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
+    st.session_state["corrections"] = []
 
-if "daily_usage" not in st.session_state:
-    st.session_state["daily_usage"] = {}
-
-today_str = str(date.today())
-usage_key = f"{st.session_state['student_code']}_{today_str}"
-if usage_key not in st.session_state["daily_usage"]:
-    st.session_state["daily_usage"][usage_key] = 0
-
-DAILY_LIMIT = 25
-max_turns = 6
-
-# ========== STEP 1: STUDENT CODE ==========
-if st.session_state["step"] == 1:
+# === STEP 1: STUDENT LOGIN ===
+def student_login():
     st.title("Student Login")
     code = st.text_input("🔑 Enter your student code to begin:")
     if st.button("Next ➡️"):
@@ -69,12 +68,12 @@ if st.session_state["step"] == 1:
         df_codes = load_codes()
         if code_clean in df_codes["code"].dropna().tolist():
             st.session_state["student_code"] = code_clean
-            st.session_state["step"] = 2
+            set_step(2)
         else:
             st.error("This code is not recognized. Please check with your tutor.")
 
-# ========== STEP 2: WELCOME SCREEN ==========
-elif st.session_state["step"] == 2:
+# === STEP 2: WELCOME SCREEN ===
+def welcome_screen():
     st.markdown("<h2 style='font-weight:bold'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor, Herr Felix!</h2>", unsafe_allow_html=True)
     st.markdown("> Practice your German speaking or writing. Get simple AI feedback and audio answers!")
     st.info(
@@ -91,13 +90,16 @@ elif st.session_state["step"] == 2:
         **Are you ready? Let’s go! 🚀**
         """, icon="💡"
     )
-    if st.button("Next ➡️"):
-        st.session_state["step"] = 3
-    if st.button("⬅️ Back"):
-        st.session_state["step"] = 1
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅️ Back"):
+            set_step(1)
+    with col2:
+        if st.button("Next ➡️"):
+            set_step(3)
 
-# ========== STEP 3: PRACTICE MODE ==========
-elif st.session_state["step"] == 3:
+# === STEP 3: PRACTICE MODE SELECTOR ===
+def practice_mode_selector():
     st.header("Wie möchtest du üben?")
     mode = st.radio(
         "What would you like to practice?",
@@ -111,29 +113,39 @@ elif st.session_state["step"] == 3:
     if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
         custom_topic = st.text_input("Type your own topic or question here (e.g. from Google Classroom, homework, or any free conversation)...", value=st.session_state.get("custom_topic", ""))
         st.session_state["custom_topic"] = custom_topic
-    if st.button("Start Practice ➡️"):
-        st.session_state["step"] = 4
-        st.session_state["messages"] = []
-        st.session_state["turn_count"] = 0
-        st.session_state["corrections"] = []
-    if st.button("⬅️ Back"):
-        st.session_state["step"] = 2
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅️ Back"):
+            set_step(2)
+    with col2:
+        if st.button("Start Practice ➡️"):
+            set_step(4)
+            clear_conversation()
 
-# ========== STEP 4: MAIN CHAT ==========
-elif st.session_state["step"] == 4:
-    # Quick helpers for main mode
+# === STEP 4: MAIN CHAT WINDOW ===
+def chat_window():
     mode = st.session_state["selected_mode"]
     custom_topic = st.session_state.get("custom_topic", "")
-    exam_level = st.session_state.get("exam_level", "A2")
-    if mode == "Geführte Prüfungssimulation (Exam Mode)":
-        if "exam_level" not in st.session_state:
-            st.session_state["exam_level"] = "A2"
-        exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
-        st.session_state["exam_level"] = exam_level
+    if "exam_level" not in st.session_state:
+        st.session_state["exam_level"] = "A2"
+    exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
+    st.session_state["exam_level"] = exam_level
 
-    st.info(f"Student code: `{st.session_state['student_code']}` | Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}")
+    # Usage logic
+    today_str = str(date.today())
+    usage_key = f"{st.session_state['student_code']}_{today_str}"
+    if usage_key not in st.session_state["daily_usage"]:
+        st.session_state["daily_usage"][usage_key] = 0
+    col1, col2 = st.columns([4, 1])
+    col1.info(f"Student code: `{st.session_state['student_code']}`  |  Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}")
+    if col2.button("Log out"):
+        for key in ["student_code", "messages", "corrections", "turn_count"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        set_step(1)
+        st.stop()
 
-    # --- Pick topic (for exam mode) ---
+    # Pick topic (on first chat turn)
     if not st.session_state["messages"]:
         if mode == "Geführte Prüfungssimulation (Exam Mode)":
             if exam_level == "A2":
@@ -155,11 +167,10 @@ elif st.session_state["step"] == 4:
         elif mode == "Eigenes Thema/Frage (Custom Topic Chat)" and custom_topic.strip():
             st.session_state["messages"].append({"role": "user", "content": custom_topic.strip()})
 
-    # === Chat Input ===
+    # Chat input
     uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
     typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="typed_input")
 
-    # === Chat Logic ===
     user_input = None
     if uploaded_audio is not None:
         uploaded_audio.seek(0)
@@ -184,7 +195,8 @@ elif st.session_state["step"] == 4:
     session_ended = st.session_state["turn_count"] >= max_turns
     used_today = st.session_state["daily_usage"][usage_key]
 
-    # 1. --- Append and display the student message instantly ---
+    # Append user message instantly
+    rerun_needed = False
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
@@ -192,8 +204,9 @@ elif st.session_state["step"] == 4:
             st.session_state['messages'].append({'role': 'user', 'content': user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
+            rerun_needed = True
 
-    # 2. --- Display all chat history, always up to date ---
+    # Display chat
     for msg in st.session_state['messages']:
         if msg['role'] == 'assistant':
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -202,8 +215,8 @@ elif st.session_state["step"] == 4:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # 3. --- Generate and append AI reply (with correction), always visible as text ---
-    if user_input and not session_ended and used_today < DAILY_LIMIT:
+    # Generate & append AI reply, then rerun so it shows instantly
+    if rerun_needed and not session_ended and used_today < DAILY_LIMIT:
         try:
             extra_end = (
                 "After 6 student answers, give a short, positive summary, "
@@ -249,41 +262,36 @@ elif st.session_state["step"] == 4:
                         " Never break character."
                     )
 
-            client = OpenAI(api_key=st.secrets.get("general", {}).get("OPENAI_API_KEY"))
-            response = client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[
-                    {'role': 'system', 'content': ai_system_prompt},
-                    *st.session_state['messages']
-                ]
-            )
-            ai_reply = response.choices[0].message.content
+            ai_reply = get_ai_response(st.session_state['messages'], ai_system_prompt)
         except Exception as e:
             ai_reply = "Sorry, there was a problem generating a response. Please try again."
             st.error(str(e))
 
         st.session_state['messages'].append({'role': 'assistant', 'content': ai_reply})
+        st.session_state['ai_audio'] = ai_reply
+        st.experimental_rerun()
 
-        # Play AI audio for every AI reply, but always show the text too
-        try:
-            tts = gTTS(ai_reply, lang="de")
-            tts_bytes = io.BytesIO()
-            tts.write_to_fp(tts_bytes)
-            tts_bytes.seek(0)
-            tts_data = tts_bytes.read()
-            st.audio(tts_data, format="audio/mp3")
-        except Exception:
-            st.info("Audio feedback not available or an error occurred.")
+    # Play audio for last AI message (if available)
+    if "ai_audio" in st.session_state:
+        ai_tts(st.session_state["ai_audio"])
 
     if session_ended:
         st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
         if st.button("Neue Session starten"):
-            st.session_state["messages"] = []
-            st.session_state["corrections"] = []
-            st.session_state["turn_count"] = 0
+            clear_conversation()
 
     if st.button("⬅️ Back to mode selection"):
-        st.session_state["step"] = 3
-        st.session_state["messages"] = []
-        st.session_state["corrections"] = []
-        st.session_state["turn_count"] = 0
+        set_step(3)
+        clear_conversation()
+
+# ========== MAIN APP FLOW ==========
+if "step" not in st.session_state:
+    st.session_state["step"] = 1
+if st.session_state["step"] == 1:
+    student_login()
+elif st.session_state["step"] == 2:
+    welcome_screen()
+elif st.session_state["step"] == 3:
+    practice_mode_selector()
+elif st.session_state["step"] == 4:
+    chat_window()
