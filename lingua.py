@@ -327,7 +327,7 @@ if st.session_state["step"] == 5:
             f"Ich habe gerade eine kurze Präsentation über **{topic}** gehalten.\n\n"
             "Deine Aufgabe jetzt:\n"
             "- Stelle mir **zwei Fragen** zu meiner Präsentation (auf Deutsch).\n"
-            "- Gib mir **eine positive Rückmeldung** auf Englisch oder Deutsch.\n\n"
+            "- Gib mir **eine positive Rückmeldung** auf Deutsch.\n\n"
             "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
         )
         st.session_state["messages"].append({"role": "assistant", "content": initial_prompt})
