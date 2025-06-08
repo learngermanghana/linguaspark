@@ -286,9 +286,8 @@ elif st.session_state["step"] == 4:
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
 
-# ------ Stage 5: Main Chat ------
 if st.session_state["step"] == 5:
-    # Ensure daily_usage dict always exists
+    # ==== Ensure daily_usage exists ====
     if "daily_usage" not in st.session_state:
         st.session_state["daily_usage"] = {}
     today_str = str(date.today())
@@ -296,10 +295,14 @@ if st.session_state["step"] == 5:
     usage_key = f"{student_code}_{today_str}"
     if usage_key not in st.session_state["daily_usage"]:
         st.session_state["daily_usage"][usage_key] = 0
+
+    # ==== Info header ====
     st.info(
         f"Student code: `{student_code}` | "
         f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
     )
+
+    # ==== Insert first message if needed (AI always starts for custom topic) ====
     if not st.session_state["messages"]:
         if st.session_state.get("selected_mode", "").startswith("Geführte"):
             prompt = st.session_state.get("initial_prompt", "Stelle bitte eine Frage oder beginne mit deiner Präsentation.")
@@ -308,8 +311,39 @@ if st.session_state["step"] == 5:
             custom_topic = st.session_state.get("custom_topic", "")
             if custom_topic:
                 st.session_state["messages"].append({"role": "user", "content": custom_topic})
-    uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="stage5_audio_upload")
-    typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="stage5_typed_input")
+                # Immediately generate AI reply to custom topic
+                try:
+                    ai_system_prompt = (
+                        "You are Herr Felix, an expert German teacher and presentation coach. "
+                        "The student has just given you a topic or question for practice (e.g. class presentation, homework, or exam training). "
+                        "Start the conversation right away: reply directly to the student's topic, ask a relevant follow-up question, and give an example answer if it fits. "
+                        "Be engaging and supportive, like a real exam partner or teacher, and always give a 'Grammatik-Tipp:' in English using simple language, or a brief correction if needed. "
+                        "Keep your responses short (max. 2–3 sentences). "
+                        "If the student's message is already a good presentation, praise it and help them go deeper or extend the topic. "
+                        "Never say 'How can I help you?'. Instead, react directly to the topic and keep the conversation going. "
+                        "Never break character."
+                    )
+                    client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                    response = client.chat.completions.create(
+                        model='gpt-3.5-turbo',
+                        messages=[{"role": "system", "content": ai_system_prompt}, *st.session_state["messages"]],
+                    )
+                    ai_reply = response.choices[0].message.content
+                except Exception as e:
+                    ai_reply = "Sorry, there was a problem generating a response. Please try again."
+                    st.error(str(e))
+                st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+
+    # ==== Student input ====
+    uploaded_audio = st.file_uploader(
+        "Upload an audio file (WAV, MP3, OGG, M4A)",
+        type=["wav", "mp3", "ogg", "m4a"],
+        key="stage5_audio_upload"
+    )
+    typed_message = st.chat_input(
+        "💬 Oder tippe deine Antwort hier...",
+        key="stage5_typed_input"
+    )
     user_input = None
     if uploaded_audio:
         uploaded_audio.seek(0)
@@ -331,11 +365,12 @@ if st.session_state["step"] == 5:
     elif typed_message:
         user_input = typed_message
 
+    # ==== Chat & AI turn handling ====
     session_ended = st.session_state["turn_count"] >= max_turns
     used_today = st.session_state["daily_usage"][usage_key]
     ai_just_replied = False
 
-    # Append user message, get AI response right away
+    # When user replies, get AI reply right away, show both in chat
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
@@ -355,8 +390,8 @@ if st.session_state["step"] == 5:
                         "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                         "First, answer the student's question or statement naturally as a German tutor (max 2–3 sentences). "
                         "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                        "After that, give a very short 'Grammatik-Tipp:' explaining the main issue. "
-                        "If the student's answer is perfect, say so and still give a tip. "
+                        "After that, give a very short 'Grammatik-Tipp:' in English using simple language to explain the main issue. "
+                        "If the student's answer is perfect, say so and still give a tip in English. "
                         "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                         + extra_end +
                         " Never break character."
@@ -369,8 +404,8 @@ if st.session_state["step"] == 5:
                             "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                             "First, answer the student's question or statement in very simple A2-level German (max 2–3 sentences). "
                             "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                            "After that, give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
-                            "If the answer is perfect, say so and still give a tip. "
+                            "After that, give a very short 'Grammatik-Tipp:' in English with a brief, simple explanation. "
+                            "If the answer is perfect, say so and still give a tip in English. "
                             "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                             "Never use advanced vocabulary. "
                             + extra_end +
@@ -382,8 +417,8 @@ if st.session_state["step"] == 5:
                             "Only correct and give a grammar tip for the student's most recent answer, never your own messages. "
                             "First, answer the student's question or statement in B1-level German (max 2–3 sentences). "
                             "Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                            "After that, give a very short 'Grammatik-Tipp:' with a brief explanation. "
-                            "If the answer is perfect, say so and still give a tip. "
+                            "After that, give a very short 'Grammatik-Tipp:' in English with a brief explanation. "
+                            "If the answer is perfect, say so and still give a tip in English. "
                             "Finally, always end your message with a follow-up question or prompt to keep the conversation going. "
                             + extra_end +
                             " Never break character."
@@ -401,7 +436,7 @@ if st.session_state["step"] == 5:
             st.session_state["ai_audio"] = ai_reply
             ai_just_replied = True
 
-    # Show chat history
+    # ==== Display chat history ====
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -410,7 +445,7 @@ if st.session_state["step"] == 5:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # Play AI audio after response (if new)
+    # ==== Play audio for last AI message (if new) ====
     if ai_just_replied and "ai_audio" in st.session_state:
         try:
             tts = gTTS(st.session_state["ai_audio"], lang="de")
@@ -421,7 +456,7 @@ if st.session_state["step"] == 5:
         except:
             st.info("Audio feedback not available.")
 
-    # Navigation
+    # ==== Navigation ====
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
