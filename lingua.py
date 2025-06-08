@@ -35,7 +35,6 @@ def save_codes(df):
     df["code"] = df["code"].astype(str).str.strip().str.lower()
     df.to_csv(CODES_FILE, index=False)
 
-# ========== TEACHER DASHBOARD (SIDEBAR) ==========
 with st.sidebar:
     st.header("👩‍🏫 Teacher Dashboard")
 
@@ -49,7 +48,6 @@ with st.sidebar:
             if pwd == TEACHER_PASSWORD:
                 st.session_state["teacher_authenticated"] = True
                 st.success("Access granted!")
-                st.rerun()
             elif pwd != "":
                 st.error("Incorrect password. Please try again.")
     else:
@@ -64,7 +62,7 @@ with st.sidebar:
                 df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
                 save_codes(df_codes)
                 st.success(f"Code '{new_code_clean}' added!")
-                st.experimental_rerun()
+                # No rerun needed; the UI will refresh naturally.
             elif not new_code_clean:
                 st.warning("Enter a code to add.")
             else:
@@ -76,13 +74,14 @@ with st.sidebar:
                 df_codes = df_codes[df_codes["code"] != remove_code]
                 save_codes(df_codes)
                 st.success(f"Code '{remove_code}' removed!")
-                st.rerun()
+                # No rerun needed.
             else:
                 st.warning("Choose a code to remove.")
 
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
-            st.experimental_rerun()
+            # No rerun needed.
+
 
 # ======= STUDENT PRACTICE LOGIC (MAIN PAGE) =======
 df_codes = load_codes()
@@ -449,11 +448,3 @@ if st.session_state["corrections"]:
     for tip in st.session_state["corrections"]:
         st.write(f"- {tip}")
 
-share_text = "Ich habe mit Herr Felix auf Falowen Deutsch gesprochen! 🌟 Probier es aus: https://falowen.streamlit.app"
-share_url = f"https://wa.me/?text={share_text.replace(' ', '%20')}"
-st.markdown(
-    f'<a href="{share_url}" target="_blank">'
-    '<button style="background:#25D366;color:white;padding:7px 14px;border:none;border-radius:6px;margin-top:10px;font-size:1em;">'
-    'Share on WhatsApp 🚀</button></a>',
-    unsafe_allow_html=True
-)
