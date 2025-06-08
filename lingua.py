@@ -79,7 +79,7 @@ with st.sidebar:
             st.session_state["teacher_authenticated"] = False
 
 # ======= STUDENT PRACTICE LOGIC (MAIN PAGE) =======
-df_codes = load_codes()  # Always load the current codes file
+df_codes = load_codes()
 
 if "student_code" not in st.session_state:
     st.session_state["student_code"] = ""
@@ -91,7 +91,7 @@ if not st.session_state["student_code"]:
         valid_codes = df_codes["code"].dropna().tolist()
         if code_clean in valid_codes:
             st.session_state["student_code"] = code_clean
-            st.experimental_rerun()  # Safe and recommended: switch to logged-in view
+            st.success("Login successful! Please click anywhere or refresh if the screen doesn't update.")
         else:
             st.error("This code is not recognized. Please check with your tutor.")
     st.stop()  # Prevents rest of app from running if not logged in
@@ -115,8 +115,8 @@ if col2.button("Log out"):
     for key in ["student_code", "messages", "corrections", "turn_count"]:
         if key in st.session_state:
             del st.session_state[key]
-    # DO NOT CALL st.experimental_rerun() here!
-    # Just let the app rerun on next user interaction.
+    st.success("Logged out. Please refresh or click anywhere if the screen doesn't update.")
+
 
 # --- Fun Fact & Header ---
 fun_facts = [
