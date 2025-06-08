@@ -79,7 +79,8 @@ with st.sidebar:
             st.session_state["teacher_authenticated"] = False
 
 # ======= STUDENT PRACTICE LOGIC (MAIN PAGE) =======
-df_codes = load_codes()
+df_codes = load_codes()  # Always load the current codes file
+
 if "student_code" not in st.session_state:
     st.session_state["student_code"] = ""
 
@@ -90,10 +91,10 @@ if not st.session_state["student_code"]:
         valid_codes = df_codes["code"].dropna().tolist()
         if code_clean in valid_codes:
             st.session_state["student_code"] = code_clean
-            st.experimental_rerun()
+            st.experimental_rerun()  # Instantly move to practice area after login
         else:
             st.error("This code is not recognized. Please check with your tutor.")
-    st.stop()
+    st.stop()  # Prevents rest of app from running if not logged in
 
 student_code = st.session_state["student_code"]
 
@@ -111,9 +112,9 @@ col1, col2 = st.columns([4, 1])
 col1.info(f"Student code: `{student_code}`  |  Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}")
 if col2.button("Log out"):
     for key in ["student_code", "messages", "corrections", "turn_count"]:
-        if key in st.session_state: del st.session_state[key]
-    st.experimental_rerun()
-
+        if key in st.session_state:
+            del st.session_state[key]
+    st.experimental_rerun()  # Instantly go back to login input
 
 # --- Fun Fact & Header ---
 fun_facts = [
