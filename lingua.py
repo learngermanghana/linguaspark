@@ -379,7 +379,7 @@ if user_input and not session_ended:
         st.session_state["daily_usage"][usage_key] += 1
 
         try:
-            # ==== NEW: System prompt is level-based and concise ====
+            # ==== Explicit correction logic ====
             if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
                 extra_end = (
                     "After 6 student answers, give a short, positive summary, "
@@ -388,38 +388,49 @@ if user_input and not session_ended:
                 )
                 ai_system_prompt = (
                     "You are Herr Felix, an expert German teacher and exam trainer. "
-                    "Help the student have a conversation about their chosen topic, answer questions, correct mistakes, "
-                    "and always give a short 'Grammatik-Tipp:' or suggestion after each reply. "
-                    "Be friendly, explain in simple German when needed, and encourage the student to practice more. "
-                    "Always keep your answer short (no more than 2–3 sentences)."
-                    + extra_end
+                    "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
+                    "If the sentence is correct, say so. "
+                    "Then give a very short 'Grammatik-Tipp:' with a brief explanation. "
+                    "Always keep your answer short (no more than 2–3 sentences). "
+                    "Example:\n"
+                    "Student: ich lesen ein Buch\n"
+                    "Correction: Ich lese ein Buch.\n"
+                    "Grammatik-Tipp: 'lesen' must be 'lese' with 'ich'."
+                    + extra_end +
+                    " Never break character."
                 )
             else:
                 extra_end = (
                     "This is the end of the session. Give a positive summary, encourage a new topic or a break, and do NOT answer more unless the student restarts."
                     if st.session_state["turn_count"] >= max_turns else ""
                 )
-                # --- Level-based exam prompt (concise and controlled) ---
+                # --- Level-based exam prompt (concise, correction, and controlled) ---
                 if exam_level == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
-                        "Always answer in very simple German, using only words and grammar allowed at A2 level. "
-                        "Keep your answers short (max. 2–3 sentences). "
-                        "Never use advanced vocabulary. Speak in short, clear sentences. "
-                        "If the student makes a mistake, gently correct them in simple words. "
-                        "After every answer, give a short 'Grammatik-Tipp:' with a very brief explanation, using only A2 words. "
-                        "If you explain grammar, use very simple words and 1–2 short examples only. "
+                        "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
+                        "If the sentence is correct, say so. "
+                        "Then give a very short 'Grammatik-Tipp:' with a brief, simple explanation. "
+                        "Use only words and grammar allowed at A2 level, and keep all answers very short (max. 2–3 sentences). "
+                        "Never use advanced vocabulary. "
+                        "Example:\n"
+                        "Student: ich lesen ein Buch\n"
+                        "Correction: Ich lese ein Buch.\n"
+                        "Grammatik-Tipp: 'lesen' must be conjugated as 'lese' with 'ich'."
                         + extra_end +
                         " Never break character."
                     )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                        "Answer in clear, exam-appropriate B1-level German. "
-                        "Use a wider range of vocabulary than A2, but keep your answers short (max. 2–3 sentences). "
-                        "Do not use very advanced words or long, complex sentences. "
-                        "After every answer, give a short 'Grammatik-Tipp:' with a useful pointer, in clear B1-level German. "
-                        "If you explain grammar, use simple words and 1–2 brief examples only. "
+                        "After every student answer, first rewrite the student's sentence(s) correctly (if there are mistakes). "
+                        "If the sentence is correct, say so. "
+                        "Then give a very short 'Grammatik-Tipp:' with a brief explanation. "
+                        "Keep your answer short (max. 2–3 sentences) and use B1-level language. "
+                        "Example:\n"
+                        "Student: ich lesen ein Buch\n"
+                        "Correction: Ich lese ein Buch.\n"
+                        "Grammatik-Tipp: The verb must match the subject: 'ich lese'."
                         + extra_end +
                         " Never break character."
                     )
