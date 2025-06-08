@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # ======= CODE MANAGEMENT FUNCTIONS =======
-CODES_FILE = "student_codes.csv"  # <-- CSV file with NO .csv extension
+CODES_FILE = "student_codes.csv"
 TEACHER_PASSWORD = "Felix029"
 
 def load_codes():
@@ -79,7 +79,7 @@ with st.sidebar:
             st.session_state["teacher_authenticated"] = False
 
 # ======= STUDENT PRACTICE LOGIC (MAIN PAGE) =======
-df_codes = load_codes()  # Always load the current codes file
+df_codes = load_codes()
 
 if "student_code" not in st.session_state:
     st.session_state["student_code"] = ""
@@ -92,11 +92,10 @@ if not st.session_state["student_code"]:
         if code_clean in valid_codes:
             st.session_state["student_code"] = code_clean
             st.success("✅ Login successful! Click the 'Continue to Practice' button below, or refresh/click anywhere to begin.")
-            # Show a big button to nudge the user to continue (triggers a rerun naturally)
             st.button("Continue to Practice")
         else:
             st.error("This code is not recognized. Please check with your tutor.")
-    st.stop()  # Prevents rest of app from running if not logged in
+    st.stop()
 
 student_code = st.session_state["student_code"]
 
@@ -108,7 +107,7 @@ usage_key = f"{student_code}_{today_str}"
 if usage_key not in st.session_state["daily_usage"]:
     st.session_state["daily_usage"][usage_key] = 0
 
-DAILY_LIMIT = 25  # <-- daily limit set to 25
+DAILY_LIMIT = 25
 
 col1, col2 = st.columns([4, 1])
 col1.info(f"Student code: `{student_code}`  |  Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}")
@@ -118,7 +117,6 @@ if col2.button("Log out"):
         if key in st.session_state:
             del st.session_state[key]
     st.success("Logged out. Please click anywhere or refresh to log in again.")
-
 
 # --- Fun Fact & Header ---
 fun_facts = [
@@ -155,93 +153,9 @@ st.info(
     """, icon="💡"
 )
 
-with st.expander("🎤 German Speaking Exam – A2 & B1: Format, Tips, and Practice Topics (click to expand)"):
-    st.markdown("""
-    ### 🗣️ **A2 Sprechen (Goethe-Zertifikat) – Structure**
-    **Teil 1:** Fragen zu Schlüsselwörtern  
-    **Teil 2:** Bildbeschreibung & Diskussion  
-    **Teil 3:** Gemeinsam planen  
-
-    ---
-    ### 🗣️ **B1 Sprechen (Goethe-Zertifikat) – Structure**
-    **Teil 1:** Gemeinsam planen (Dialogue)  
-    **Teil 2:** Präsentation (Monologue)  
-    **Teil 3:** Feedback & Fragen stellen  
-
-    ---
-    **Download full topic sheets for practice:**  
-    [A2 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/A2%20sprechen.pdf)  
-    [B1 Sprechen Topic Sheet (PDF)](sandbox:/mnt/data/Sprechen%20B1%20(Goethe%20Exams).pdf)
-    """)
-
-# ==== Official Exam Topics ====
-A2_TEIL1 = [
-    "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
-    "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
-    "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
-]
-A2_TEIL2 = [
-    "Was machen Sie mit Ihrem Geld?",
-    "Was machen Sie am Wochenende?",
-    "Wie verbringen Sie Ihren Urlaub?",
-    "Wie oft gehen Sie einkaufen und was kaufen Sie?",
-    "Was für Musik hören Sie gern?",
-    "Wie feiern Sie Ihren Geburtstag?",
-    "Welche Verkehrsmittel nutzen Sie?",
-    "Wie bleiben Sie gesund?",
-    "Was machen Sie gern mit Ihrer Familie?",
-    "Wie sieht Ihr Traumhaus aus?",
-    "Welche Filme oder Serien mögen Sie?",
-    "Wie oft gehen Sie ins Restaurant?",
-    "Was ist Ihr Lieblingsfeiertag?",
-    "Was machen Sie morgens als Erstes?",
-    "Wie lange schlafen Sie normalerweise?",
-    "Welche Hobbys hatten Sie als Kind?",
-    "Machen Sie lieber Urlaub am Meer oder in den Bergen?",
-    "Wie sieht Ihr Lieblingszimmer aus?",
-    "Was ist Ihr Lieblingsgeschäft?",
-    "Wie sieht ein perfekter Tag für Sie aus?"
-]
-A2_TEIL3 = [
-    "Zusammen ins Kino gehen", "Ein Café besuchen", "Gemeinsam einkaufen gehen",
-    "Ein Picknick im Park organisieren", "Eine Fahrradtour planen",
-    "Zusammen in die Stadt gehen", "Einen Ausflug ins Schwimmbad machen",
-    "Eine Party organisieren", "Zusammen Abendessen gehen",
-    "Gemeinsam einen Freund/eine Freundin besuchen", "Zusammen ins Museum gehen",
-    "Einen Spaziergang im Park machen", "Ein Konzert besuchen",
-    "Zusammen eine Ausstellung besuchen", "Einen Wochenendausflug planen",
-    "Ein Theaterstück ansehen", "Ein neues Restaurant ausprobieren",
-    "Einen Kochabend organisieren", "Einen Sportevent besuchen", "Eine Wanderung machen"
-]
-
-B1_TEIL1 = [
-    "Mithilfe beim Sommerfest", "Eine Reise nach Köln planen",
-    "Überraschungsparty organisieren", "Kulturelles Ereignis (Konzert, Ausstellung) planen",
-    "Museumsbesuch organisieren"
-]
-B1_TEIL2 = [
-    "Ausbildung", "Auslandsaufenthalt", "Behinderten-Sport", "Berufstätige Eltern",
-    "Berufswahl", "Bio-Essen", "Chatten", "Computer für jeden Kursraum", "Das Internet",
-    "Einkaufen in Einkaufszentren", "Einkaufen im Internet", "Extremsport", "Facebook",
-    "Fertigessen", "Freiwillige Arbeit", "Freundschaft", "Gebrauchte Kleidung",
-    "Getrennter Unterricht für Jungen und Mädchen", "Haushalt", "Haustiere", "Heiraten",
-    "Hotel Mama", "Ich bin reich genug", "Informationen im Internet", "Kinder und Fernsehen",
-    "Kinder und Handys", "Kinos sterben", "Kreditkarten", "Leben auf dem Land oder in der Stadt",
-    "Makeup für Kinder", "Marken-Kleidung", "Mode", "Musikinstrument lernen",
-    "Musik im Zeitalter des Internets", "Rauchen", "Reisen", "Schokolade macht glücklich",
-    "Sport treiben", "Sprachenlernen", "Sprachenlernen mit dem Internet",
-    "Stadtzentrum ohne Autos", "Studenten und Arbeit in den Ferien", "Studium", "Tattoos",
-    "Teilzeitarbeit", "Unsere Idole", "Umweltschutz", "Vegetarische Ernährung", "Zeitungslesen"
-]
-B1_TEIL3 = [
-    "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
-    "Etwas überraschend finden", "Weitere Details erfragen"
-]
-
+# ---- Exam & Custom Topic Selectors ----
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
-if "transcript" not in st.session_state:
-    st.session_state["transcript"] = ""
 if "corrections" not in st.session_state:
     st.session_state["corrections"] = []
 if "turn_count" not in st.session_state:
@@ -255,7 +169,9 @@ mode = st.radio(
 
 max_turns = 6
 
+# ---- Exam Mode Setup ----
 if mode == "Geführte Prüfungssimulation (Exam Mode)":
+    # Define your A2_TEIL1, etc., above as in your original code
     exam_level = st.selectbox("Welches Prüfungsniveau möchtest du üben?", ["A2", "B1"], key="exam_level")
     if exam_level == "A2":
         teil_options = [
@@ -294,28 +210,84 @@ if mode == "Geführte Prüfungssimulation (Exam Mode)":
         st.session_state["turn_count"] = 0
         if exam_level == "A2":
             if teil.startswith("Teil 1"):
-                topic = random.choice(A2_TEIL1)
+                topic = random.choice([
+                    "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
+                    "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
+                    "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
+                ])
                 prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
             elif teil.startswith("Teil 2"):
-                topic = random.choice(A2_TEIL2)
+                topic = random.choice([
+                    "Was machen Sie mit Ihrem Geld?",
+                    "Was machen Sie am Wochenende?",
+                    "Wie verbringen Sie Ihren Urlaub?",
+                    "Wie oft gehen Sie einkaufen und was kaufen Sie?",
+                    "Was für Musik hören Sie gern?",
+                    "Wie feiern Sie Ihren Geburtstag?",
+                    "Welche Verkehrsmittel nutzen Sie?",
+                    "Wie bleiben Sie gesund?",
+                    "Was machen Sie gern mit Ihrer Familie?",
+                    "Wie sieht Ihr Traumhaus aus?",
+                    "Welche Filme oder Serien mögen Sie?",
+                    "Wie oft gehen Sie ins Restaurant?",
+                    "Was ist Ihr Lieblingsfeiertag?",
+                    "Was machen Sie morgens als Erstes?",
+                    "Wie lange schlafen Sie normalerweise?",
+                    "Welche Hobbys hatten Sie als Kind?",
+                    "Machen Sie lieber Urlaub am Meer oder in den Bergen?",
+                    "Wie sieht Ihr Lieblingszimmer aus?",
+                    "Was ist Ihr Lieblingsgeschäft?",
+                    "Wie sieht ein perfekter Tag für Sie aus?"
+                ])
                 prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
             else:
-                topic = random.choice(A2_TEIL3)
+                topic = random.choice([
+                    "Zusammen ins Kino gehen", "Ein Café besuchen", "Gemeinsam einkaufen gehen",
+                    "Ein Picknick im Park organisieren", "Eine Fahrradtour planen",
+                    "Zusammen in die Stadt gehen", "Einen Ausflug ins Schwimmbad machen",
+                    "Eine Party organisieren", "Zusammen Abendessen gehen",
+                    "Gemeinsam einen Freund/eine Freundin besuchen", "Zusammen ins Museum gehen",
+                    "Einen Spaziergang im Park machen", "Ein Konzert besuchen",
+                    "Zusammen eine Ausstellung besuchen", "Einen Wochenendausflug planen",
+                    "Ein Theaterstück ansehen", "Ein neues Restaurant ausprobieren",
+                    "Einen Kochabend organisieren", "Einen Sportevent besuchen", "Eine Wanderung machen"
+                ])
                 prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
         else:
             if teil.startswith("Teil 1"):
-                topic = random.choice(B1_TEIL1)
+                topic = random.choice([
+                    "Mithilfe beim Sommerfest", "Eine Reise nach Köln planen",
+                    "Überraschungsparty organisieren", "Kulturelles Ereignis (Konzert, Ausstellung) planen",
+                    "Museumsbesuch organisieren"
+                ])
                 prompt = f"**B1 Teil 1:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
             elif teil.startswith("Teil 2"):
-                topic = random.choice(B1_TEIL2)
+                topic = random.choice([
+                    "Ausbildung", "Auslandsaufenthalt", "Behinderten-Sport", "Berufstätige Eltern",
+                    "Berufswahl", "Bio-Essen", "Chatten", "Computer für jeden Kursraum", "Das Internet",
+                    "Einkaufen in Einkaufszentren", "Einkaufen im Internet", "Extremsport", "Facebook",
+                    "Fertigessen", "Freiwillige Arbeit", "Freundschaft", "Gebrauchte Kleidung",
+                    "Getrennter Unterricht für Jungen und Mädchen", "Haushalt", "Haustiere", "Heiraten",
+                    "Hotel Mama", "Ich bin reich genug", "Informationen im Internet", "Kinder und Fernsehen",
+                    "Kinder und Handys", "Kinos sterben", "Kreditkarten", "Leben auf dem Land oder in der Stadt",
+                    "Makeup für Kinder", "Marken-Kleidung", "Mode", "Musikinstrument lernen",
+                    "Musik im Zeitalter des Internets", "Rauchen", "Reisen", "Schokolade macht glücklich",
+                    "Sport treiben", "Sprachenlernen", "Sprachenlernen mit dem Internet",
+                    "Stadtzentrum ohne Autos", "Studenten und Arbeit in den Ferien", "Studium", "Tattoos",
+                    "Teilzeitarbeit", "Unsere Idole", "Umweltschutz", "Vegetarische Ernährung", "Zeitungslesen"
+                ])
                 prompt = f"**B1 Teil 2:** Halte eine Präsentation über das Thema: **{topic}**. Begrüße, nenne das Thema, gib deine Meinung, teile Vor- und Nachteile, fasse zusammen."
             else:
-                topic = random.choice(B1_TEIL3)
+                topic = random.choice([
+                    "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
+                    "Etwas überraschend finden", "Weitere Details erfragen"
+                ])
                 prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
 
     st.caption("Du kannst jederzeit einen neuen Teil wählen oder im Chat üben.")
 
+# ---- Custom Topic Mode ----
 else:
     custom_topic = st.text_input("Type your own topic or question here (e.g. from Google Classroom, homework, or any free conversation)...")
     if st.button("Start the conversation on my topic!"):
@@ -352,10 +324,11 @@ else:
 
     st.caption("You choose the topic – Herr Felix will help you, give tips, and correct your mistakes!")
 
+# === Chat Input ===
 uploaded_audio = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"], key="audio_upload")
 typed_message = st.chat_input("💬 Oder tippe deine Antwort hier...", key="typed_input")
 
-# --- Get the input (typed or audio) ---
+# === Chat Progression Logic ===
 user_input = None
 if uploaded_audio is not None:
     uploaded_audio.seek(0)
@@ -374,36 +347,33 @@ if uploaded_audio is not None:
         user_input = transcript.text
     except Exception:
         st.warning("Transcription failed. Please try again or type your message.")
-else:
-    if typed_message:
-        user_input = typed_message
+elif typed_message:
+    user_input = typed_message
 
 session_ended = st.session_state["turn_count"] >= max_turns
 used_today = st.session_state["daily_usage"][usage_key]
 
-# 1. --- Append and display the student message instantly ---
+# --- Append and display student message instantly ---
 if user_input and not session_ended:
     if used_today >= DAILY_LIMIT:
         st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
     else:
-        # Add student input before display so it shows up instantly
         st.session_state['messages'].append({'role': 'user', 'content': user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
-# 2. --- Display all chat history, always up to date ---
+# --- Display all chat, always up to date ---
 for msg in st.session_state['messages']:
     if msg['role'] == 'assistant':
         # Show Herr Felix's reply (with correction and tip if present)
-        parts = re.split(r'(Grammatik-Tipp\s*:)', msg['content'], maxsplit=1)
-        reply_to_show = parts[0].strip()
+        # Correction always visible in chat!
         with st.chat_message("assistant", avatar="🧑‍🏫"):
-            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {reply_to_show}", unsafe_allow_html=True)
+            st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {msg['content']}", unsafe_allow_html=True)
     else:
         with st.chat_message("user"):
             st.markdown(f"🗣️ {msg['content']}")
 
-# 3. --- Generate and append AI reply, so it will show in the next rerun (audio and text) ---
+# --- Generate and append AI reply (with correction), always visible as text ---
 if user_input and not session_ended and used_today < DAILY_LIMIT:
     try:
         if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
@@ -480,10 +450,9 @@ if user_input and not session_ended and used_today < DAILY_LIMIT:
     except Exception:
         st.info("Audio feedback not available or an error occurred.")
 
-if session_ended:
+if st.session_state["turn_count"] >= max_turns:
     st.success("🎉 **Session beendet!** Du hast fleißig geübt. Willst du ein neues Thema oder eine Pause?")
     if st.button("Neue Session starten"):
         st.session_state["messages"] = []
         st.session_state["corrections"] = []
         st.session_state["turn_count"] = 0
-
