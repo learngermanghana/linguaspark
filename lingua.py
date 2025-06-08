@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # ======= CODE MANAGEMENT FUNCTIONS =======
-CODES_FILE = "student_codes"  # <-- CSV file with NO .csv extension
+CODES_FILE = "student_codes.csv"  # <-- CSV file with NO .csv extension
 TEACHER_PASSWORD = "Felix029"
 
 def load_codes():
