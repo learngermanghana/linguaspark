@@ -24,11 +24,15 @@ def load_codes():
         df = pd.read_csv(CODES_FILE)
         if "code" not in df.columns:
             df = pd.DataFrame(columns=["code"])
+        # Always clean codes: lowercase & strip spaces
+        df["code"] = df["code"].astype(str).str.strip().str.lower()
     else:
         df = pd.DataFrame(columns=["code"])
     return df
 
 def save_codes(df):
+    # Always save codes cleaned
+    df["code"] = df["code"].astype(str).str.strip().str.lower()
     df.to_csv(CODES_FILE, index=False)
 
 # ========== TEACHER DASHBOARD (SIDEBAR) ==========
@@ -55,13 +59,13 @@ with st.sidebar:
 
         new_code = st.text_input("Add a new student code")
         if st.button("Add Code"):
-            new_code = new_code.strip().lower()
-            if new_code and new_code not in df_codes["code"].values:
-                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code]})], ignore_index=True)
+            new_code_clean = new_code.strip().lower()
+            if new_code_clean and new_code_clean not in df_codes["code"].values:
+                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
                 save_codes(df_codes)
-                st.success(f"Code '{new_code}' added!")
+                st.success(f"Code '{new_code_clean}' added!")
                 st.experimental_rerun()
-            elif not new_code:
+            elif not new_code_clean:
                 st.warning("Enter a code to add.")
             else:
                 st.warning("Code already exists.")
@@ -88,9 +92,10 @@ if "student_code" not in st.session_state:
 if not st.session_state["student_code"]:
     code = st.text_input("🔑 Enter your student code to begin:", key="code_entry")
     if code:
-        code = code.strip().lower()
-        if code in df_codes["code"].values:
-            st.session_state["student_code"] = code
+        code_clean = code.strip().lower()
+        valid_codes = df_codes["code"].dropna().tolist()
+        if code_clean in valid_codes:
+            st.session_state["student_code"] = code_clean
             st.rerun()
         else:
             st.error("This code is not recognized. Please check with your tutor.")
@@ -114,6 +119,7 @@ if col2.button("Log out"):
     for key in ["student_code", "messages", "corrections", "turn_count"]:
         if key in st.session_state: del st.session_state[key]
     st.experimental_rerun()
+
 
 # --- Fun Fact & Header ---
 fun_facts = [
