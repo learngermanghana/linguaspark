@@ -380,7 +380,6 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
-
 # --- STAGE 5 Logic ---
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
@@ -455,6 +454,7 @@ if st.session_state["step"] == 5:
     ):
         prompt = st.session_state.get("initial_prompt")
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
+
 
     # -- Student input (audio or text) --
     uploaded = st.file_uploader(
