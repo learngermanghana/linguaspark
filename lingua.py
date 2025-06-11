@@ -326,6 +326,63 @@ def show_formatted_ai_reply(ai_reply):
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
         
 # ------ STAGE 5: Chat & Correction ------
+def show_formatted_ai_reply(ai_reply):
+    # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
+    import re
+    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
+    main, correction, grammatik, followup = '', '', '', ''
+    curr_section = 'main'
+
+    for line in lines:
+        header = line.lower()
+        if header.startswith('correction:') or header.startswith('- correction:'):
+            curr_section = 'correction'
+            line = line.split(':',1)[-1].strip()
+            if line: correction += line + ' '
+            continue
+        elif header.startswith('grammar tip:') or header.startswith('- grammar tip:') \
+             or header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
+            curr_section = 'grammatik'
+            line = line.split(':',1)[-1].strip()
+            if line: grammatik += line + ' '
+            continue
+        elif header.startswith('next question:') or header.startswith('- next question:') \
+             or header.startswith('follow-up question') or header.startswith('folgefrage'):
+            curr_section = 'followup'
+            line = line.split(':',1)[-1].strip()
+            if line: followup += line + ' '
+            continue
+        if curr_section == 'main':
+            main += line + ' '
+        elif curr_section == 'correction':
+            correction += line + ' '
+        elif curr_section == 'grammatik':
+            grammatik += line + ' '
+        elif curr_section == 'followup':
+            followup += line + ' '
+
+    # In case the followup got stuck inside main/grammatik
+    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
+        candidates = [l.strip() for l in block.split('\n') if l.strip()]
+        if candidates:
+            last = candidates[-1]
+            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
+                followup = last
+                if setter == 'grammatik':
+                    grammatik = grammatik.replace(last, '').strip()
+                else:
+                    main = main.replace(last, '').strip()
+
+    st.markdown(f"**📝 Answer:**  \n{main.strip()}", unsafe_allow_html=True)
+    if correction.strip():
+        st.markdown(f"<div style='color:#c62828'><b>✏️ Correction:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
+    if grammatik.strip():
+        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammar Tip:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
+    if followup.strip():
+        st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
+
+
+# ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
@@ -456,15 +513,24 @@ if st.session_state["step"] == 5:
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
-                        "Reply at A2-level, using simple sentences and clear explanations. "
-                        "Correct and give a grammar tip ONLY for the student's most recent answer. "
-                        "Format: Your reply (German). Correction (if needed). Grammar tip (English, simple). Follow-up question (German)."
+                        "Reply at A2-level, using simple German sentences. "
+                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Your reply format:\n"
+                        "- Your answer (German)\n"
+                        "- Correction (if needed, in German)\n"
+                        "- Grammar Tip (in English, one short sentence)\n"
+                        "- Next question (in German)\n"
                     )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
-                        "Reply at B1-level. Correct and give a grammar tip for the student's last answer. "
-                        "Format: Your reply (German). Correction (if needed). Grammar tip (English). Follow-up question (German)."
+                        "Reply at B1-level in German. "
+                        "Correct and give a grammar tip for the student's last answer (always in English). "
+                        "Your reply format:\n"
+                        "- Your answer (German)\n"
+                        "- Correction (if needed, in German)\n"
+                        "- Grammar Tip (in English, one short sentence)\n"
+                        "- Next question (in German)\n"
                     )
             else:
                 lvl = st.session_state["selected_exam_level"]
@@ -474,11 +540,11 @@ if st.session_state["step"] == 5:
                         "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
                         "1. Answer the student's message in very simple A2-level German (max 2–3 sentences). "
                         "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                        "3. Give a short 'Grammatik-Tipp:' in English with a simple explanation. "
+                        "3. Give a short grammar tip (in English, one short sentence). "
                         "4. If the answer is perfect, say so and still give a tip in English. "
-                        "5. End with a follow-up question or prompt. "
+                        "5. End with a next question or prompt in German. "
                         "Format your reply:\n"
-                        "- Your reply (German)\n- Correction: ...\n- Grammatik-Tipp: ...\n- Follow-up question (German)"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
                     )
                 else:
                     ai_system_prompt = (
@@ -486,11 +552,11 @@ if st.session_state["step"] == 5:
                         "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
                         "1. Answer the student's message in B1-level German (max 2–3 sentences). "
                         "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                        "3. Give a short 'Grammatik-Tipp:' in English. "
-                        "4. If the answer is perfect, say so and still give a tip. "
-                        "5. End with a follow-up question. "
+                        "3. Give a short grammar tip (in English, one short sentence). "
+                        "4. If the answer is perfect, say so and still give a tip in English. "
+                        "5. End with a next question or prompt in German. "
                         "Format your reply:\n"
-                        "- Your reply (German)\n- Correction: ...\n- Grammatik-Tipp: ...\n- Follow-up question (German)"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
                     )
 
             # --- Call OpenAI with only the last user message ---
@@ -513,7 +579,7 @@ if st.session_state["step"] == 5:
             )
             ai_just_replied = True
 
-    # --- Render chat history with Herr Felix label ---
+    # --- Render chat history with formatted AI replies ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
