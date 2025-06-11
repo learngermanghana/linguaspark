@@ -516,40 +516,6 @@ if st.session_state["step"] == 5:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
 
-
-    # --- Show chat history ---
-    for msg in st.session_state["messages"]:
-        if msg["role"] == "assistant":
-            with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {msg['content']}", unsafe_allow_html=True)
-        else:
-            with st.chat_message("user"):
-                st.markdown(f"🗣️ {msg['content']}")
-
-    # --- Play audio for last AI message (if new) ---
-    if ai_just_replied and "ai_audio" in st.session_state:
-        try:
-            tts = gTTS(st.session_state["ai_audio"], lang="de")
-            buf = io.BytesIO()
-            tts.write_to_fp(buf)
-            buf.seek(0)
-            st.audio(buf.read(), format="audio/mp3")
-        except:
-            st.info("Audio feedback not available.")
-
-    # --- Navigation ---
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬅️ Back", key="stage5_back"):
-            prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
-            st.session_state["step"] = prev
-            st.session_state["messages"] = []
-            st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
-    with col2:
-        if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
-            st.session_state["step"] = 6
-
 # ------ Stage 6: Summary ------
 if st.session_state["step"] == 6:
     st.title("🎉 Congratulations!")
