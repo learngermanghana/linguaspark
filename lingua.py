@@ -328,30 +328,61 @@ def show_formatted_ai_reply(ai_reply):
 # ------ STAGE 5: Chat & Correction ------
 def show_formatted_ai_reply(ai_reply):
     import re
-    corr_pat = r'(?:-?\s*Correction:)\s*(.*?)(?=\n-?\s*Grammatik-Tipp:|\Z)'
-    gram_pat = r'(?:-?\s*Grammatik-Tipp:)\s*(.*?)(?=\n-?\s*(?:Follow-up question|Folgefrage)|\Z)'
-    foll_pat = r'(?:-?\s*(?:Follow-up question|Folgefrage):?)\s*(.*)'
+    # Improved block-wise extraction for each section, even if the AI merges them
+    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
+    main, correction, grammatik, followup = '', '', '', ''
+    curr_section = 'main'
 
-    correction = re.search(corr_pat, ai_reply, re.DOTALL)
-    grammatik  = re.search(gram_pat, ai_reply, re.DOTALL)
-    followup   = re.search(foll_pat, ai_reply, re.DOTALL)
+    for line in lines:
+        # Detect headers
+        header = line.lower()
+        if header.startswith('correction:') or header.startswith('- correction:'):
+            curr_section = 'correction'
+            line = line.split(':',1)[-1].strip()
+            if line: correction += line + ' '
+            continue
+        elif header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
+            curr_section = 'grammatik'
+            line = line.split(':',1)[-1].strip()
+            if line: grammatik += line + ' '
+            continue
+        elif header.startswith('follow-up question') or header.startswith('- follow-up question') or header.startswith('folgefrage'):
+            curr_section = 'followup'
+            line = line.split(':',1)[-1].strip()
+            if line: followup += line + ' '
+            continue
+        # Add content to the right block
+        if curr_section == 'main':
+            main += line + ' '
+        elif curr_section == 'correction':
+            correction += line + ' '
+        elif curr_section == 'grammatik':
+            grammatik += line + ' '
+        elif curr_section == 'followup':
+            followup += line + ' '
 
-    main = ai_reply
-    if correction:
-        main = ai_reply.split(correction.group(0))[0].strip()
-    # Remove Grammatik-Tipp from main answer if present
-    main = re.sub(r'-?\s*Grammatik-Tipp:.*', '', main, flags=re.DOTALL).strip()
+    # Fallback: If there's a likely question at the end, show it as followup
+    if not followup:
+        # Try to grab a trailing question from grammatik or main
+        for block in [grammatik, main]:
+            qmarks = [m.start() for m in re.finditer(r'\?', block)]
+            if qmarks:
+                idx = qmarks[-1]
+                followup_candidate = block[idx:].strip()
+                if followup_candidate.count('?')==1 and len(followup_candidate) < 150:
+                    followup = followup_candidate
+                    if block is grammatik:
+                        grammatik = grammatik[:idx].strip()
+                    else:
+                        main = main[:idx].strip()
 
-    st.markdown(f"**📝 Antwort:**  \n{main}", unsafe_allow_html=True)
-    if correction:
-        text = correction.group(1).strip()
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if grammatik:
-        text = grammatik.group(1).strip()
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if followup:
-        text = followup.group(1).strip()
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
+    st.markdown(f"**📝 Antwort:**  \n{main.strip()}", unsafe_allow_html=True)
+    if correction.strip():
+        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
+    if grammatik.strip():
+        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
+    if followup.strip():
+        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
 # -- STAGE 5 logic --
 if st.session_state["step"] == 5:
@@ -372,7 +403,7 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Initial prompt for B1 Teil 3
+    # --- B1 Teil 3: First message
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -385,35 +416,23 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
-    elif not st.session_state["messages"]:
-        if st.session_state["selected_mode"].startswith("Geführte"):
-            prompt = st.session_state.get("initial_prompt")
-            st.session_state["messages"].append({"role": "assistant", "content": prompt})
-        else:
-            topic = st.session_state.get("custom_topic", "")
-            if topic:
-                st.session_state["messages"].append({"role": "user", "content": topic})
-                ai_system_prompt = (
-                    "You are Herr Felix, an expert German teacher and presentation coach. "
-                    "The student has just given you a topic or question for practice (e.g. class presentation, homework, or exam training). "
-                    "Start the conversation right away: reply directly to the student's topic, ask a relevant follow-up question, and give an example answer if it fits. "
-                    "Be engaging and supportive, like a real exam partner or teacher, and always give a 'Grammatik-Tipp:' in English using simple language, or a brief correction if needed. "
-                    "Keep your responses short (max. 2–3 sentences). "
-                    "If the student's message is already a good presentation, praise it and help them go deeper or extend the topic. "
-                    "Never say 'How can I help you?'. Instead, react directly to the topic and keep the conversation going. "
-                    "Never break character."
-                )
-                try:
-                    client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                    resp = client.chat.completions.create(
-                        model='gpt-4o',
-                        messages=[{"role":"system","content":ai_system_prompt}, *st.session_state["messages"]],
-                    )
-                    reply = resp.choices[0].message.content
-                except Exception as e:
-                    reply = "Sorry, there was a problem generating a response."
-                    st.error(str(e))
-                st.session_state["messages"].append({"role": "assistant", "content": reply})
+    # --- Custom Topic Mode: greet & wait for student input
+    elif (
+        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
+        and not st.session_state["messages"]
+    ):
+        st.session_state["messages"].append({
+            "role": "assistant",
+            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage, und ich helfe dir, dich perfekt vorzubereiten."
+        })
+
+    # --- Exam Mode: insert standard exam prompt
+    elif (
+        st.session_state.get("selected_mode", "").startswith("Geführte")
+        and not st.session_state["messages"]
+    ):
+        prompt = st.session_state.get("initial_prompt")
+        st.session_state["messages"].append({"role": "assistant", "content": prompt})
 
     # -- Student input (audio or text) --
     uploaded = st.file_uploader(
@@ -458,7 +477,7 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-            # --- SYSTEM PROMPT LOGIC HERE ---
+            # SYSTEM PROMPT LOGIC
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
                 ai_system_prompt = (
