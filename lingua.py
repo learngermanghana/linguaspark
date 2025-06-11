@@ -324,17 +324,15 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
-
 # ------ STAGE 5: Chat & Correction ------
 def show_formatted_ai_reply(ai_reply):
     import re
-    # Improved block-wise extraction for each section, even if the AI merges them
+    # Section-by-section extraction
     lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
     main, correction, grammatik, followup = '', '', '', ''
     curr_section = 'main'
 
     for line in lines:
-        # Detect headers
         header = line.lower()
         if header.startswith('correction:') or header.startswith('- correction:'):
             curr_section = 'correction'
@@ -351,7 +349,6 @@ def show_formatted_ai_reply(ai_reply):
             line = line.split(':',1)[-1].strip()
             if line: followup += line + ' '
             continue
-        # Add content to the right block
         if curr_section == 'main':
             main += line + ' '
         elif curr_section == 'correction':
@@ -361,20 +358,19 @@ def show_formatted_ai_reply(ai_reply):
         elif curr_section == 'followup':
             followup += line + ' '
 
-    # Fallback: If there's a likely question at the end, show it as followup
-    if not followup:
-        # Try to grab a trailing question from grammatik or main
-        for block in [grammatik, main]:
-            qmarks = [m.start() for m in re.finditer(r'\?', block)]
-            if qmarks:
-                idx = qmarks[-1]
-                followup_candidate = block[idx:].strip()
-                if followup_candidate.count('?')==1 and len(followup_candidate) < 150:
-                    followup = followup_candidate
-                    if block is grammatik:
-                        grammatik = grammatik[:idx].strip()
-                    else:
-                        main = main[:idx].strip()
+    # --- Ensure follow-up question is always separated and last ---
+    # If the last line is a question and not yet in 'Folgefrage', put it there
+    # Check grammatik then main
+    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
+        candidates = [l.strip() for l in block.split('\n') if l.strip()]
+        if candidates:
+            last = candidates[-1]
+            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
+                followup = last
+                if setter == 'grammatik':
+                    grammatik = grammatik.replace(last, '').strip()
+                else:
+                    main = main.replace(last, '').strip()
 
     st.markdown(f"**📝 Antwort:**  \n{main.strip()}", unsafe_allow_html=True)
     if correction.strip():
@@ -384,7 +380,8 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
-# -- STAGE 5 logic --
+
+# --- STAGE 5 Logic ---
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
@@ -403,6 +400,30 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
+    # -- Custom Chat: Ask for level if not yet set
+    if (
+        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
+        and not st.session_state.get("custom_chat_level")
+    ):
+        if not st.session_state.get("custom_level_prompted"):
+            st.session_state["messages"] = [{
+                "role": "assistant",
+                "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Bevor wir starten, wähle bitte dein Sprachniveau."
+            }]
+            st.session_state["custom_level_prompted"] = True
+
+        level = st.radio(
+            "Wähle dein Sprachniveau / Select your level:",
+            ["A2", "B1"],
+            horizontal=True,
+            key="custom_level_select"
+        )
+        if st.button("Start Custom Chat"):
+            st.session_state["custom_chat_level"] = level
+            st.experimental_rerun()
+        # Stop further UI so user must select level
+        st.stop()
+
     # --- B1 Teil 3: First message
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
@@ -416,14 +437,15 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
-    # --- Custom Topic Mode: greet & wait for student input
+    # --- Custom Topic Mode: greet (after level select) & wait for student input
     elif (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
+        and st.session_state.get("custom_chat_level")
         and not st.session_state["messages"]
     ):
         st.session_state["messages"].append({
             "role": "assistant",
-            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage, und ich helfe dir, dich perfekt vorzubereiten."
+            "content": "Super, du hast Level " + st.session_state["custom_chat_level"] + " gewählt. Was möchtest du üben? Schreib dein Präsentationsthema oder eine Frage."
         })
 
     # --- Exam Mode: insert standard exam prompt
@@ -491,17 +513,20 @@ if st.session_state["step"] == 5:
                     "Be friendly, supportive, and exam-like. Never break character."
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                ai_system_prompt = (
-                    "You are Herr Felix, an expert German teacher and exam trainer. "
-                    "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
-                    "1. First, answer the student's message naturally as a German tutor (max 2–3 sentences). "
-                    "2. Then, if there are mistakes, show the corrected sentence(s) clearly under 'Correction:'. "
-                    "3. After that, give a very short 'Grammatik-Tipp:' in English with a simple explanation. "
-                    "4. If the answer is perfect, say so and still give a tip in English. "
-                    "5. Always end your message with a follow-up question or prompt to keep the conversation going. "
-                    "Reply in this format:\n"
-                    "- Your reply (German)\n- Correction: ...\n- Grammatik-Tipp: ...\n- Follow-up question (German)"
-                )
+                lvl = st.session_state.get("custom_chat_level", "A2")
+                if lvl == "A2":
+                    ai_system_prompt = (
+                        "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
+                        "Reply at A2-level, using simple sentences and clear explanations. "
+                        "Correct and give a grammar tip ONLY for the student's most recent answer. "
+                        "Format: Your reply (German). Correction (if needed). Grammar tip (English, simple). Follow-up question (German)."
+                    )
+                else:
+                    ai_system_prompt = (
+                        "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
+                        "Reply at B1-level. Correct and give a grammar tip for the student's last answer. "
+                        "Format: Your reply (German). Correction (if needed). Grammar tip (English). Follow-up question (German)."
+                    )
             else:
                 lvl = st.session_state["selected_exam_level"]
                 if lvl == "A2":
@@ -563,7 +588,13 @@ if st.session_state["step"] == 5:
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
             prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
-            st.session_state.update({"step":prev, "messages":[], "turn_count":0})
+            st.session_state.update({
+                "step":prev,
+                "messages":[],
+                "turn_count":0,
+                "custom_chat_level":None,
+                "custom_level_prompted":False,
+            })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
