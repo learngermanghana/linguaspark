@@ -220,10 +220,9 @@ elif st.session_state["step"] == 3:
         key="mode_selector"
     )
     st.session_state["selected_mode"] = mode
-    custom_topic = ""
-    if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
-        custom_topic = st.text_input("Type your own topic or question here...", value=st.session_state.get("custom_topic", ""), key="custom_topic_input")
-        st.session_state["custom_topic"] = custom_topic
+
+    # --- REMOVE the custom_topic input! ---
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage3_back"):
@@ -237,6 +236,7 @@ elif st.session_state["step"] == 3:
                 st.session_state["step"] = 5
             else:
                 st.session_state["step"] = 4
+
 
 # ------ STAGE 4: Exam Part Selection ------
 elif st.session_state["step"] == 4:
