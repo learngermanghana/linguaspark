@@ -513,10 +513,14 @@ if st.session_state["step"] == 5:
             )
             ai_just_replied = True
 
-    # --- Render chat history with formatted AI replies ---
+    # --- Render chat history with Herr Felix label ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
+                st.markdown(
+                    "<span style='color:#33691e;font-weight:bold'>🧑‍🏫 Herr Felix:</span>",
+                    unsafe_allow_html=True
+                )
                 show_formatted_ai_reply(msg["content"])
         else:
             with st.chat_message("user"):
