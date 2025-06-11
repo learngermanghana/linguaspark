@@ -1,26 +1,28 @@
+# STAGE 1: Imports, Config, and Constants
 import streamlit as st
 from openai import OpenAI
 import tempfile
 import io
 from gtts import gTTS
 import random
-import re
 import pandas as pd
 import os
 from datetime import date
 
+# Streamlit page config
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
+# File/database constants
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
 max_turns = 6
 TEACHER_PASSWORD = "Felix029"
 
-# ==== Topic lists ====
+# Exam topic lists
 A2_TEIL1 = [
     "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
     "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
@@ -93,18 +95,16 @@ def load_codes():
     else:
         df = pd.DataFrame(columns=["code"])
     return df
+# STAGE 2: Teacher Area Sidebar & Session State Setup
 
-# ========== TEACHER DASHBOARD (SIDEBAR) ==========
-
+# ---- Teacher Dashboard (Sidebar) ----
 with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
     if "teacher_authenticated" not in st.session_state:
         st.session_state["teacher_authenticated"] = False
 
-    # --- Teacher login prompt if not authenticated ---
+    # Teacher login prompt
     if not st.session_state["teacher_authenticated"]:
         st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
-        # Optionally, uncomment below to show a logo
-        # st.image("your_logo.png", width=120)
         pwd = st.text_input("Teacher Login (for admin only)", type="password")
         login_btn = st.button("Login (Teacher)")
         if login_btn:
@@ -114,7 +114,7 @@ with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=F
             elif pwd != "":
                 st.error("Incorrect password. Please try again.")
 
-    # --- Teacher dashboard (settings) ---
+    # Teacher dashboard/settings
     else:
         st.header("👩‍🏫 Teacher Dashboard")
         df_codes = load_codes()
@@ -145,8 +145,7 @@ with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=F
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
 
-
-# ====== STEPPER STAGES ======
+# ---- Global session state for app navigation ----
 if "step" not in st.session_state:
     st.session_state["step"] = 1
 if "student_code" not in st.session_state:
@@ -159,6 +158,7 @@ if "corrections" not in st.session_state:
     st.session_state["corrections"] = []
 if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
+# STAGE 3: Student Login, Welcome, and Mode Selection
 
 # ------ Stage 1: Student Login ------
 if st.session_state["step"] == 1:
@@ -237,7 +237,8 @@ elif st.session_state["step"] == 3:
                 st.session_state["step"] = 5
             else:
                 st.session_state["step"] = 4
-# ------ Stage 4: Exam Part Selection ------
+# STAGE 4: Exam Part Selection
+
 elif st.session_state["step"] == 4:
     st.header("Prüfungsteil wählen / Choose exam part")
     exam_level = st.selectbox(
@@ -298,15 +299,15 @@ elif st.session_state["step"] == 4:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
+# STAGE 5: Chat & Correction
 
-# ------ Stage 5: Chat & Correction ------
 if st.session_state["step"] == 5:
-    # --- Setup daily_usage
-    if "daily_usage" not in st.session_state:
-        st.session_state["daily_usage"] = {}
+    # Setup daily_usage for this student
     today_str = str(date.today())
     student_code = st.session_state["student_code"]
     usage_key = f"{student_code}_{today_str}"
+    if "daily_usage" not in st.session_state:
+        st.session_state["daily_usage"] = {}
     if usage_key not in st.session_state["daily_usage"]:
         st.session_state["daily_usage"][usage_key] = 0
 
@@ -315,14 +316,14 @@ if st.session_state["step"] == 5:
         f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
     )
 
-    # --- B1 Teil 3: Special "role-play" prompt ---
+    # Detect if we are in B1 Teil 3 special mode
     is_b1_teil3 = (
         st.session_state.get("selected_mode", "").startswith("Geführte") and
         st.session_state.get("selected_exam_level", "") == "B1" and
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # Insert first message for B1 Teil 3
+    # Insert initial message for the chat
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -335,7 +336,6 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": initial_prompt})
 
-    # Insert first message for all other modes
     elif not st.session_state["messages"]:
         if st.session_state.get("selected_mode", "").startswith("Geführte"):
             prompt = st.session_state.get("initial_prompt", "Stelle bitte eine Frage oder beginne mit deiner Präsentation.")
@@ -344,7 +344,6 @@ if st.session_state["step"] == 5:
             custom_topic = st.session_state.get("custom_topic", "")
             if custom_topic:
                 st.session_state["messages"].append({"role": "user", "content": custom_topic})
-                # For custom topic, AI begins the conversation as before
                 try:
                     ai_system_prompt = (
                         "You are Herr Felix, an expert German teacher and presentation coach. "
@@ -367,7 +366,7 @@ if st.session_state["step"] == 5:
                     st.error(str(e))
                 st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
 
-    # --- Student input ---
+    # --- Student input: audio upload or typed message ---
     uploaded_audio = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav", "mp3", "ogg", "m4a"],
@@ -381,7 +380,7 @@ if st.session_state["step"] == 5:
     if uploaded_audio:
         uploaded_audio.seek(0)
         audio_bytes = uploaded_audio.read()
-        st.audio(audio_bytes, format=uploaded_audio.type)
+        st.audio(audio_bytes, format=uploaded_audio.type)  # Only play student's uploaded audio
         try:
             suffix = "." + uploaded_audio.name.split(".")[-1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -402,7 +401,7 @@ if st.session_state["step"] == 5:
     used_today = st.session_state["daily_usage"][usage_key]
     ai_just_replied = False
 
-    # --- Improved AI reply/grammar correction logic ---
+    # AI processing and feedback
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
@@ -412,7 +411,7 @@ if st.session_state["step"] == 5:
             st.session_state["daily_usage"][usage_key] += 1
 
             try:
-                # --------- Choose prompt and context based on mode ----------
+                # Prompt selection based on exam mode/level/part
                 if is_b1_teil3:
                     b1_topic = st.session_state.get("current_b1_teil3_topic", random.choice(B1_TEIL2))
                     ai_system_prompt = (
@@ -480,10 +479,9 @@ if st.session_state["step"] == 5:
                 ai_reply = "Sorry, there was a problem generating a response. Please try again."
                 st.error(str(e))
             st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
-            st.session_state["ai_audio"] = ai_reply
             ai_just_replied = True
 
-    # --- Show chat history ---
+    # --- Show chat history (no AI audio playback here) ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -491,17 +489,6 @@ if st.session_state["step"] == 5:
         else:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
-
-    # --- Play audio for last AI message (if new) ---
-    if ai_just_replied and "ai_audio" in st.session_state:
-        try:
-            tts = gTTS(st.session_state["ai_audio"], lang="de")
-            buf = io.BytesIO()
-            tts.write_to_fp(buf)
-            buf.seek(0)
-            st.audio(buf.read(), format="audio/mp3")
-        except:
-            st.info("Audio feedback not available.")
 
     # --- Navigation ---
     col1, col2 = st.columns(2)
@@ -515,8 +502,8 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+# STAGE 6: Session Summary & Restart
 
-# ------ Stage 6: Summary ------
 if st.session_state["step"] == 6:
     st.title("🎉 Congratulations!")
     st.markdown(
