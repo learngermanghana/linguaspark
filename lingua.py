@@ -299,10 +299,43 @@ elif st.session_state["step"] == 4:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
-# STAGE 5: Chat & Correction
+            
+import re
 
+def show_formatted_ai_reply(ai_reply):
+    # Split into sections by your AI format
+    correction = ""
+    grammatik = ""
+    followup = ""
+    main_reply = ai_reply
+
+    # Try to extract by label (for your format)
+    correction_match = re.search(r'Correction:\s*(.*?)\n- Grammatik-Tipp:', ai_reply, re.DOTALL)
+    grammatik_match = re.search(r'- Grammatik-Tipp:\s*(.*?)\n- Follow-up question', ai_reply, re.DOTALL)
+    followup_match = re.search(r'- Follow-up question\s*(.*)', ai_reply, re.DOTALL)
+    
+    if correction_match:
+        correction = correction_match.group(1).strip()
+    if grammatik_match:
+        grammatik = grammatik_match.group(1).strip()
+    if followup_match:
+        followup = followup_match.group(1).strip()
+    
+    # The main reply is before "Correction:" if it exists
+    if "Correction:" in ai_reply:
+        main_reply = ai_reply.split("Correction:")[0].strip()
+
+    # Display each section with color and headings
+    st.markdown(f"**📝 Antwort:**<br>{main_reply}", unsafe_allow_html=True)
+    if correction:
+        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b><br>{correction}</div>", unsafe_allow_html=True)
+    if grammatik:
+        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b><br>{grammatik}</div>", unsafe_allow_html=True)
+    if followup:
+        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b><br>{followup}</div>", unsafe_allow_html=True)
+
+# ------ STAGE 5: Chat & Correction ------
 if st.session_state["step"] == 5:
-    # Setup daily_usage for this student
     today_str = str(date.today())
     student_code = st.session_state["student_code"]
     usage_key = f"{student_code}_{today_str}"
@@ -316,14 +349,13 @@ if st.session_state["step"] == 5:
         f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
     )
 
-    # Detect if we are in B1 Teil 3 special mode
     is_b1_teil3 = (
         st.session_state.get("selected_mode", "").startswith("Geführte") and
         st.session_state.get("selected_exam_level", "") == "B1" and
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # Insert initial message for the chat
+    # Insert initial prompt if chat just started
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -366,7 +398,7 @@ if st.session_state["step"] == 5:
                     st.error(str(e))
                 st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
 
-    # --- Student input: audio upload or typed message ---
+    # --- Student input: audio or text ---
     uploaded_audio = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav", "mp3", "ogg", "m4a"],
@@ -380,7 +412,7 @@ if st.session_state["step"] == 5:
     if uploaded_audio:
         uploaded_audio.seek(0)
         audio_bytes = uploaded_audio.read()
-        st.audio(audio_bytes, format=uploaded_audio.type)  # Only play student's uploaded audio
+        st.audio(audio_bytes, format=uploaded_audio.type)
         try:
             suffix = "." + uploaded_audio.name.split(".")[-1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -401,7 +433,7 @@ if st.session_state["step"] == 5:
     used_today = st.session_state["daily_usage"][usage_key]
     ai_just_replied = False
 
-    # AI processing and feedback
+    # --- AI processing ---
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor for unlimited access!")
@@ -411,7 +443,7 @@ if st.session_state["step"] == 5:
             st.session_state["daily_usage"][usage_key] += 1
 
             try:
-                # Prompt selection based on exam mode/level/part
+                # Prompt selection logic as before...
                 if is_b1_teil3:
                     b1_topic = st.session_state.get("current_b1_teil3_topic", random.choice(B1_TEIL2))
                     ai_system_prompt = (
@@ -463,7 +495,6 @@ if st.session_state["step"] == 5:
                             "- Your reply (German)\n- Correction: ...\n- Grammatik-Tipp: ...\n- Follow-up question (German)"
                         )
 
-                # Only pass the latest user message for correction
                 conversation = [
                     {"role": "system", "content": ai_system_prompt},
                     st.session_state["messages"][-1]
@@ -481,11 +512,11 @@ if st.session_state["step"] == 5:
             st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
             ai_just_replied = True
 
-    # --- Show chat history (no AI audio playback here) ---
+    # --- Show chat history with new formatting ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown(f"🧑‍🏫 <span style='color:#33691e;font-weight:bold'>Herr Felix:</span> {msg['content']}", unsafe_allow_html=True)
+                show_formatted_ai_reply(msg["content"])
         else:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
@@ -502,6 +533,8 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
+
 # STAGE 6: Session Summary & Restart
 
 if st.session_state["step"] == 6:
