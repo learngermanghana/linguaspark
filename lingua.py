@@ -95,31 +95,16 @@ def load_codes():
     return df
 
 # ========== TEACHER DASHBOARD (SIDEBAR) ==========
-with st.sidebar:
-    if "teacher_authenticated" not in st.session_state:
-        st.session_state["teacher_authenticated"] = False
 
-    # --- Teacher login prompt if not authenticated ---
-    if not st.session_state["teacher_authenticated"]:
-        st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)  # Blank space
-        # Optionally, uncomment below to show a logo
-        # st.image("your_logo.png", width=120)
-        pwd = st.text_input("Teacher Login (for admin only)", type="password")
-        login_btn = st.button("Login (Teacher)")
-        if login_btn:
-            if pwd == TEACHER_PASSWORD:
-                st.session_state["teacher_authenticated"] = True
-                st.success("Access granted!")
-            elif pwd != "":
-                st.error("Incorrect password. Please try again.")
-
-   with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
+with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
     if "teacher_authenticated" not in st.session_state:
         st.session_state["teacher_authenticated"] = False
 
     # --- Teacher login prompt if not authenticated ---
     if not st.session_state["teacher_authenticated"]:
         st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
+        # Optionally, uncomment below to show a logo
+        # st.image("your_logo.png", width=120)
         pwd = st.text_input("Teacher Login (for admin only)", type="password")
         login_btn = st.button("Login (Teacher)")
         if login_btn:
@@ -159,6 +144,7 @@ with st.sidebar:
 
         if st.button("Log out (Teacher)"):
             st.session_state["teacher_authenticated"] = False
+
 
 # ====== STEPPER STAGES ======
 if "step" not in st.session_state:
