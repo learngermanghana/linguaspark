@@ -114,6 +114,19 @@ with st.sidebar:
                 st.error("Incorrect password. Please try again.")
 
     # --- Teacher dashboard (settings) ---
+with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
+    if "teacher_authenticated" not in st.session_state:
+        st.session_state["teacher_authenticated"] = False
+
+    if not st.session_state["teacher_authenticated"]:
+        pwd = st.text_input("Teacher Login (for admin only)", type="password")
+        login_btn = st.button("Login (Teacher)")
+        if login_btn:
+            if pwd == TEACHER_PASSWORD:
+                st.session_state["teacher_authenticated"] = True
+                st.success("Access granted!")
+            elif pwd != "":
+                st.error("Incorrect password. Please try again.")
     else:
         st.header("👩‍🏫 Teacher Dashboard")
         df_codes = load_codes()
