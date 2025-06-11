@@ -324,117 +324,8 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
+        
 # ------ STAGE 5: Chat & Correction ------
-def show_formatted_ai_reply(ai_reply):
-    import re
-    # Section-by-section extraction
-    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
-    main, correction, grammatik, followup = '', '', '', ''
-    curr_section = 'main'
-
-    for line in lines:
-        header = line.lower()
-        if header.startswith('correction:') or header.startswith('- correction:'):
-            curr_section = 'correction'
-            line = line.split(':',1)[-1].strip()
-            if line: correction += line + ' '
-            continue
-        elif header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
-            curr_section = 'grammatik'
-            line = line.split(':',1)[-1].strip()
-            if line: grammatik += line + ' '
-            continue
-        elif header.startswith('follow-up question') or header.startswith('- follow-up question') or header.startswith('folgefrage'):
-            curr_section = 'followup'
-            line = line.split(':',1)[-1].strip()
-            if line: followup += line + ' '
-            continue
-        if curr_section == 'main':
-            main += line + ' '
-        elif curr_section == 'correction':
-            correction += line + ' '
-        elif curr_section == 'grammatik':
-            grammatik += line + ' '
-        elif curr_section == 'followup':
-            followup += line + ' '
-
-    # --- Ensure follow-up question is always separated and last ---
-    # If the last line is a question and not yet in 'Folgefrage', put it there
-    # Check grammatik then main
-    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
-        candidates = [l.strip() for l in block.split('\n') if l.strip()]
-        if candidates:
-            last = candidates[-1]
-            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
-                followup = last
-                if setter == 'grammatik':
-                    grammatik = grammatik.replace(last, '').strip()
-                else:
-                    main = main.replace(last, '').strip()
-
-    st.markdown(f"**📝 Antwort:**  \n{main.strip()}", unsafe_allow_html=True)
-    if correction.strip():
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
-    if grammatik.strip():
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
-    if followup.strip():
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
-
-# ------ STAGE 5: Chat & Correction ------
-def show_formatted_ai_reply(ai_reply):
-    import re
-    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
-    main, correction, grammatik, followup = '', '', '', ''
-    curr_section = 'main'
-
-    for line in lines:
-        header = line.lower()
-        if header.startswith('correction:') or header.startswith('- correction:'):
-            curr_section = 'correction'
-            line = line.split(':',1)[-1].strip()
-            if line: correction += line + ' '
-            continue
-        elif header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
-            curr_section = 'grammatik'
-            line = line.split(':',1)[-1].strip()
-            if line: grammatik += line + ' '
-            continue
-        elif header.startswith('follow-up question') or header.startswith('- follow-up question') or header.startswith('folgefrage'):
-            curr_section = 'followup'
-            line = line.split(':',1)[-1].strip()
-            if line: followup += line + ' '
-            continue
-        if curr_section == 'main':
-            main += line + ' '
-        elif curr_section == 'correction':
-            correction += line + ' '
-        elif curr_section == 'grammatik':
-            grammatik += line + ' '
-        elif curr_section == 'followup':
-            followup += line + ' '
-
-    # --- Ensure follow-up question is always separated and last ---
-    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
-        candidates = [l.strip() for l in block.split('\n') if l.strip()]
-        if candidates:
-            last = candidates[-1]
-            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
-                followup = last
-                if setter == 'grammatik':
-                    grammatik = grammatik.replace(last, '').strip()
-                else:
-                    main = main.replace(last, '').strip()
-
-    st.markdown(f"**📝 Antwort:**  \n{main.strip()}", unsafe_allow_html=True)
-    if correction.strip():
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
-    if grammatik.strip():
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
-    if followup.strip():
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
-
-
-# --- STAGE 5 Logic ---
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
@@ -453,7 +344,7 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Custom Chat: Level selection comes first, no chat box yet
+    # --- Custom Chat: Level selection comes first, no chat box yet ---
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -470,8 +361,7 @@ if st.session_state["step"] == 5:
                 "role": "assistant",
                 "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
             }]
-            st.experimental_rerun()
-        st.stop()
+        st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
 
     # --- B1 Teil 3: First message
     if is_b1_teil3 and not st.session_state["messages"]:
