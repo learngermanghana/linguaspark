@@ -751,10 +751,50 @@ def stage_7():
         if not st.session_state.presentation_messages or st.session_state.presentation_messages[-1]['role'] != 'assistant':
             generate_ai_reply_and_rerun()
 
-    # Chat interaction logic remains unchanged
-    # [Rest of the original chat interaction and progress tracking code here]
+ # Stage 3+: chat loop
+    # show history
+    for m in st.session_state.presentation_messages:
+        pnl = "👤" if m['role']=='user' else "🧑‍🏫"
+        st.markdown(f"**{pnl}**: {m['content']}")
+
+    inp = st.chat_input("Type your response...")
+    if inp:
+        # increment usage
+        st.session_state['daily_usage'][key] += 1
+        st.session_state.presentation_messages.append({'role':'user','content':inp})
+        st.session_state.presentation_turn_count +=1
+        if st.session_state.presentation_level=='A2':
+            for k in st.session_state.a2_keywords or []:
+                if k.lower() in inp.lower():
+                    st.session_state.a2_keyword_progress.add(k)
+        generate_ai_reply_and_rerun()
+
+    # progress
+    max_turns=8
+    if st.session_state.presentation_level=='A2':
+        kws = st.session_state.a2_keywords or []
+        done=len(st.session_state.a2_keyword_progress)
+        total=max(1,len(kws))
+        st.progress(done/total)
+        st.markdown(f"**Progress:** {done}/{total} keywords used")
+    else:
+        done=st.session_state.presentation_turn_count
+        st.progress(min(done/max_turns,1.0))
+        st.markdown(f"**Progress:** Turn {done}/{max_turns}")
+    st.markdown("---")
+
+    # completion
+    a2_done=(st.session_state.presentation_level=='A2' and done>=total)
+    b1_done=(st.session_state.presentation_level=='B1' and done>=max_turns)
+    if a2_done or b1_done:
+        st.success("Practice complete! 🎉")
+        lines=[f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}" for m in st.session_state.presentation_messages]
+        st.subheader("Your Session Summary")
+        st.markdown("\n\n".join(lines))
+        if st.button("Restart Practice"):
+            for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_keyword_progress']:
+                st.session_state.pop(k,None)
+            safe_rerun()
 
 # invoke
 stage_7()
-```
-
