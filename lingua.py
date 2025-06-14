@@ -638,16 +638,17 @@ def stage_7():
     if st.session_state.get("step") != 7:
         return
 
-    # --- Initialize defaults ---
+    # Initialize defaults
     st.session_state.setdefault("presentation_step", 0)
     st.session_state.setdefault("presentation_level", None)
     st.session_state.setdefault("presentation_topic", "")
-    st.session_state.setdefault("a2_keywords", None)
-    st.session_state.setdefault("a2_keyword_progress", set())
+    st.session_state.setdefault("a2_keywords", [])
+    # track per-keyword question counts
+    st.session_state.setdefault("a2_kw_counts", {kw:0 for kw in st.session_state.a2_keywords})
     st.session_state.setdefault("presentation_messages", [])
     st.session_state.setdefault("presentation_turn_count", 0)
 
-    # --- Daily limit ---
+    # Daily limit
     today = str(date.today())
     code = st.session_state.get("student_code", "(unknown)")
     key = f"{code}_{today}"
@@ -664,45 +665,38 @@ def stage_7():
     def safe_rerun():
         try:
             st.experimental_rerun()
-        except Exception:
+        except:
             pass
 
-    def generate_ai_reply_and_rerun():
-        placeholder = st.empty()
-        placeholder.info("🧑‍🏫 Herr Felix is typing...")
-        # Build system prompt
+    def generate_and_show():
+        # Placeholder typing
+        ph = st.empty()
+        ph.text("🧑‍🏫 Herr Felix is typing...")
+        # build prompt
         if st.session_state.presentation_level == 'A2':
-            kws = list(st.session_state.a2_keywords or [])
-            used = st.session_state.a2_keyword_progress
-            next_kw = next((kw for kw in kws if kw not in used), kws[0] if kws else '(no keyword)')
+            # pick keyword with count<3
+            kws = st.session_state.a2_keywords
+            counts = st.session_state.a2_kw_counts
+            next_kw = next((k for k in kws if counts.get(k,0) < 3), None)
             system = (
-                f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-                "Encourage the student warmly, provide an English suggestion sentence using it, a German example, a hint on how to start your own sentence, and then explain any corrections in English, followed by a fun follow-up question in German."
+                f"You are an A2 teacher. Today’s keyword: '{next_kw}'. "
+                "Ask a question in German using that keyword."
             )
         else:
-            count = st.session_state.presentation_turn_count
+            # B1 step logic
+            step = st.session_state.presentation_turn_count
             topic = st.session_state.presentation_topic
-            if count == 0:
-                system = (
-                    f"You are Herr Felix, an inspiring B1 teacher. The topic is '{topic}'. "
-                    "Ask the student their opinion in German and give positive feedback in English."
-                )
-            elif count == 1:
-                system = (
-                    "Ask the student to list advantages and disadvantages in German, then praise and give a tip in English."
-                )
-            elif count == 2:
-                system = (
-                    "Ask how this topic relates to their homeland in German, then provide encouraging feedback in English."
-                )
-            elif count == 3:
-                system = (
-                    "Ask for a conclusion or recommendation in German, then cheer them on in English."
-                )
-            else:
-                system = (
-                    "Summarize their points in German, highlight progress, and motivate them to keep learning!"
-                )
+            prompts = [
+                f"Opinion: Was denkst du über '{topic}'?",  # 1
+                "Vorteile/Nachteile?",                      #2
+                "Situation in deiner Heimat?",             #3
+                "Persönliche Empfehlung?",                  #4
+                "Schlussfolgerung?",                       #5
+                "Weitere Gedanken?",                       #6
+                "Zusammenfassung?"                         #7
+            ]
+            q = prompts[min(step, len(prompts)-1)]
+            system = f"You are an inspiring B1 teacher. Ask: {q}"
         last = next((m for m in reversed(st.session_state.presentation_messages) if m['role']=='user'), None)
         if last:
             try:
@@ -710,126 +704,107 @@ def stage_7():
                     model='gpt-4o', messages=[{'role':'system','content':system}, last]
                 )
                 reply = resp.choices[0].message.content
-            except Exception:
+            except:
                 reply = "Sorry, something went wrong."
-            placeholder.empty()
-            st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
+            ph.empty()
+            st.chat_message('assistant', avatar='🧑‍🏫').markdown(reply)
             st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-        safe_rerun()
 
-    # Stage 0: select level
+    # Stage flow
     if st.session_state.presentation_step == 0:
-        lvl = st.radio("Select your level:", ["A2","B1"], horizontal=True)
-        if st.button("Start Presentation Practice"):
+        lvl = st.radio("Level:", ['A2','B1'], horizontal=True)
+        if st.button("Start"): 
             st.session_state.presentation_level = lvl
             st.session_state.presentation_step = 1
-            # clear prior
-            st.session_state.presentation_messages.clear()
-            st.session_state.presentation_turn_count = 0
-            st.session_state.a2_keywords = None
-            st.session_state.a2_keyword_progress.clear()
-            st.session_state.presentation_topic = ""
             safe_rerun()
         return
 
-    # Stage 1: topic
     if st.session_state.presentation_step == 1:
-        st.info("Please enter your presentation topic (English or German). 🔖")
-        t = st.text_input("Topic:", key="topic_input")
-        if st.button("Submit Topic") and t:
-            st.session_state.presentation_topic = t
-            st.session_state.presentation_messages.append({'role':'user','content':t})
-            # next stage
-            if st.session_state.presentation_level == 'A2':
+        topic = st.text_input("Topic (EN/DE):", key='topic_input')
+        if st.button("Submit Topic") and topic:
+            st.session_state.presentation_topic = topic
+            st.session_state.presentation_messages.append({'role':'user','content':topic})
+            if st.session_state.presentation_level=='A2':
                 st.session_state.presentation_step = 2
             else:
                 st.session_state.presentation_step = 3
-                generate_ai_reply_and_rerun()
+                generate_and_show()
             safe_rerun()
         return
 
-    # Stage 2: A2 keywords
     if st.session_state.presentation_step == 2:
-        st.info("Enter 3–4 German keywords, comma-separated.")
-        kw = st.text_input("Keywords:", key="kw_input")
+        kw_input = st.text_input("Keywords, comma-separated:")
         if st.button("Submit Keywords"):
-            arr = [x.strip() for x in kw.split(',') if x.strip()]
-            if len(arr) >= 3:
-                st.session_state.a2_keywords = arr[:4]
+            kws = [k.strip() for k in kw_input.split(',') if k.strip()]
+            if len(kws)>=3:
+                st.session_state.a2_keywords = kws
+                # init counts
+                st.session_state.a2_kw_counts = {k:0 for k in kws}
                 st.session_state.presentation_step = 3
-                generate_ai_reply_and_rerun()
+                generate_and_show()
                 safe_rerun()
             else:
-                st.warning("Enter at least 3 keywords.")
+                st.warning("Enter >=3 keywords")
         return
 
-    # Stage 3+: chat loop
-    # show history
+    # Chat loop
     for m in st.session_state.presentation_messages:
-        pnl = "👤" if m['role']=='user' else "🧑‍🏫"
-        st.markdown(f"**{pnl}**: {m['content']}")
+        tag = '🗣️' if m['role']=='user' else '🧑‍🏫'
+        st.markdown(f"**{tag}** {m['content']}")
 
-    inp = st.chat_input("Type your response...")
+    inp = st.chat_input("Your turn:")
     if inp:
-        # increment usage
-        st.session_state['daily_usage'][key] += 1
+        st.session_state['daily_usage'][key]+=1
         st.session_state.presentation_messages.append({'role':'user','content':inp})
         st.session_state.presentation_turn_count +=1
         if st.session_state.presentation_level=='A2':
-            for k in st.session_state.a2_keywords or []:
-                if k.lower() in inp.lower():
-                    st.session_state.a2_keyword_progress.add(k)
-        generate_ai_reply_and_rerun()
+            # increment count for current keyword
+            curr = next(k for k,v in st.session_state.a2_kw_counts.items() if v<3)
+            st.session_state.a2_kw_counts[curr]+=1
+        generate_and_show()
 
-    # progress
-    max_turns=8
+    # Progress
     if st.session_state.presentation_level=='A2':
-        kws = st.session_state.a2_keywords or []
-        done=len(st.session_state.a2_keyword_progress)
-        total=max(1,len(kws))
+        total = len(st.session_state.a2_keywords)*3
+        done = sum(st.session_state.a2_kw_counts.values())
         st.progress(done/total)
-        st.markdown(f"**Progress:** {done}/{total} keywords used")
+        st.markdown(f"Progress: {done}/{total} questions asked")
     else:
-        done=st.session_state.presentation_turn_count
-        st.progress(min(done/max_turns,1.0))
-        st.markdown(f"**Progress:** Turn {done}/{max_turns}")
-    st.markdown("---")
+        st.progress(min(st.session_state.presentation_turn_count/7,1))
+        st.markdown(f"Progress: {st.session_state.presentation_turn_count}/7 turns")
 
-    # Bottom controls
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🔄 Restart Practice"):
-            for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_keyword_progress']:
-                st.session_state.pop(k, None)
-            safe_rerun()
-    with col2:
-        if st.button("📝 Change Topic"):
-            st.session_state.presentation_step = 1
-            st.session_state.presentation_messages = []
-            st.session_state.presentation_turn_count = 0
-            st.session_state['daily_usage'][key] = st.session_state['daily_usage'][key]  # preserve count
-            safe_rerun()
-    with col3:
-        if st.button("🔧 Change Level"):
-            st.session_state.presentation_step = 0
-            for k in ['presentation_messages','presentation_turn_count','presentation_topic','a2_keywords','a2_keyword_progress']:
-                st.session_state.pop(k, None)
-            safe_rerun()
+        # Completion
+    a2_complete = st.session_state.presentation_level=='A2' and done>=total
+    b1_complete = st.session_state.presentation_level=='B1' and st.session_state.presentation_turn_count>=7
+    if a2_complete or b1_complete:
+        st.success("🎉 Practice complete! 🎉")
+        # Build summary text
+        lines = [
+            f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
+            for m in st.session_state.presentation_messages
+        ]
+        summary = "
 
-    # completion
-    a2_done=(st.session_state.presentation_level=='A2' and done>=total)
-    b1_done=(st.session_state.presentation_level=='B1' and done>=max_turns)
-    if a2_done or b1_done:
-        st.success("Practice complete! 🎉")
-        lines=[f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}" for m in st.session_state.presentation_messages]
-        st.subheader("Your Session Summary")
-        st.markdown("\n\n".join(lines))
+".join(lines)
+        st.subheader("📄 Your Session Summary")
+        st.markdown(summary)
+        # Scoring, strengths, weaknesses, suggestions
+        if st.session_state.presentation_level=='A2':
+            score = int((done/total)*10)
+            strengths = [kw for kw,count in st.session_state.a2_kw_counts.items() if count>0]
+            weaknesses = [kw for kw,count in st.session_state.a2_kw_counts.items() if count==0]
+            st.markdown(f"**Score:** {score}/10")
+            st.markdown(f"**Strengths:** You used keywords: {', '.join(strengths) if strengths else 'None'}.")
+            st.markdown(f"**Weaknesses:** You didn’t use keywords: {', '.join(weaknesses) if weaknesses else 'None'}.")
+            st.markdown("**Suggestion:** Practice sentences around your missing keywords and review the German examples.")
+        else:
+            turns = st.session_state.presentation_turn_count
+            score = int((turns/7)*10)
+            st.markdown(f"**Score:** {score}/10")
+            st.markdown("**Strengths:** You answered all prompts fluently.")
+            st.markdown("**Weaknesses:** Try adding more detail and varied connectors.")
+            st.markdown("**Suggestion:** Work on expanding your answers with examples and reasons.")
         if st.button("Restart Practice"):
-            for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_keyword_progress']:
-                st.session_state.pop(k,None)
+            for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_kw_counts']:
+                st.session_state.pop(k, None)
             safe_rerun()
-
-# invoke
-stage_7()
-
-
