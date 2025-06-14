@@ -619,7 +619,6 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     # --- SPEECH BUBBLES: Show chat history ---
     for m in st.session_state.presentation_messages:
         if m['role'] == 'user':
-            # User speech bubble: left
             st.markdown(
                 f"""
                 <div style='display:flex;align-items:flex-start;margin-bottom:10px;'>
@@ -630,7 +629,6 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
                 """, unsafe_allow_html=True
             )
         else:
-            # Herr Felix speech bubble: right
             st.markdown(
                 f"""
                 <div style='display:flex;justify-content:flex-end;margin-bottom:10px;'>
@@ -709,7 +707,6 @@ def generate_ai_reply_and_rerun():
     if st.session_state.presentation_level == 'A2':
         kws = list(st.session_state.a2_keywords or [])
         topic = st.session_state.presentation_topic
-        # Find the next uncovered keyword, fallback to first
         next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0] if kws else "")
         system = (
             f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
@@ -726,7 +723,7 @@ def generate_ai_reply_and_rerun():
             "Do not move to a new topic or keyword until the current one has been covered well. "
             "Act as both a helpful coach and a chat partner—encourage, teach, and help them improve for their real presentation!"
         )
-    else:  # B1 logic (as before)
+    else:
         topic = st.session_state.presentation_topic
         steps = [
             f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
@@ -764,7 +761,7 @@ def generate_ai_reply_and_rerun():
 
 # --------- STAGE 7: Presentation Practice Tab ---------
 def stage_7():
-    # Make sure all keys exist (robust)
+    # Ensure all session keys exist
     defaults = {
         "presentation_step": 0,
         "presentation_level": None,
