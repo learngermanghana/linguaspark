@@ -811,6 +811,3 @@ def stage_7():
             for key in ['presentation_step','presentation_level','presentation_topic','a2_keywords','a2_kw_counts','presentation_messages','presentation_turn_count']:
                 st.session_state.pop(key, None)
             safe_rerun()
-
-# call function
-stage_7()
