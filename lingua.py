@@ -32,26 +32,8 @@ st.markdown(
 # File/database constants
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
-max_turns = 15
+max_turns = 6
 TEACHER_PASSWORD = "Felix029"
-USAGE_LOG_FILE = "usage_log.csv"
-
-# Usage logging function
-def log_usage(code):
-    today = str(date.today())
-    if os.path.exists(USAGE_LOG_FILE):
-        df = pd.read_csv(USAGE_LOG_FILE)
-    else:
-        df = pd.DataFrame(columns=["code", "date", "count"])
-
-    match = (df["code"] == code) & (df["date"] == today)
-    if df[match].empty:
-        df = pd.concat([df, pd.DataFrame({"code": [code], "date": [today], "count": [1]})], ignore_index=True)
-    else:
-        df.loc[match, "count"] += 1
-
-    df.to_csv(USAGE_LOG_FILE, index=False)
-
 
 # Exam topic lists
 A2_TEIL1 = [
@@ -355,6 +337,63 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
+        
+# ------ STAGE 5: Chat & Correction ------
+def show_formatted_ai_reply(ai_reply):
+    # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
+    import re
+    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
+    main, correction, grammatik, followup = '', '', '', ''
+    curr_section = 'main'
+
+    for line in lines:
+        header = line.lower()
+        if header.startswith('correction:') or header.startswith('- correction:'):
+            curr_section = 'correction'
+            line = line.split(':',1)[-1].strip()
+            if line: correction += line + ' '
+            continue
+        elif header.startswith('grammar tip:') or header.startswith('- grammar tip:') \
+             or header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
+            curr_section = 'grammatik'
+            line = line.split(':',1)[-1].strip()
+            if line: grammatik += line + ' '
+            continue
+        elif header.startswith('next question:') or header.startswith('- next question:') \
+             or header.startswith('follow-up question') or header.startswith('folgefrage'):
+            curr_section = 'followup'
+            line = line.split(':',1)[-1].strip()
+            if line: followup += line + ' '
+            continue
+        if curr_section == 'main':
+            main += line + ' '
+        elif curr_section == 'correction':
+            correction += line + ' '
+        elif curr_section == 'grammatik':
+            grammatik += line + ' '
+        elif curr_section == 'followup':
+            followup += line + ' '
+
+    # In case the followup got stuck inside main/grammatik
+    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
+        candidates = [l.strip() for l in block.split('\n') if l.strip()]
+        if candidates:
+            last = candidates[-1]
+            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
+                followup = last
+                if setter == 'grammatik':
+                    grammatik = grammatik.replace(last, '').strip()
+                else:
+                    main = main.replace(last, '').strip()
+
+    st.markdown(f"**📝 Answer:**  \n{main.strip()}", unsafe_allow_html=True)
+    if correction.strip():
+        st.markdown(f"<div style='color:#c62828'><b>✏️ Correction:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
+    if grammatik.strip():
+        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammar Tip:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
+    if followup.strip():
+        st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
+
 
 # ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
@@ -362,75 +401,20 @@ if st.session_state["step"] == 5:
     student_code = st.session_state["student_code"]
     usage_key    = f"{student_code}_{today_str}"
     st.session_state.setdefault("daily_usage", {})
-    st.session_state.setdefault("a2_keyword_progress", set())
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
     st.info(
-        f"Student code: `{student_code}` | Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT} | "
-        f"Turns used: {st.session_state['turn_count']}/{max_turns}"
+        f"Student code: `{student_code}` | "
+        f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
     )
 
-    # Progress Bar + Keyword Labels
-    if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
-        total_keywords = len(st.session_state["a2_keywords"])
-        completed_keywords = len(st.session_state["a2_keyword_progress"])
-        st.progress(completed_keywords / total_keywords)
-        st.markdown("**Progress:** " + " | ".join([
-            f"✅ `{kw}`" if kw in st.session_state["a2_keyword_progress"] else f"⬜ `{kw}`"
-            for kw in st.session_state["a2_keywords"]
-        ]))
-    else:
-        st.progress(st.session_state['turn_count'] / max_turns)
-
-    # B1 Mode Check
     is_b1_teil3 = (
         st.session_state.get("selected_mode", "").startswith("Geführte") and
         st.session_state.get("selected_exam_level") == "B1" and
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # Keyword Progress View + Completion
-    if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
-        st.subheader("📊 Presentation Keyword Progress")
-        completed = st.session_state["a2_keyword_progress"]
-        total = set(st.session_state["a2_keywords"])
-        remaining = total - completed
-
-        st.markdown("**Completed:** " + ", ".join([f"✅ `{kw}`" for kw in completed]) if completed else "**Completed:** -")
-        st.markdown("**Remaining:** " + ", ".join([f"🕓 `{kw}`" for kw in remaining]) if remaining else "**Remaining:** 🎉 All keywords completed!")
-
-        if not remaining:
-            st.success("🎉 Great job! You've covered all your keywords. Now let's build your final presentation!")
-            if st.button("🧩 Build My Final Presentation"):
-                all_sentences = []
-                for msg in st.session_state["messages"]:
-                    if msg["role"] == "user":
-                        all_sentences.append(f"👤 {msg['content']}")
-                    elif msg["role"] == "assistant":
-                        all_sentences.append(f"🧑‍🏫 {msg['content']}")
-                final_presentation = "\n\n".join(all_sentences)
-                st.markdown("---")
-                st.subheader("📄 Your Final Presentation")
-                st.markdown(final_presentation)
-
-                import io
-                from fpdf import FPDF
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", size=12)
-                for line in final_presentation.split("\n"):
-                    pdf.multi_cell(0, 10, line)
-                pdf_output = io.BytesIO()
-                pdf.output(pdf_output)
-                st.download_button("📥 Download My Practice (PDF)", data=pdf_output.getvalue(), file_name="A2_Presentation_Practice.pdf")
-
-        if st.session_state.get("messages") and st.session_state["messages"][-1]["role"] == "user":
-            latest_input = st.session_state["messages"][-1]["content"].lower()
-            for kw in st.session_state["a2_keywords"]:
-                if kw.lower() in latest_input:
-                    st.session_state["a2_keyword_progress"].add(kw)
-
-    # Level Selection (First Time Only)
+    # --- Custom Chat: Level selection comes first, no chat box yet ---
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -443,26 +427,51 @@ if st.session_state["step"] == 5:
         )
         if st.button("Start Custom Chat"):
             st.session_state["custom_chat_level"] = level
-            st.session_state["a2_keywords"] = None
-            st.session_state["custom_topic_acknowledged"] = False
-            st.session_state["a2_keyword_progress"] = set()
             st.session_state["messages"] = [{
                 "role": "assistant",
-                "content": (
-                    "🎤 **Presentation Practice – A2 Level**\n\n"
-                    "Please write one short sentence to tell me your presentation topic. ✍️\n\n"
-                    "**Examples:**\n"
-                    "- Ich möchte über meine Familie sprechen.\n"
-                    "- Ich will über mein Lieblingsessen sprechen.\n"
-                    "- I want to talk about my school.\n\n"
-                    "💡 *Then I will help you step by step — first, I’ll ask for 3–4 keywords, then we’ll build your presentation together!*"
-                )
+                "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
             }]
-        st.stop()
+        st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
 
-    # Input Handling
-    uploaded = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"])
-    typed = st.chat_input("💬 Or type your message here...")
+    # --- B1 Teil 3: First message
+    if is_b1_teil3 and not st.session_state["messages"]:
+        topic = random.choice(B1_TEIL2)
+        st.session_state["current_b1_teil3_topic"] = topic
+        init = (
+            f"Ich habe gerade eine kurze Präsentation über **{topic}** gehalten.\n\n"
+            "Deine Aufgabe jetzt:\n"
+            "- Stelle mir **zwei Fragen** zu meiner Präsentation (auf Deutsch).\n"
+            "- Gib mir **eine positive Rückmeldung** auf Deutsch.\n\n"
+            "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
+        )
+        st.session_state["messages"].append({"role": "assistant", "content": init})
+
+    # --- Custom Chat: Ensure greeting if messages is empty (safety)
+    elif (
+        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
+        and st.session_state.get("custom_chat_level")
+        and not st.session_state["messages"]
+    ):
+        st.session_state["messages"].append({
+            "role": "assistant",
+            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
+        })
+
+    # --- Exam Mode: insert standard exam prompt
+    elif (
+        st.session_state.get("selected_mode", "").startswith("Geführte")
+        and not st.session_state["messages"]
+    ):
+        prompt = st.session_state.get("initial_prompt")
+        st.session_state["messages"].append({"role": "assistant", "content": prompt})
+
+    # -- Student input (audio or text) --
+    uploaded = st.file_uploader(
+        "Upload an audio file (WAV, MP3, OGG, M4A)",
+        type=["wav","mp3","ogg","m4a"],
+        key="stage5_audio_upload"
+    )
+    typed = st.chat_input("💬 Oder tippe deine Antwort hier...", key="stage5_typed_input")
     user_input = None
 
     if uploaded:
@@ -475,7 +484,7 @@ if st.session_state["step"] == 5:
                 tmp.write(data); tmp.flush()
             client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
             transcript = client.audio.transcriptions.create(
-                model="whisper-1", file=open(tmp.name, "rb")
+                model="whisper-1", file=open(tmp.name,"rb")
             )
             user_input = transcript.text
         except:
@@ -483,104 +492,135 @@ if st.session_state["step"] == 5:
     elif typed:
         user_input = typed
 
-    # Response Generation
-    session_ended = st.session_state["turn_count"] >= max_turns
+    session_ended    = st.session_state["turn_count"] >= max_turns
+    used_today       = st.session_state["daily_usage"][usage_key]
+    ai_just_replied  = False
+
+    # --- Build system prompt dynamically before OpenAI call ---
     if user_input and not session_ended:
-        if st.session_state["daily_usage"][usage_key] >= DAILY_LIMIT:
-            st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor!")
+        if used_today >= DAILY_LIMIT:
+            st.warning(
+                "You’ve reached today’s free practice limit. "
+                "Please come back tomorrow or contact your tutor!"
+            )
         else:
-            st.session_state["messages"].append({"role": "user", "content": user_input})
+            st.session_state["messages"].append({"role":"user","content":user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
-            log_usage(student_code)
 
-            import re
-            user_words = re.findall(r"\b[a-zäöüß]+\b", user_input.lower())
-
-            # Prompt design
-            if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
-                if not st.session_state.get("a2_keywords") and len(user_words) >= 3:
-                    st.session_state["a2_keywords"] = user_words[:4]
-                    st.success(f"✅ Thanks! I've added these keywords to your presentation: {', '.join(st.session_state['a2_keywords'])}")
-
-                if not st.session_state.get("a2_keywords"):
+            # SYSTEM PROMPT LOGIC
+            if is_b1_teil3:
+                b1_topic = st.session_state["current_b1_teil3_topic"]
+                ai_system_prompt = (
+                    "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
+                    f"The topic of your presentation is: {b1_topic}. "
+                    "The student is supposed to ask you TWO questions about your presentation and give you ONE positive feedback. "
+                    "1. Read the student's message. "
+                    "2. Tell the student if they have written two valid questions about the topic and one positive feedback (praise them if so, otherwise say politely what is missing). "
+                    "3. If the questions are good, answer them briefly (in simple German). "
+                    "4. Always end with clear encouragement in English. "
+                    "Be friendly, supportive, and exam-like. Never break character."
+                )
+            elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
+                lvl = st.session_state.get("custom_chat_level", "A2")
+                if lvl == "A2":
                     ai_system_prompt = (
-                        "You are Herr Felix, an A2-level German teacher. The student gave a topic but not their 3–4 German keywords yet."
-                        " Ask once in English with examples like 'Eltern, Bruder, Wochenende'."
-                        " Do not repeat this request if they already gave them."
-                    )
-                elif not st.session_state.get("custom_topic_acknowledged"):
-                    st.session_state["custom_topic_acknowledged"] = True
-                    keywords = st.session_state["a2_keywords"]
-                    highlighted = ", ".join([f"**{kw}**" for kw in keywords])
-                    ai_system_prompt = (
-                        f"You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
-                        f" Use the keywords: {highlighted} to give initial ideas."
-                        " Provide idea suggestions (in English), with German examples. Also give one sentence starter (German), one correction (German), one grammar tip (English), and one follow-up question (German)."
+                        "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
+                        "Reply at A2-level, using simple German sentences. "
+                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Your reply format:\n"
+                        "- Your answer (German)\n"
+                        "- Correction (if needed, in German)\n"
+                        "- Grammar Tip (in English, one short sentence)\n"
+                        "- Next question (in German)\n"
                     )
                 else:
-                    keywords = st.session_state["a2_keywords"]
-                    highlighted = ", ".join([f"**{kw}**" for kw in keywords])
                     ai_system_prompt = (
-                        f"You are Herr Felix, an A2-level teacher. The student has already chosen a topic and keywords: {highlighted}."
-                        " Now continue the conversation in a natural way using these keywords."
-                        " Each response should focus on one keyword or question. Give one correction and one follow-up question only."
+                        "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
+                        "Reply at B1-level in German. "
+                        "Correct and give a grammar tip for the student's last answer (always in English). "
+                        "Your reply format:\n"
+                        "- Your answer (German)\n"
+                        "- Correction (if needed, in German)\n"
+                        "- Grammar Tip (in English, one short sentence)\n"
+                        "- Next question (in German)\n"
                     )
             else:
-                ai_system_prompt = "You are Herr Felix. Just reply in German."
+                lvl = st.session_state["selected_exam_level"]
+                if lvl == "A2":
+                    ai_system_prompt = (
+                        "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                        "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
+                        "1. Answer the student's message in very simple A2-level German (max 2–3 sentences). "
+                        "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
+                        "3. Give a short grammar tip (in English, one short sentence). "
+                        "4. If the answer is perfect, say so and still give a tip in English. "
+                        "5. End with a next question or prompt in German. "
+                        "Format your reply:\n"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
+                    )
+                else:
+                    ai_system_prompt = (
+                        "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
+                        "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
+                        "1. Answer the student's message in B1-level German (max 2–3 sentences). "
+                        "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
+                        "3. Give a short grammar tip (in English, one short sentence). "
+                        "4. If the answer is perfect, say so and still give a tip in English. "
+                        "5. End with a next question or prompt in German. "
+                        "Format your reply:\n"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
+                    )
 
-            # Get AI Response
+            # --- Call OpenAI with only the last user message ---
             conversation = [
-                {"role": "system", "content": ai_system_prompt},
+                {"role":"system","content":ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
-
             try:
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=conversation
+                resp   = client.chat.completions.create(
+                    model="gpt-4o", messages=conversation
                 )
                 ai_reply = resp.choices[0].message.content
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
 
-            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+            st.session_state["messages"].append(
+                {"role":"assistant","content":ai_reply}
+            )
+            ai_just_replied = True
 
-    # Display Chat
+    # --- Render chat history with formatted AI replies ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown("<span style='color:#33691e;font-weight:bold'>🧑‍🏫 Herr Felix:</span>", unsafe_allow_html=True)
-                import re
-                reply_text = msg["content"]
-                reply_text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "\n\n🔹 **Idea Suggestions (in English):**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "\n\n🔹 **Sentence Starter:**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "\n\n✏️ **Correction:**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip (English Explanation):**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question (in German):**", reply_text)
-                show_formatted_ai_reply(reply_text)
+                st.markdown(
+                    "<span style='color:#33691e;font-weight:bold'>🧑‍🏫 Herr Felix:</span>",
+                    unsafe_allow_html=True
+                )
+                show_formatted_ai_reply(msg["content"])
         else:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # Navigation Buttons
+    # --- Navigation buttons (single instance) ---
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
             prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
             st.session_state.update({
-                "step": prev,
-                "messages": [],
-                "turn_count": 0,
-                "custom_chat_level": None,
-                "a2_keywords": None,
-                "a2_keyword_progress": set()
+                "step":prev,
+                "messages":[],
+                "turn_count":0,
+                "custom_chat_level":None,
+                "custom_level_prompted":False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
 
 # STAGE 6: Session Summary & Restart
 
@@ -595,32 +635,14 @@ if st.session_state["step"] == 6:
         "Start again or choose another mode?",
         unsafe_allow_html=True
     )
-
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔁 Start New Session", key="stage6_restart"):
-            # Reset based on the previous mode
-            if st.session_state.get("selected_mode") == "Geführte Prüfungssimulation (Exam Mode)":
-                st.session_state["step"] = 4  # Restart from exam part selection
-            else:
-                st.session_state["step"] = 5  # Continue in Custom Chat mode
-
-            # Clear session state
+            st.session_state["step"] = 1
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["custom_topic"] = ""
-            st.session_state["initial_prompt"] = ""
-            st.session_state["custom_chat_level"] = None
-            st.session_state["selected_exam_level"] = ""
-            st.session_state["selected_teil"] = ""
-
-    with col2:
-        if st.button("⬅️ Back to Mode Selection", key="stage6_back"):
-            st.session_state["step"] = 3
-            st.session_state["messages"] = []
-            st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
     with col2:
         if st.button("⬅️ Back to Mode Selection", key="stage6_back"):
             st.session_state["step"] = 3
