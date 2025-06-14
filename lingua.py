@@ -698,7 +698,7 @@ if st.session_state.get("step") == 7:
                     st.session_state.presentation_step = 3
                 else:
                     st.session_state.presentation_step = 2
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Please enter a topic.")
 
