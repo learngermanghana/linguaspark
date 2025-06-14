@@ -749,7 +749,7 @@ def stage_7():
             safe_rerun()
         return
 
-    # Stage 2: A2 keywords input
+        # Stage 2: A2 keywords input
     if st.session_state["presentation_step"] == 2:
         st.info("Enter 3–4 German keywords separated by commas. 🎯 Focus on core vocabulary.")
         keywords = st.text_input("Keywords (comma-separated):", key="presentation_keywords")
@@ -759,11 +759,12 @@ def stage_7():
                 st.session_state.a2_keywords = kws[:4]
                 st.session_state.presentation_step = 3
                 generate_ai_reply_and_rerun()
+                safe_rerun()
             else:
                 st.warning("Please enter at least 3 keywords.")
         return
 
-    # Stage 3+: Chat loop
+    # Stage 3+: Chat loop+: Chat loop
     # show history
     for m in st.session_state.get('presentation_messages', []):
         prefix = "👤" if m['role'] == 'user' else "🧑‍🏫"
@@ -822,4 +823,3 @@ def stage_7():
             safe_rerun()
 
 stage_7()
-
