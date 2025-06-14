@@ -835,6 +835,8 @@ def stage_7():
 ".join([
                 f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
                 for msg in st.session_state.presentation_messages
+            ])}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
+                for msg in st.session_state.presentation_messages
             ])
             st.subheader("📄 Your Final Presentation")
             st.markdown(final)
@@ -864,6 +866,3 @@ def stage_7():
 # Execute stage 7
 stage_7()
 stage_7()
-
-
-
