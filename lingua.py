@@ -631,7 +631,31 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
             
-# ------ STAGE 7: Presentation Practice ------
+# ====== Vocabulary Suggestion Helpers ======
+BASIC_WORDS = {"gut", "schlecht", "essen", "trinken", "machen", "gehen", "kommen", "schön", "gut", "okay", "viel"}
+SUGGESTED_VOCAB = {
+    "familie": ["Verwandte", "Großeltern", "Geschwister", "Onkel", "Tante", "Verhältnis", "verheiratet", "alleinerziehend"],
+    "schule": ["Unterricht", "Lehrer", "Klassenzimmer", "Pause", "Hausaufgaben", "Fach", "Prüfung", "Schulhof"],
+    "essen": ["Gericht", "Zutat", "Frühstück", "Mittagessen", "Abendessen", "Rezept", "süß", "würzig"],
+    "urlaub": ["Reise", "Abenteuer", "Erfahrung", "Strand", "Gebirge", "besichtigen", "Erholung"],
+    # Add more topics as needed
+}
+def suggest_vocab(user_input, topic):
+    words = set(re.findall(r'\w+', user_input.lower()))
+    suggestions = []
+    found_basic = any(w in BASIC_WORDS for w in words)
+    topic_key = None
+    for key in SUGGESTED_VOCAB.keys():
+        if key in topic.lower():
+            topic_key = key
+            break
+    if found_basic and topic_key:
+        suggestions = SUGGESTED_VOCAB[topic_key]
+    elif found_basic:
+        suggestions = ["beschreiben", "erklären", "erzählen", "Meinung", "Beispiel"]
+    return suggestions
+
+# ====== STAGE 7: Presentation Practice ======
 if st.session_state.get("step") == 7:
     # -------- Session state defaults for Stage 7 --------
     defaults = dict(
@@ -677,7 +701,7 @@ if st.session_state.get("step") == 7:
                     prompt = (
                         "You are Herr Felix, a B1 teacher. The student wants to prepare a presentation on this topic. "
                         "Suggest 2-3 main points, pros/cons, and help with structure, connectors, and grammar tips in English. "
-                        "Start right away—do not greet, just begin giving ideas."
+                        "Always give your correction or feedback in English. Start right away—do not greet, just begin giving ideas."
                     )
                     conversation = [
                         {"role": "system", "content": prompt},
@@ -703,11 +727,11 @@ if st.session_state.get("step") == 7:
             if len(kws) >= 3:
                 st.session_state.a2_keywords = kws[:4]
                 st.session_state.a2_keyword_progress = set()
-                # AI responds immediately with ideas for those keywords
                 highlighted = ", ".join([f"**{kw}**" for kw in kws])
                 prompt = (
                     f"You are Herr Felix, an A2 German teacher helping a student with a presentation. "
-                    f"Use the keywords: {highlighted}. Give ideas in English, examples in German, a sentence starter, a correction (explain error in English), and a follow-up question in German."
+                    f"Use the keywords: {highlighted}. Give ideas in English, examples in German, a sentence starter, "
+                    f"a correction (always explain the correction in English), and a follow-up question in German."
                 )
                 conversation = [
                     {"role": "system", "content": prompt},
@@ -759,6 +783,11 @@ if st.session_state.get("step") == 7:
             st.session_state.presentation_messages.append({"role": "user", "content": user_input})
             st.session_state.presentation_turn_count += 1
 
+            # Vocabulary Suggestions
+            vocab_suggestions = suggest_vocab(user_input, st.session_state.presentation_topic)
+            if vocab_suggestions:
+                st.info(f"💡 **Try using some of these words in your next answer:** {', '.join(vocab_suggestions)}")
+
             # Keyword progress (A2)
             if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
                 for kw in st.session_state.a2_keywords:
@@ -771,12 +800,18 @@ if st.session_state.get("step") == 7:
                 highlighted = ", ".join([f"**{kw}**" for kw in kws]) if kws else ""
                 prompt = (
                     f"You are Herr Felix, an A2 German teacher. Continue the chat for the student's presentation. "
-                    f"Use the keywords: {highlighted}. Each reply should focus on one keyword, offer a correction with English explanation, and a follow-up question in German."
+                    f"Use the keywords: {highlighted}. Each reply should focus on one keyword, offer a correction (in English), and a follow-up question in German."
                 )
-            else:
+            else:  # B1
                 prompt = (
-                    "You are Herr Felix, a B1 teacher. Guide the student to make a structured B1 presentation: introduction, 2–3 main points, conclusion. "
-                    "Give grammar feedback in English and encourage use of connectors."
+                    "You are Herr Felix, a German B1 teacher. The student is preparing a B1-level presentation on the topic above. "
+                    "For each of the student's responses, do the following:\n"
+                    "- React as a helpful teacher (in English or simple German).\n"
+                    "- Correct or improve their sentences (always explain corrections in English).\n"
+                    "- Suggest how to expand their answer or add another idea.\n"
+                    "- Ask a guiding question to help them develop the next part of their presentation.\n"
+                    "- Encourage them to use connectors, opinions, and details.\n"
+                    "Keep the conversation interactive, like a real exam or coaching session."
                 )
             conversation = [
                 {"role": "system", "content": prompt},
@@ -789,6 +824,7 @@ if st.session_state.get("step") == 7:
             except Exception as e:
                 ai_reply = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
+            st.experimental_rerun()  # KEY FIX: no more double send!
 
         # --- Finish condition (all keywords covered for A2, or 8 turns) ---
         done = False
@@ -808,7 +844,7 @@ if st.session_state.get("step") == 7:
             st.subheader("📄 Your Final Presentation")
             st.markdown(final_presentation)
 
-            # --- PDF Generation (fixed for FPDF 1.x and 2.x) ---
+            # --- PDF Generation ---
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
