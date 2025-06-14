@@ -666,7 +666,7 @@ if st.session_state.get("step") == 7:
             st.session_state.a2_keywords = None
             st.session_state.a2_keyword_progress = set()
             st.session_state.presentation_topic = ""
-            st.experimental_rerun()
+            st.rerun()
 
     # Step 1: Topic input
     elif st.session_state.presentation_step == 1:
