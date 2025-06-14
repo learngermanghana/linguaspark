@@ -829,8 +829,8 @@ def stage_7():
             done = st.session_state.presentation_turn_count >= max_turns
         if done:
             st.success("🎉 Presentation practice complete! 🎉")
-            # Display final conversation
-                        final = "
+                        # Display final conversation
+            final = "
 
 ".join([
                 f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
