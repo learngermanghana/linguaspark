@@ -111,58 +111,8 @@ def load_codes():
     else:
         df = pd.DataFrame(columns=["code"])
     return df
-# STAGE 2: Teacher Area Sidebar & Session State Setup
-
-# ---- Teacher Dashboard (Sidebar) ----
-with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
-    if "teacher_authenticated" not in st.session_state:
-        st.session_state["teacher_authenticated"] = False
-
-    # Teacher login prompt
-    if not st.session_state["teacher_authenticated"]:
-        st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
-        pwd = st.text_input("Teacher Login (for admin only)", type="password")
-        login_btn = st.button("Login (Teacher)")
-        if login_btn:
-            if pwd == TEACHER_PASSWORD:
-                st.session_state["teacher_authenticated"] = True
-                st.success("Access granted!")
-            elif pwd != "":
-                st.error("Incorrect password. Please try again.")
-
-    # Teacher dashboard/settings
-    else:
-        st.header("👩‍🏫 Teacher Dashboard")
-        df_codes = load_codes()
-        st.subheader("Current Codes")
-        st.dataframe(df_codes, use_container_width=True)
-
-        new_code = st.text_input("Add a new student code")
-        if st.button("Add Code"):
-            new_code_clean = new_code.strip().lower()
-            if new_code_clean and new_code_clean not in df_codes["code"].values:
-                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
-                df_codes.to_csv(CODES_FILE, index=False)
-                st.success(f"Code '{new_code_clean}' added!")
-            elif not new_code_clean:
-                st.warning("Enter a code to add.")
-            else:
-                st.warning("Code already exists.")
-
-        remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
-        if st.button("Remove Selected Code"):
-            if remove_code:
-                df_codes = df_codes[df_codes["code"] != remove_code]
-                df_codes.to_csv(CODES_FILE, index=False)
-                st.success(f"Code '{remove_code}' removed!")
-            else:
-                st.warning("Choose a code to remove.")
-
-        if st.button("Log out (Teacher)"):
-            st.session_state["teacher_authenticated"] = False
 
 # ---- Global session state for app navigation ----
-# Core keys for general navigation
 if "step" not in st.session_state:
     st.session_state["step"] = 1
 if "student_code" not in st.session_state:
@@ -192,7 +142,7 @@ for k, v in presentation_defaults.items():
         st.session_state[k] = v.copy() if isinstance(v, (list, set, dict)) else v
 
 # ------ Stage 2: Welcome ------
-elif st.session_state["step"] == 2:
+if st.session_state["step"] == 2:
     fun_facts = [
         "🇬🇭 Herr Felix was born in Ghana and mastered German up to C1 level!",
         "🎓 Herr Felix studied International Management at IU International University in Germany.",
@@ -322,8 +272,6 @@ elif st.session_state["step"] == 4:
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
 
-
-        
 # ------ STAGE 5: Chat & Correction ------
 def show_formatted_ai_reply(ai_reply):
     # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
