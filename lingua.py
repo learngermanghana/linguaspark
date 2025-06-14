@@ -779,6 +779,8 @@ def stage_7():
                 if kw.lower() in user_msg.lower():
                     st.session_state.a2_keyword_progress.add(kw)
         generate_ai_reply_and_rerun()
+        # rerun to display both user and AI immediately
+        safe_rerun()
 
     # Progress bar
     max_turns = 8
