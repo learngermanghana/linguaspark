@@ -601,7 +601,8 @@ if st.session_state.get("step") == 7:
             st.session_state.a2_keywords = None
             st.session_state.a2_keyword_progress = set()
             st.session_state.presentation_topic = ""
-            st.experimental_rerun()
+            st.session_state.changed = True
+            st.stop()
 
     if st.session_state.presentation_step == 1:
         st.info("Write a short sentence to tell me your presentation topic (in English or German).\n\n"
@@ -612,7 +613,8 @@ if st.session_state.get("step") == 7:
                 st.session_state.presentation_topic = topic.strip()
                 st.session_state.presentation_messages = [{"role": "user", "content": topic.strip()}]
                 st.session_state.presentation_step = 2
-                st.experimental_rerun()
+                st.session_state.changed = True
+                st.stop()
             else:
                 st.warning("Please enter a topic.")
 
@@ -627,8 +629,9 @@ if st.session_state.get("step") == 7:
                 st.session_state.a2_keywords = kws[:4]
                 st.session_state.a2_keyword_progress = set()
                 st.session_state.presentation_step = 3
+                st.session_state.changed = True
                 st.success("Keywords accepted! Start chatting about your presentation now.")
-                st.experimental_rerun()
+                st.stop()
             else:
                 st.warning("Please enter at least 3 keywords.")
 
@@ -720,5 +723,7 @@ if st.session_state.get("step") == 7:
                 for key in ["presentation_step", "presentation_level", "presentation_topic",
                             "a2_keywords", "a2_keyword_progress",
                             "presentation_messages", "presentation_turn_count"]:
-                    if key in st.session_state: del st.session_state[key]
-                st.experimental_rerun()
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.session_state.changed = True
+                st.stop()
