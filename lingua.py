@@ -714,13 +714,14 @@ def stage_7():
         st.session_state['awaiting_ai_reply'] = True
         safe_rerun()
 
-    # Progress bar below input
+        # Progress bar below input
     max_turns = 8
     if st.session_state.presentation_level == "A2":
-        total = len(st.session_state.a2_keywords) or 1
+        kws = st.session_state.a2_keywords or []
+        total = len(kws) or 1
         done = len(st.session_state.a2_keyword_progress)
         bar = done / total
-        label = " | ".join([f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}" for kw in st.session_state.a2_keywords])
+        label = " | ".join([f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}" for kw in kws])
     else:
         total = max_turns
         done = st.session_state.presentation_turn_count
