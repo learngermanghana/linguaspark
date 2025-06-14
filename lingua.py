@@ -228,13 +228,15 @@ elif st.session_state["step"] == 3:
     st.header("Wie möchtest du üben? (How would you like to practice?)")
     mode = st.radio(
         "Choose your practice mode:",
-        ["Geführte Prüfungssimulation (Exam Mode)", "Eigenes Thema/Frage (Custom Topic Chat)"],
+        [
+            "Geführte Prüfungssimulation (Exam Mode)",
+            "Eigenes Thema/Frage (Custom Topic Chat)",
+            "Präsentationsübung (Presentation Practice)"
+        ],
         index=0,
         key="mode_selector"
     )
     st.session_state["selected_mode"] = mode
-
-    # --- REMOVE the custom_topic input! ---
 
     col1, col2 = st.columns(2)
     with col1:
@@ -247,96 +249,11 @@ elif st.session_state["step"] == 3:
             st.session_state["corrections"] = []
             if mode == "Eigenes Thema/Frage (Custom Topic Chat)":
                 st.session_state["step"] = 5
+            elif mode == "Präsentationsübung (Presentation Practice)":
+                st.session_state["step"] = 7  # Route to your new Presentation Practice stage
             else:
                 st.session_state["step"] = 4
 
-
-# ------ STAGE 4: Exam Part Selection ------
-elif st.session_state["step"] == 4:
-    st.header("Prüfungsteil wählen / Choose exam part")
-    exam_level = st.selectbox(
-        "Welches Prüfungsniveau möchtest du üben?",
-        ["A2", "B1"],
-        key="exam_level_select",
-        index=0
-    )
-    st.session_state["selected_exam_level"] = exam_level
-
-    teil_options = (
-        [
-            "Teil 1 – Fragen zu Schlüsselwörtern",
-            "Teil 2 – Bildbeschreibung & Diskussion",
-            "Teil 3 – Gemeinsam planen"
-        ] if exam_level == "A2" else
-        [
-            "Teil 1 – Gemeinsam planen (Dialogue)",
-            "Teil 2 – Präsentation (Monologue)",
-            "Teil 3 – Feedback & Fragen stellen"
-        ]
-    )
-    teil = st.selectbox(
-        "Welchen Teil möchtest du üben?",
-        teil_options,
-        key="exam_teil_select"
-    )
-    st.session_state["selected_teil"] = teil
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬅️ Back", key="stage4_back"):
-            st.session_state["step"] = 3
-    with col2:
-        if st.button("Start Chat ➡️", key="stage4_start"):
-            if exam_level == "A2":
-                if teil.startswith("Teil 1"):
-                    topic = random.choice(A2_TEIL1)
-                    prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
-                elif teil.startswith("Teil 2"):
-                    topic = random.choice(A2_TEIL2)
-                    prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
-                else:
-                    topic = random.choice(A2_TEIL3)
-                    prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
-            else:
-                if teil.startswith("Teil 1"):
-                    topic = random.choice(B1_TEIL1)
-                    prompt = f"**B1 Teil 1:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere auf deinen Partner, und trefft eine Entscheidung."
-                elif teil.startswith("Teil 2"):
-                    topic = random.choice(B1_TEIL2)
-                    prompt = f"**B1 Teil 2:** Halte eine Präsentation über das Thema: **{topic}**. Begrüße, nenne das Thema, gib deine Meinung, teile Vor- und Nachteile, fasse zusammen."
-                else:
-                    topic = random.choice(B1_TEIL3)
-                    prompt = f"**B1 Teil 3:** {topic}: Dein Partner hat eine Präsentation gehalten. Stelle 1–2 Fragen dazu und gib positives Feedback."
-            st.session_state["initial_prompt"] = prompt
-            st.session_state["messages"] = []
-            st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
-            st.session_state["step"] = 5
-
-def show_formatted_ai_reply(ai_reply):
-    corr_pat = r'(?:-?\s*Correction:)\s*(.*?)(?=\n-?\s*Grammatik-Tipp:|\Z)'
-    gram_pat = r'(?:-?\s*Grammatik-Tipp:)\s*(.*?)(?=\n-?\s*(?:Follow-up question|Folgefrage)|\Z)'
-    foll_pat = r'(?:-?\s*(?:Follow-up question|Folgefrage):?)\s*(.*)'
-
-    import re
-    correction = re.search(corr_pat, ai_reply, re.DOTALL)
-    grammatik  = re.search(gram_pat, ai_reply, re.DOTALL)
-    followup   = re.search(foll_pat, ai_reply, re.DOTALL)
-
-    main = ai_reply
-    if correction:
-        main = ai_reply.split(correction.group(0))[0].strip()
-
-    st.markdown(f"**📝 Antwort:**  \n{main}", unsafe_allow_html=True)
-    if correction:
-        text = correction.group(1).strip()
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if grammatik:
-        text = grammatik.group(1).strip()
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if followup:
-        text = followup.group(1).strip()
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
         
 # ------ STAGE 5: Chat & Correction ------
 def show_formatted_ai_reply(ai_reply):
