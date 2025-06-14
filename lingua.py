@@ -34,6 +34,24 @@ CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
 max_turns = 6
 TEACHER_PASSWORD = "Felix029"
+USAGE_LOG_FILE = "usage_log.csv"
+
+# Usage logging function
+def log_usage(code):
+    today = str(date.today())
+    if os.path.exists(USAGE_LOG_FILE):
+        df = pd.read_csv(USAGE_LOG_FILE)
+    else:
+        df = pd.DataFrame(columns=["code", "date", "count"])
+
+    match = (df["code"] == code) & (df["date"] == today)
+    if df[match].empty:
+        df = pd.concat([df, pd.DataFrame({"code": [code], "date": [today], "count": [1]})], ignore_index=True)
+    else:
+        df.loc[match, "count"] += 1
+
+    df.to_csv(USAGE_LOG_FILE, index=False)
+
 
 # Exam topic lists
 A2_TEIL1 = [
@@ -507,6 +525,7 @@ if st.session_state["step"] == 5:
             st.session_state["messages"].append({"role":"user","content":user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
+            log_usage(student_code)
 
             # SYSTEM PROMPT LOGIC
             if is_b1_teil3:
