@@ -533,7 +533,7 @@ if st.session_state["step"] == 5:
                     ai_system_prompt = (
                         f"You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
                         f" Use the keywords: {highlighted} to help them."
-                        " Give ideas (in German), a sentence starter, correction (in German), a grammar tip (in English), and a follow-up question."
+                        " Give ideas (in English), with German examples. Provide a sentence starter (German), a correction (German), a grammar tip (English), and a follow-up question (German)."
                     )
             else:
                 ai_system_prompt = "You are Herr Felix. Just reply in German."
@@ -564,7 +564,14 @@ if st.session_state["step"] == 5:
                     "<span style='color:#33691e;font-weight:bold'>🧑‍🏫 Herr Felix:</span>",
                     unsafe_allow_html=True
                 )
-                show_formatted_ai_reply(msg["content"])
+                import re
+                reply_text = msg["content"]
+                reply_text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "\n\n🔹 **Idea Suggestions (in English):**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "\n\n🔹 **Sentence Starter:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "\n\n✏️ **Correction:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question:**", reply_text)
+                show_formatted_ai_reply(reply_text)
         else:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
@@ -583,6 +590,7 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
 
 # STAGE 6: Session Summary & Restart
 
