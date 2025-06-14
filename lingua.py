@@ -634,112 +634,7 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-def stage_7():
-    # --- DEBUG INFO: see what step you are on ---
-    st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
-
-    # Ensure we're in the correct app stage
-    if st.session_state.get("step") != 7:
-        return
-
-    # --- Always reset the step if missing or broken (for new sessions) ---
-    if "presentation_step" not in st.session_state or st.session_state["presentation_step"] not in [0,1,2,3]:
-        st.session_state["presentation_step"] = 0
-        st.session_state["presentation_level"] = None
-        st.session_state["presentation_topic"] = ""
-        st.session_state["a2_keywords"] = None
-        st.session_state["a2_keyword_progress"] = set()
-        st.session_state["presentation_messages"] = []
-        st.session_state["presentation_turn_count"] = 0
-
-    # --- Daily limit ---
-    today = str(date.today())
-    code = st.session_state.get("student_code", "(unknown)")
-    key = f"{code}_{today}"
-    st.session_state.setdefault("daily_usage", {})
-    st.session_state["daily_usage"].setdefault(key, 0)
-    used = st.session_state["daily_usage"][key]
-    st.info(f"Student code: `{code}` | Chats today: {used}/25")
-    if used >= 25:
-        st.warning("You’ve reached today’s limit of 25 chat turns. Please come back tomorrow.")
-        return
-
-    st.header("🎤 Presentation Practice (A2 & B1)")
-
-    def safe_rerun():
-        try:
-            st.experimental_rerun()
-        except Exception:
-            pass
-
-    def generate_ai_reply_and_rerun():
-        placeholder = st.empty()
-        placeholder.info("🧑‍🏫 Herr Felix is typing...")
-
-        if st.session_state.presentation_level == 'A2':
-            kws = list(st.session_state.a2_keywords or [])
-            next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
-            system = (
-                f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-                "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct in English, and ask a German follow-up question."
-            )
-        else:  # B1
-            topic = st.session_state.presentation_topic
-            steps = [
-                f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
-                f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
-                f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
-                f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
-                f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
-                f"Summarize student's points in German and highlight progress. Explanations/corrections in English."
-            ]
-            idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-            system = steps[idx]
-
-        last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
-        messages = [{'role':'system','content':system}]
-        if last:
-            messages.append(last)
-
-        try:
-            resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                model='gpt-4o', messages=messages
-            )
-            reply = resp.choices[0].message.content
-        except Exception:
-            reply = "Sorry, something went wrong."
-
-        placeholder.empty()
-        st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
-        st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-        safe_rerun()
-
-    # --- Stage 0: select level ---
-    if st.session_state.presentation_step == 0:
-        lvl = st.radio("Select your level:", ["A2","B1"], horizontal=True)
-        if st.button("Start Presentation Practice"):
-            st.session_state.presentation_level = lvl
-            st.session_state.presentation_step = 1
-            st.session_state.presentation_messages.clear()
-            st.session_state.presentation_turn_count = 0
-            st.session_state.a2_keywords = None
-            st.session_state.a2_keyword_progress.clear()
-            st.session_state.presentation_topic = ""
-            safe_rerun()
-        return
-
-    # --- Stage 1: topic input ---
-    if st.session_state.presentation_step == 1:
-        st.info("Please enter your presentation topic (English or German). 🔖")
-        t = st.text_input("Topic:", key="topic_input")
-        if st.button("Submit Topic") and t:
-            st.session_state.presentation_topic = t
-            st.session_state.presentation_messages.append({'role':'user','content':t})
-            st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
-            safe_rerun()
-        return
-
- def presentation_keywords_input():
+def presentation_keywords_input(safe_rerun):
     if st.session_state.presentation_step == 2:
         st.info(
             "Enter 3–4 German keywords, comma-separated.\n\n"
@@ -761,7 +656,7 @@ def stage_7():
                 st.warning("Enter at least 3 keywords.")
         return
 
-def presentation_chat_loop():
+def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     if st.session_state.presentation_step != 3:
         return
 
@@ -822,6 +717,124 @@ def presentation_chat_loop():
             ]:
                 st.session_state.pop(k, None)
             safe_rerun()
+
+def stage_7():
+    st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
+    if st.session_state.get("step") != 7:
+        return
+
+    # Reset on weird/missing steps
+    if "presentation_step" not in st.session_state or st.session_state["presentation_step"] not in [0,1,2,3]:
+        st.session_state["presentation_step"] = 0
+        st.session_state["presentation_level"] = None
+        st.session_state["presentation_topic"] = ""
+        st.session_state["a2_keywords"] = None
+        st.session_state["a2_keyword_progress"] = set()
+        st.session_state["presentation_messages"] = []
+        st.session_state["presentation_turn_count"] = 0
+
+    # Daily limit
+    today = str(date.today())
+    code = st.session_state.get("student_code", "(unknown)")
+    key = f"{code}_{today}"
+    st.session_state.setdefault("daily_usage", {})
+    st.session_state["daily_usage"].setdefault(key, 0)
+    used = st.session_state["daily_usage"][key]
+    st.info(f"Student code: `{code}` | Chats today: {used}/25")
+    if used >= 25:
+        st.warning("You’ve reached today’s limit of 25 chat turns. Please come back tomorrow.")
+        return
+
+    st.header("🎤 Presentation Practice (A2 & B1)")
+
+    def safe_rerun():
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
+
+    def generate_ai_reply_and_rerun():
+        placeholder = st.empty()
+        placeholder.info("🧑‍🏫 Herr Felix is typing...")
+
+        if st.session_state.presentation_level == 'A2':
+            kws = list(st.session_state.a2_keywords or [])
+            next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
+            system = (
+                f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
+                "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct in English, and ask a German follow-up question."
+            )
+        else:  # B1 logic, 12 varied steps
+            topic = st.session_state.presentation_topic
+            steps = [
+                f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
+                f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
+                f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
+                f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
+                f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
+                f"Summarize student's points in German and highlight progress. Explanations/corrections in English.",
+                f"Ask the student to tell a personal story about '{topic}' in German. Feedback/corrections in English.",
+                f"Ask for a comparison: How is '{topic}' different in Germany vs. student's country? (German). Corrections/tips in English.",
+                f"Invite the student to ask you a question about '{topic}' in German. Respond and explain in English.",
+                f"Ask the student for a summary or key learning about '{topic}' in German. Encourage in English.",
+                f"Conclude with a final opinion on '{topic}' in German. Give closing positive feedback in English.",
+                f"Ask: What is your advice for someone interested in '{topic}'? (German). Cheer in English.",
+            ]
+            idx = min(st.session_state.presentation_turn_count, len(steps)-1)
+            system = steps[idx]
+
+        last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
+        messages = [{'role':'system','content':system}]
+        if last:
+            messages.append(last)
+
+        try:
+            resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+                model='gpt-4o', messages=messages
+            )
+            reply = resp.choices[0].message.content
+        except Exception:
+            reply = "Sorry, something went wrong."
+
+        placeholder.empty()
+        st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
+        st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+        safe_rerun()
+
+    # Stage 0: select level
+    if st.session_state.presentation_step == 0:
+        lvl = st.radio("Select your level:", ["A2","B1"], horizontal=True)
+        if st.button("Start Presentation Practice"):
+            st.session_state.presentation_level = lvl
+            st.session_state.presentation_step = 1
+            st.session_state.presentation_messages.clear()
+            st.session_state.presentation_turn_count = 0
+            st.session_state.a2_keywords = None
+            st.session_state.a2_keyword_progress.clear()
+            st.session_state.presentation_topic = ""
+            safe_rerun()
+        return
+
+    # Stage 1: topic input
+    if st.session_state.presentation_step == 1:
+        st.info("Please enter your presentation topic (English or German). 🔖")
+        t = st.text_input("Topic:", key="topic_input")
+        if st.button("Submit Topic") and t:
+            st.session_state.presentation_topic = t
+            st.session_state.presentation_messages.append({'role':'user','content':t})
+            st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
+            safe_rerun()
+        return
+
+    # Stage 2: keywords (A2 only)
+    if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
+        presentation_keywords_input(safe_rerun)
+        return
+
+    # Stage 3: chat loop
+    if st.session_state.presentation_step == 3:
+        presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
+        return
 
 
 # ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
