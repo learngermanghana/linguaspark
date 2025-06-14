@@ -798,10 +798,12 @@ def stage_7():
     b1_done = (st.session_state.presentation_level == 'B1' and st.session_state.presentation_turn_count >= 8)
     if a2_done or b1_done:
         st.success("🎉 Practice complete! 🎉")
-        final = "
+                final = "
 
 ".join([
             f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
+            for m in st.session_state.presentation_messages
+        ])}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
             for m in st.session_state.presentation_messages
         ])
         st.subheader("📄 Your Presentation Summary")
@@ -813,6 +815,11 @@ def stage_7():
             score = int((covered / total_kw) * 10) if total_kw else 0
             st.markdown(f"**Your score:** {score}/10 keywords covered.")
             st.markdown("**Tips:** Practice using the remaining keywords in sentences, and review the examples provided.")
+            # Provide example sentences for each keyword
+            st.markdown("**Keyword Examples:**")
+            for kw in st.session_state.a2_keywords or []:
+                st.markdown(f"- **{kw}**: Beispiel: ___{kw} ist sehr wichtig.
+")
         else:
             turns = st.session_state.presentation_turn_count
             score = min(turns, 8)
