@@ -634,7 +634,8 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-# Module-level configuration for default session state
+
+# Stage 7 Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
     "presentation_level": None,
@@ -820,16 +821,16 @@ def stage_7():
             ])
             st.subheader("📄 Your Final Presentation")
             st.markdown(final)
-            # Generate PDF with unicode-safe fallback
+            # Generate PDF with unicode-safe fallback and return bytes
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
-            buf = io.BytesIO()
             for line in final.split("\n\n"):
                 safe_line = line.encode('latin-1', 'replace').decode('latin-1')
                 pdf.multi_cell(0, 10, safe_line)
-            pdf.output(buf)
-            st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
+            # get PDF as bytes
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            st.download_button("📥 Download PDF", data=pdf_bytes, file_name="Presentation_Practice.pdf")
             return
 
     cols = st.columns(len(action_buttons))
@@ -842,3 +843,4 @@ def stage_7():
 
 # Execute the Presentation Practice module
 stage_7()
+
