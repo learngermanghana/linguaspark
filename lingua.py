@@ -804,4 +804,9 @@ def stage_7():
                     'a2_keywords', 'a2_keyword_progress'
                 ]:
                     st.session_state.pop(k, None)
-                safe_rerun()
+                safe_rerun
+
+# ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
+if st.session_state.get("step") == 7:
+    stage_7()
+
