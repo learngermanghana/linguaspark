@@ -791,3 +791,7 @@ def stage_7():
                 for k in ['presentation_step','presentation_level','presentation_topic','a2_keywords','a2_keyword_progress','presentation_messages','presentation_turn_count','awaiting_ai_reply']:
                     st.session_state.pop(k, None)
                 safe_rerun()
+
+
+# Invoke stage 7 when appropriate
+stage_7()
