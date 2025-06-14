@@ -366,28 +366,30 @@ if st.session_state["step"] == 5:
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
     st.info(
-    f"Student code: `{student_code}` | Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT} | "
-    f"Turns used: {st.session_state['turn_count']}/{max_turns}"
-)
+        f"Student code: `{student_code}` | Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT} | "
+        f"Turns used: {st.session_state['turn_count']}/{max_turns}"
+    )
 
-# Progress Bar
-if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
-    total_keywords = len(st.session_state["a2_keywords"])
-    completed_keywords = len(st.session_state["a2_keyword_progress"])
-    st.progress(completed_keywords / total_keywords)
-    st.markdown("**Progress:** " + " | ".join([
-        f"✅ `{kw}`" if kw in st.session_state["a2_keyword_progress"] else f"⬜ `{kw}`"
-        for kw in st.session_state["a2_keywords"]
-    ]))
-else:
-    st.progress(st.session_state['turn_count'] / max_turns)
+    # Progress Bar + Keyword Labels
+    if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
+        total_keywords = len(st.session_state["a2_keywords"])
+        completed_keywords = len(st.session_state["a2_keyword_progress"])
+        st.progress(completed_keywords / total_keywords)
+        st.markdown("**Progress:** " + " | ".join([
+            f"✅ `{kw}`" if kw in st.session_state["a2_keyword_progress"] else f"⬜ `{kw}`"
+            for kw in st.session_state["a2_keywords"]
+        ]))
+    else:
+        st.progress(st.session_state['turn_count'] / max_turns)
 
+    # B1 Mode Check
     is_b1_teil3 = (
         st.session_state.get("selected_mode", "").startswith("Geführte") and
         st.session_state.get("selected_exam_level") == "B1" and
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
+    # Keyword Progress View + Completion
     if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
         st.subheader("📊 Presentation Keyword Progress")
         completed = st.session_state["a2_keyword_progress"]
@@ -428,6 +430,7 @@ else:
                 if kw.lower() in latest_input:
                     st.session_state["a2_keyword_progress"].add(kw)
 
+    # Level Selection (First Time Only)
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -457,6 +460,7 @@ else:
             }]
         st.stop()
 
+    # Input Handling
     uploaded = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"])
     typed = st.chat_input("💬 Or type your message here...")
     user_input = None
@@ -479,6 +483,7 @@ else:
     elif typed:
         user_input = typed
 
+    # Response Generation
     session_ended = st.session_state["turn_count"] >= max_turns
     if user_input and not session_ended:
         if st.session_state["daily_usage"][usage_key] >= DAILY_LIMIT:
@@ -492,6 +497,7 @@ else:
             import re
             user_words = re.findall(r"\b[a-zäöüß]+\b", user_input.lower())
 
+            # Prompt design
             if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
                 if not st.session_state.get("a2_keywords") and len(user_words) >= 3:
                     st.session_state["a2_keywords"] = user_words[:4]
@@ -523,6 +529,7 @@ else:
             else:
                 ai_system_prompt = "You are Herr Felix. Just reply in German."
 
+            # Get AI Response
             conversation = [
                 {"role": "system", "content": ai_system_prompt},
                 st.session_state["messages"][-1]
@@ -541,6 +548,7 @@ else:
 
             st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
 
+    # Display Chat
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -557,6 +565,7 @@ else:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
+    # Navigation Buttons
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
@@ -572,7 +581,6 @@ else:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
 
 # STAGE 6: Session Summary & Restart
 
