@@ -784,7 +784,7 @@ if st.session_state.get("step") == 7:
             except Exception as e:
                 ai_reply = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-            st.experimental_rerun()
+            st.rerun()
 
         # --- Complete condition (A2: all keywords, B1: 8 turns) ---
         done = False
@@ -818,4 +818,4 @@ if st.session_state.get("step") == 7:
                             "a2_keywords", "a2_keyword_progress",
                             "presentation_messages", "presentation_turn_count"]:
                     if key in st.session_state: del st.session_state[key]
-                st.experimental_rerun()
+                st.rerun()
