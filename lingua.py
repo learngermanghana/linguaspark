@@ -636,6 +636,11 @@ if st.session_state["step"] == 6:
 
 # --- Presentation Practice Module ---
 
+import streamlit as st
+from fpdf import FPDF
+from openai import OpenAI
+import io
+
 # Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
@@ -667,7 +672,7 @@ def safe_rerun():
     """Gracefully rerun the Streamlit app without error."""
     try:
         st.experimental_rerun()
-    except AttributeError:
+    except Exception:
         pass
 
 
@@ -683,11 +688,7 @@ def handle_level_selection():
     if st.button("Start Presentation Practice"):
         st.session_state.presentation_level = level
         st.session_state.presentation_step = 1
-        reset_state([
-            "presentation_messages", "presentation_turn_count",
-            "a2_keywords", "a2_keyword_progress",
-            "b1_init_done", "awaiting_ai_reply"
-        ])
+        reset_state(["presentation_messages", "presentation_turn_count", "a2_keywords", "a2_keyword_progress", "b1_init_done", "awaiting_ai_reply"])
         safe_rerun()
 
 
@@ -729,10 +730,7 @@ def render_progress_bar():
         kws = st.session_state.a2_keywords or []
         total = max(len(kws), 1)
         done = len(st.session_state.a2_keyword_progress)
-        label = " | ".join([
-            f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}"
-            for kw in kws
-        ])
+        label = " | ".join([f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}" for kw in kws])
     else:
         total = max_turns
         done = st.session_state.presentation_turn_count
@@ -751,21 +749,12 @@ def build_system_prompt():
         kws = st.session_state.a2_keywords or []
         used = st.session_state.a2_keyword_progress
         next_kw = next((kw for kw in kws if kw not in used), None) or (kws[-1] if kws else "(no keywords)")
-        return (
-            f"You are Herr Felix, an A2 teacher. Focus on keyword '{next_kw}'. "
-            "Provide an English suggestion using it, a German example, a sentence starter, an English correction, and ask a related question in German."
-        )
+        return f"You are Herr Felix, an A2 teacher. Focus on keyword '{next_kw}'. Provide an English suggestion sentence using it, a German example sentence, a sentence starter, an English correction, and then ask a follow-up question in German using this keyword."
     else:
         if not st.session_state.b1_init_done:
             st.session_state.b1_init_done = True
-            return (
-                f"You are Herr Felix, a B1 teacher. Provide structure and ideas for '{topic}': introduction, main points, conclusion, connectors. "
-                "Then ask the first follow-up question in German about this topic."
-            )
-        return (
-            f"You are Herr Felix, a B1 teacher. Student presenting on '{topic}'. "
-            "Based on their last answer, ask the next German question tied to the topic and give brief English feedback."
-        )
+            return f"You are Herr Felix, a B1 teacher. Provide structure and ideas for '{topic}': introduction, main points, conclusion, connectors. Then ask the first follow-up question in German about this topic."
+        return f"You are Herr Felix, a B1 teacher. Student presenting on '{topic}'. Based on their last answer, ask the next relevant question in German tied to the topic and give brief English feedback."
 
 
 def handle_chat_loop():
@@ -788,19 +777,19 @@ def handle_chat_loop():
         if last_user:
             with st.spinner("Thinking..."):
                 try:
-                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                        model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user]
-                    )
+                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user])
                     ai_text = resp.choices[0].message.content
                 except Exception:
                     ai_text = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_text})
             safe_rerun()
     for msg in st.session_state.presentation_messages:
-        role = 'user' if msg['role']=='user' else 'assistant'
-        avatar = None if role=='user' else '🧑‍🏫'
-        with st.chat_message(role, avatar=avatar):
-            st.markdown(f"{'🗣️' if role=='user' else '**🧑‍🏫 Herr Felix:**'} {msg['content']}", unsafe_allow_html=True)
+        if msg['role'] == 'user':
+            with st.chat_message('user'):
+                st.markdown(f"🗣️ {msg['content']}")
+        else:
+            with st.chat_message('assistant', avatar='🧑‍🏫'):
+                st.markdown(f"**🧑‍🏫 Herr Felix:** {msg['content']}", unsafe_allow_html=True)
 
 
 def stage_7():
@@ -819,7 +808,7 @@ def stage_7():
     else:
         handle_chat_loop()
 
-        # Check for completion and stop chat when done
+    # Check for completion and stop chat when done
     if st.session_state.presentation_step >= 3:
         if st.session_state.presentation_level == "A2":
             kws = st.session_state.a2_keywords or []
@@ -830,12 +819,8 @@ def stage_7():
         if done:
             st.success("🎉 Presentation practice complete! 🎉")
             # Display final conversation
-            final = "
-
-".join([
+            final = "\n\n".join([
                 f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
-                for msg in st.session_state.presentation_messages
-            ])}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
                 for msg in st.session_state.presentation_messages
             ])
             st.subheader("📄 Your Final Presentation")
@@ -844,11 +829,8 @@ def stage_7():
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
-            import io
             buf = io.BytesIO()
-            for line in final.split("
-
-"):
+            for line in final.split("\n\n"):
                 pdf.multi_cell(0, 10, line)
             pdf.output(buf)
             st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
@@ -864,5 +846,4 @@ def stage_7():
             safe_rerun()
 
 # Execute stage 7
-stage_7()
 stage_7()
