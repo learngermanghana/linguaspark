@@ -528,10 +528,12 @@ if st.session_state["step"] == 5:
                         " Do not repeat this request if they already gave them."
                     )
                 else:
+                    keywords = st.session_state["a2_keywords"]
+                    highlighted = ", ".join([f"**{kw}**" for kw in keywords])
                     ai_system_prompt = (
-                        "You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
-                        " Use their keywords to give idea suggestions (in German), a sentence starter, a correction (in German),"
-                        " a grammar tip (in English), and a follow-up question (in German)."
+                        f"You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
+                        f" Use the keywords: {highlighted} to help them."
+                        " Give ideas (in German), a sentence starter, correction (in German), a grammar tip (in English), and a follow-up question."
                     )
             else:
                 ai_system_prompt = "You are Herr Felix. Just reply in German."
@@ -581,7 +583,6 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
 
 # STAGE 6: Session Summary & Restart
 
