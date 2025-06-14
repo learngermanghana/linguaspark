@@ -812,6 +812,42 @@ def stage_7():
         presentation_chat_loop(generate_ai_reply_and_rerun, st.experimental_rerun)
         return
 
-# --------- ACTIVATE STAGE 7 TAB WHEN NEEDED ---------
-if st.session_state.get("step") == 7:
+# ---- Main navigation ----
+if "step" not in st.session_state:
+    st.session_state["step"] = 1
+
+if st.session_state["step"] == 1:
+    st.title("Student Login")
+    code = st.text_input("🔑 Enter your student code to begin:")
+    if st.button("Next ➡️"):
+        code_clean = code.strip().lower()
+        df_codes = load_codes()
+        if code_clean in df_codes["code"].dropna().tolist():
+            st.session_state["student_code"] = code_clean
+            st.session_state["step"] = 2
+        else:
+            st.error("This code is not recognized. Please check with your tutor.")
+elif st.session_state["step"] == 2:
+    st.header("🧑‍🏫 Welcome!")
+    if st.button("Next ➡️"):
+        st.session_state["step"] = 3
+elif st.session_state["step"] == 3:
+    st.header("Select mode")
+    mode = st.radio(
+        "Choose your practice mode:",
+        [
+            "Geführte Prüfungssimulation (Exam Mode)",
+            "Eigenes Thema/Frage (Custom Topic Chat)",
+            "Präsentationstraining (Presentation Practice)"
+        ],
+        index=0
+    )
+    st.session_state["selected_mode"] = mode
+    if st.button("Start"):
+        if mode == "Präsentationstraining (Presentation Practice)":
+            st.session_state["step"] = 7
+        else:
+            st.session_state["step"] = 4
+elif st.session_state["step"] == 7:
     stage_7()
+
