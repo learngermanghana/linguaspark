@@ -737,7 +737,8 @@ def stage_7():
                 if kw.lower() in user_msg.lower():
                     st.session_state.a2_keyword_progress.add(kw)
         st.session_state.awaiting_ai_reply = True
-        safe_rerun()
+        # Removed immediate rerun to allow progress bar update
+
 
     render_progress_bar()
 
@@ -805,3 +806,4 @@ def stage_7():
 
 # Invoke stage 7
 stage_7()
+
