@@ -818,9 +818,9 @@ def stage_7():
         handle_keywords_input()
     else:
         handle_chat_loop()
-            # Check for completion and stop chat when done
+
+    # Check for completion and stop chat when done
     if st.session_state.presentation_step >= 3:
-        # Determine done condition
         if st.session_state.presentation_level == "A2":
             kws = st.session_state.a2_keywords or []
             done = len(st.session_state.a2_keyword_progress) == len(kws)
@@ -845,13 +845,14 @@ def stage_7():
             import io
             buf = io.BytesIO()
             for line in final.split("
+
 "):
                 pdf.multi_cell(0, 10, line)
             pdf.output(buf)
             st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
             return
 
-# Bottom control buttons generated from config
+    # Bottom control buttons generated from config
     cols = st.columns(len(action_buttons))
     for i, btn in enumerate(action_buttons):
         if cols[i].button(btn["label"]):
@@ -862,3 +863,5 @@ def stage_7():
 
 # Execute stage 7
 stage_7()
+stage_7()
+
