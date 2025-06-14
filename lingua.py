@@ -781,7 +781,7 @@ def handle_chat_loop():
             prefix = '🧑‍🏫 Herr Felix:' if msg['role']=='assistant' else '🗣️'
             st.markdown(f"{prefix} {msg['content']}")
 
-    if st.session_state.presentation_step >= 3:
+    if st.session_state.get("presentation_step", 0) >= 3:
         user_msg = st.chat_input(f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'...", key="chat_input")
         if user_msg:
             st.session_state.presentation_messages.append({"role":"user","content":user_msg})
@@ -797,16 +797,16 @@ def handle_chat_loop():
 def stage_7():
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")  
-    if st.session_state.presentation_step == 0:
+    if st.session_state.get("presentation_step", 0) == 0:
         handle_level_selection()
-    elif st.session_state.presentation_step == 1:
+    elif st.session_state.get("presentation_step", 0) == 1:
         handle_topic_input()
-    elif st.session_state.presentation_step == 2:
+    elif st.session_state.get("presentation_step", 0) == 2:
         handle_keywords_input()
     else:
         handle_chat_loop()
 
-    if st.session_state.presentation_step >= 3:
+    if st.session_state.get("presentation_step", 0) >= 3:
         done = (
             len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or [])
             if st.session_state.presentation_level == "A2"
