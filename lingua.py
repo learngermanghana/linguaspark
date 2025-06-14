@@ -861,6 +861,4 @@ def stage_7():
             reset_state(btn["reset_keys"])
             safe_rerun()
 
-# Execute stage 7
-stage_7()
-stage_7()
+
