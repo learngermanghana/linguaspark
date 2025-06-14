@@ -707,14 +707,16 @@ def stage_7():
     if typed and typed.strip():
         st.session_state.presentation_messages.append({"role": "user", "content": typed.strip()})
         st.session_state.presentation_turn_count += 1
+        # track A2 keywords safely
         if st.session_state.presentation_level == "A2":
-            for kw in st.session_state.a2_keywords:
+            kws = st.session_state.a2_keywords or []
+            for kw in kws:
                 if kw.lower() in typed.lower():
                     st.session_state.a2_keyword_progress.add(kw)
         st.session_state['awaiting_ai_reply'] = True
         safe_rerun()
 
-        # Progress bar below input
+    # Progress bar below input
     max_turns = 8
     if st.session_state.presentation_level == "A2":
         kws = st.session_state.a2_keywords or []
@@ -798,4 +800,3 @@ def stage_7():
 
 # Invoke stage 7 when appropriate
 stage_7()
-
