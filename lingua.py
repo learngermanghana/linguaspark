@@ -631,7 +631,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-```python
 # ------ STAGE 7: Presentation Practice ------
 if st.session_state.get("step") == 7:
     import re, io
