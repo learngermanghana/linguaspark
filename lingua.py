@@ -647,13 +647,13 @@ if st.session_state.get("step") == 7:
         "presentation_messages": [],
         "presentation_turn_count": 0,
     }
-    for key, val in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = val
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
     st.header("🎤 Presentation Practice (A2 & B1)")
 
-    # Step 0: Choose level
+    # Step 0: Level selection
     if st.session_state["presentation_step"] == 0:
         lvl = st.radio("Select your level:", ["A2", "B1"], horizontal=True)
         if st.button("Start Presentation Practice"):
@@ -661,15 +661,16 @@ if st.session_state.get("step") == 7:
             st.session_state["presentation_step"] = 1
         st.stop()
 
-    # Step 1: Enter topic
+    # Step 1: Topic input
     if st.session_state["presentation_step"] == 1:
         with st.form("topic_form"):
-            st.info(
-                "Write a short sentence for your presentation topic (in German or English)."
-                "Examples:
-- Ich möchte über meine Familie sprechen."
-                "- I want to talk about my school."
-            )
+            st.info("""
+Write a short sentence for your presentation topic (in German or English).
+
+Examples:
+- Ich möchte über meine Familie sprechen.
+- I want to talk about my school.
+""")
             topic = st.text_input("Your presentation topic:")
             submitted = st.form_submit_button("Submit Topic")
         if submitted and topic.strip():
@@ -701,11 +702,11 @@ if st.session_state.get("step") == 7:
             st.session_state["presentation_step"] = 3 if st.session_state["presentation_level"] == "B1" else 2
         st.stop()
 
-    # Step 2: Keywords for A2
+    # Step 2: Keywords input for A2
     if st.session_state["presentation_step"] == 2 and st.session_state["presentation_level"] == "A2":
         with st.form("keywords_form"):
             st.info("Enter 3–4 German keywords separated by commas (e.g. Eltern, Bruder, Wochenende).")
-            kws_input = st.text_input("Keywords:")
+            kws_input = st.text_input("Your keywords:")
             submitted_kws = st.form_submit_button("Submit Keywords")
         if submitted_kws and kws_input.strip():
             kws = [kw.strip() for kw in kws_input.split(",") if kw.strip()]
@@ -731,18 +732,31 @@ if st.session_state.get("step") == 7:
                 st.session_state["presentation_step"] = 3
         st.stop()
 
-    # Step 3+: Chat loop
-    # 1) User input
+    # Step 3+: Chat Loop
+    # Display chat history
+    for msg in st.session_state["presentation_messages"]:
+        if msg["role"] == "assistant":
+            with st.chat_message("assistant", avatar="🧑‍🏫"):
+                text = msg["content"]
+                text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "\n\n🔹 **Idea Suggestions (English):**", text)
+                text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "\n\n🔹 **Sentence Starter:**", text)
+                text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "\n\n✏️ **Correction (English):**", text)
+                text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip (English):**", text)
+                text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question (German):**", text)
+                st.markdown(f"<span style='color:#33691e'>🧑‍🏫 Herr Felix:</span><br>{text}", unsafe_allow_html=True)
+        else:
+            with st.chat_message("user"):
+                st.markdown(f"🗣️ {msg['content']}")
+
+    # User input & immediate AI reply
     user_msg = st.chat_input("💬 Type your sentence or answer here…")
     if user_msg:
         st.session_state["presentation_messages"].append({"role": "user", "content": user_msg})
         st.session_state["presentation_turn_count"] += 1
-        # Track A2 keywords immediately
         if st.session_state["presentation_level"] == "A2":
             for kw in st.session_state["a2_keywords"]:
                 if kw.lower() in user_msg.lower():
                     st.session_state["a2_keyword_progress"].add(kw)
-        # Build prompt
         if st.session_state["presentation_level"] == "A2":
             highlight = ", ".join(f"**{kw}**" for kw in st.session_state["a2_keywords"])
             system_prompt = (
@@ -767,32 +781,7 @@ if st.session_state.get("step") == 7:
         st.session_state["presentation_messages"].append({"role": "assistant", "content": ai_text})
         st.experimental_rerun()
 
-    # 2) Display history
-    for msg in st.session_state["presentation_messages"]:
-        if msg["role"] == "assistant":
-            with st.chat_message("assistant", avatar="🧑‍🏫"):
-                text = msg["content"]
-                text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "
-
-🔹 **Idea Suggestions (English):**", text)
-                text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "
-
-🔹 **Sentence Starter:**", text)
-                text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "
-
-✏️ **Correction (English):**", text)
-                text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "
-
-📘 **Grammar Tip (English):**", text)
-                text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "
-
-➡️ **Next Question (German):**", text)
-                st.markdown(f"<span style='color:#33691e'>🧑‍🏫 Herr Felix:</span><br>{text}", unsafe_allow_html=True)
-        else:
-            with st.chat_message("user"):
-                st.markdown(f"🗣️ {msg['content']}")
-
-    # 3) Progress bar below input
+    # Progress bar below input
     if st.session_state["presentation_level"] == "A2" and st.session_state["a2_keywords"]:
         total = len(st.session_state["a2_keywords"])
         done  = len(st.session_state["a2_keyword_progress"])
@@ -803,29 +792,7 @@ if st.session_state.get("step") == 7:
         ))
         st.markdown("---")
 
-    # 4) Completion and download
+    # Completion and download
     done = False
     if st.session_state["presentation_level"] == "A2" and st.session_state["a2_keywords"]:
-        done = len(st.session_state["a2_keyword_progress"]) == len(st.session_state["a2_keywords"])
-    elif st.session_state["presentation_turn_count"] >= 8:
-        done = True
-    if done:
-        st.success("🎉 Practice complete! Review or download below.")
-        final = "
-
-".join(
-            ("👤 " if m["role"] == "user" else "🧑‍🏫 ")+m["content"]
-            for m in st.session_state["presentation_messages"]
-        )
-        st.subheader("📄 Your Final Presentation")
-        st.markdown(final)
-        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
-        for ln in final.split("
-"):
-            pdf.multi_cell(0, 10, ln)
-        buf = io.BytesIO(); pdf.output(buf)
-        st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
-        if st.button("🔁 Start New Practice"):
-            for k in defaults.keys():
-                st.session_state.pop(k, None)
-            st.session_state["step"] = 7
+        done = len(st.session_state["a2_keyword_progress"]) == len(st.session_state["a2_keywords"])``
