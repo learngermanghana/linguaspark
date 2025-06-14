@@ -634,11 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-import streamlit as st
-from fpdf import FPDF
-from openai import OpenAI
-import io
-
 # Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
@@ -831,7 +826,20 @@ def stage_7():
             pdf.set_font("Arial", size=12)
             buf = io.BytesIO()
             for line in final.split("\n\n"):
-                # replace unsupported chars
                 safe_line = line.encode('latin-1', 'replace').decode('latin-1')
-                pdf.multi_cell(0
+                pdf.multi_cell(0, 10, safe_line)
+            pdf.output(buf)
+            st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
+            return
+
+    cols = st.columns(len(action_buttons))
+    for i, btn in enumerate(action_buttons):
+        if cols[i].button(btn["label"]):
+            if btn.get("set_step") is not None:
+                st.session_state.presentation_step = btn["set_step"]
+            reset_state(btn["reset_keys"])
+            safe_rerun()
+
+# Execute the Presentation Practice module
+stage_7()
 
