@@ -829,7 +829,7 @@ def stage_7():
             done = st.session_state.presentation_turn_count >= max_turns
         if done:
             st.success("🎉 Presentation practice complete! 🎉")
-            # Display final conversation
+                        # Display final conversation
             final = "
 
 ".join([
@@ -864,4 +864,3 @@ def stage_7():
 # Execute stage 7
 stage_7()
 stage_7()
-
