@@ -635,7 +635,12 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 
-# Stage 7 Module-level configuration for default session state
+import streamlit as st
+from fpdf import FPDF
+from openai import OpenAI
+import io
+
+# Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
     "presentation_level": None,
@@ -770,34 +775,30 @@ def handle_chat_loop():
 
     render_progress_bar()
     for msg in st.session_state.presentation_messages:
-        if msg['role'] == 'user':
-            with st.chat_message('user'):
-                st.markdown(f"🗣️ {msg['content']}")
-        else:
-            with st.chat_message('assistant', avatar='🧑‍🏫'):
-                st.markdown(f"**🧑‍🏫 Herr Felix:** {msg['content']}", unsafe_allow_html=True)
+        with st.chat_message(msg['role'], avatar='🧑‍🏫' if msg['role']=='assistant' else None):
+            prefix = '🧑‍🏫 Herr Felix:' if msg['role']=='assistant' else '🗣️'
+            st.markdown(f"{prefix} {msg['content']}")
 
-    placeholder = f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'..."
-    user_msg = st.chat_input(placeholder, key="chat_input")
-    if user_msg:
-        st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
-        st.session_state.presentation_turn_count += 1
-        if st.session_state.presentation_level == "A2":
-            for kw in (st.session_state.a2_keywords or []):
-                if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
-                    st.session_state.a2_keyword_progress.append(kw)
-        st.session_state.awaiting_ai_reply = True
-        safe_rerun()
+    user_msg = None
+    if st.session_state.presentation_step >= 3:
+        user_msg = st.chat_input(f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'...", key="chat_input")
+        if user_msg:
+            st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
+            st.session_state.presentation_turn_count += 1
+            if st.session_state.presentation_level == "A2":
+                for kw in (st.session_state.a2_keywords or []):
+                    if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
+                        st.session_state.a2_keyword_progress.append(kw)
+            st.session_state.awaiting_ai_reply = True
+            safe_rerun()
 
 
 def stage_7():
-    if st.session_state.get("presentation_step", 0) == 0:
-        return
-
+    # Always initialize and show header + selection
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
-    stage = st.session_state.presentation_step
 
+    stage = st.session_state.presentation_step
     if stage == 0:
         handle_level_selection()
     elif stage == 1:
@@ -807,40 +808,35 @@ def stage_7():
     else:
         handle_chat_loop()
 
+    # Completion check
     if st.session_state.presentation_step >= 3:
         if st.session_state.presentation_level == "A2":
-            kws = st.session_state.a2_keywords or []
-            done = len(st.session_state.a2_keyword_progress) == len(kws)
+            done = len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or [])
         else:
-            max_turns = 8
-            done = st.session_state.presentation_turn_count >= max_turns
+            done = st.session_state.presentation_turn_count >= 8
         if done:
-            st.success("🎉 Presentation practice complete! 🎉")
-            final = "\n\n".join([
-                f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}" for msg in st.session_state.presentation_messages
-            ])
+            st.success("🎉 Practice complete! 🎉")
+            final = "\n\n".join([f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}" for m in st.session_state.presentation_messages])
             st.subheader("📄 Your Final Presentation")
             st.markdown(final)
-            # Generate PDF with unicode-safe fallback and return bytes
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
             for line in final.split("\n\n"):
                 safe_line = line.encode('latin-1', 'replace').decode('latin-1')
                 pdf.multi_cell(0, 10, safe_line)
-            # get PDF as bytes
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             st.download_button("📥 Download PDF", data=pdf_bytes, file_name="Presentation_Practice.pdf")
             return
 
+    # Bottom controls
     cols = st.columns(len(action_buttons))
     for i, btn in enumerate(action_buttons):
-        if cols[i].button(btn["label"]):
-            if btn.get("set_step") is not None:
-                st.session_state.presentation_step = btn["set_step"]
-            reset_state(btn["reset_keys"])
+        if cols[i].button(btn['label']):
+            if btn['set_step'] is not None:
+                st.session_state.presentation_step = btn['set_step']
+            reset_state(btn['reset_keys'])
             safe_rerun()
 
-# Execute the Presentation Practice module
+# Run module
 stage_7()
-
