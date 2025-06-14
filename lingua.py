@@ -668,7 +668,8 @@ def stage_7():
             pass
 
     def generate_ai_reply_and_rerun():
-        placeholder = st.chat_message("assistant", avatar="🧑‍🏫", is_typing=True)
+        placeholder = st.empty()
+        placeholder.info("🧑‍🏫 Herr Felix is typing...")
         # Build system prompt
         if st.session_state.presentation_level == 'A2':
             kws = list(st.session_state.a2_keywords or [])
@@ -810,3 +811,4 @@ def stage_7():
 
 # invoke
 stage_7()
+
