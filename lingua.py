@@ -827,9 +827,9 @@ def stage_7():
         else:
             max_turns = 8
             done = st.session_state.presentation_turn_count >= max_turns
-        if done:
+                if done:
             st.success("🎉 Presentation practice complete! 🎉")
-                        # Display final conversation
+            # Display final conversation
             final = "
 
 ".join([
@@ -859,6 +859,9 @@ def stage_7():
                 st.session_state.presentation_step = btn["set_step"]
             reset_state(btn["reset_keys"])
             safe_rerun()
+
+# Execute stage 7
+stage_7()
 
 # Execute stage 7
 stage_7()
