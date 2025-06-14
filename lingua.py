@@ -635,17 +635,6 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 """
-Stage 7: Presentation Practice (A2 & B1)
-
-Handles user interactions for presentation practice:
-- Level selection (A2/B1)
-- Topic input
-- A2 keyword input
-- Interactive chat loop with AI
-- Progress tracking via progress bar
-- Bottom controls to restart/change topic/level
-"""
-
 """
 Stage 7: Presentation Practice (A2 & B1)
 
@@ -786,8 +775,11 @@ def stage_7():
                 )
                 st.session_state.b1_init_done = True
             else:
+                # Subsequent B1 follow-ups anchored on the main topic
+                topic = st.session_state.presentation_topic
                 system = (
-                    "You are Herr Felix, a B1 teacher. Based on the student's last answer, ask the next relevant question in German and give brief feedback in English."
+                    f"You are Herr Felix, a B1 teacher. The student is presenting on '{topic}'. "
+                    "Based on the student's last answer, ask the next relevant question in German that connects back to the main topic and provide brief feedback in English."
                 )
         last_user = next((m for m in reversed(st.session_state.presentation_messages) if m['role']=='user'), None)
         if last_user:
