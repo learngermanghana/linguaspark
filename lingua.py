@@ -681,6 +681,7 @@ def stage_7():
         else:  # B1
             steps = [
                 "Ask the student's opinion on the topic in German and give positive feedback in English.",
+                "Also share your opinion so the student can pick some points from you also.",
                 "Ask the student to list advantages and disadvantages in German, praise, and provide an English tip.",
                 "Ask how this topic relates to their homeland in German, then encouraging English feedback.",
                 "Ask for a conclusion or recommendation in German, cheer on in English.",
@@ -735,6 +736,8 @@ def stage_7():
     # Stage 2: keywords input (A2 only)
     if st.session_state.presentation_step == 2:
         st.info("Enter 3–4 German keywords, comma-separated.")
+        "Example: **Schule, Hausaufgaben, Lehrer, Prüfung**"
+    )
         kw = st.text_input("Keywords:", key="kw_input")
         if st.button("Submit Keywords"):
             arr = [x.strip() for x in kw.split(',') if x.strip()]
