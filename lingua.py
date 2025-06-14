@@ -677,8 +677,7 @@ def stage_7():
             next_kw = next((kw for kw in kws if kw not in used), kws[0] if kws else '(no keyword)')
             system = (
                 f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-                "Encourage the student warmly, provide an English suggestion sentence using it, a German example, "
-                "a hint on how to start your own sentence, an English correction, and a fun follow-up question in German."
+                "Encourage the student warmly, provide an English suggestion sentence using it, a German example, a hint on how to start your own sentence, and then explain any corrections in English, followed by a fun follow-up question in German."
             )
         else:
             count = st.session_state.presentation_turn_count
@@ -796,6 +795,27 @@ def stage_7():
         st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
+    # Bottom controls
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔄 Restart Practice"):
+            for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_keyword_progress']:
+                st.session_state.pop(k, None)
+            safe_rerun()
+    with col2:
+        if st.button("📝 Change Topic"):
+            st.session_state.presentation_step = 1
+            st.session_state.presentation_messages = []
+            st.session_state.presentation_turn_count = 0
+            st.session_state['daily_usage'][key] = st.session_state['daily_usage'][key]  # preserve count
+            safe_rerun()
+    with col3:
+        if st.button("🔧 Change Level"):
+            st.session_state.presentation_step = 0
+            for k in ['presentation_messages','presentation_turn_count','presentation_topic','a2_keywords','a2_keyword_progress']:
+                st.session_state.pop(k, None)
+            safe_rerun()
+
     # completion
     a2_done=(st.session_state.presentation_level=='A2' and done>=total)
     b1_done=(st.session_state.presentation_level=='B1' and done>=max_turns)
@@ -811,4 +831,5 @@ def stage_7():
 
 # invoke
 stage_7()
+
 
