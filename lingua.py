@@ -818,7 +818,40 @@ def stage_7():
         handle_keywords_input()
     else:
         handle_chat_loop()
-    # Bottom control buttons generated from config
+        # Check for completion and stop chat when done
+    if st.session_state.presentation_step >= 3:
+        # Determine done condition
+        if st.session_state.presentation_level == "A2":
+            kws = st.session_state.a2_keywords or []
+            done = len(st.session_state.a2_keyword_progress) == len(kws)
+        else:
+            max_turns = 8
+            done = st.session_state.presentation_turn_count >= max_turns
+        if done:
+            st.success("🎉 Presentation practice complete! 🎉")
+            # Display final conversation
+            final = "
+
+".join([
+                f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
+                for msg in st.session_state.presentation_messages
+            ])
+            st.subheader("📄 Your Final Presentation")
+            st.markdown(final)
+            # Generate PDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            import io
+            buf = io.BytesIO()
+            for line in final.split("
+"):
+                pdf.multi_cell(0, 10, line)
+            pdf.output(buf)
+            st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
+            return
+
+# Bottom control buttons generated from config
     cols = st.columns(len(action_buttons))
     for i, btn in enumerate(action_buttons):
         if cols[i].button(btn["label"]):
