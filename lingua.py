@@ -768,5 +768,30 @@ def stage_7():
                 text = msg['content']
                 st.markdown(f"**🧑‍🏫 Herr Felix:** {text}", unsafe_allow_html=True)
 
+        # Action buttons always visible at bottom
+    col1, col2, col3 = st.columns([1,1,1])
+    with col1:
+        if st.button("🔄 Restart Practice"):
+            for k in ['presentation_step','presentation_level','presentation_topic','a2_keywords','a2_keyword_progress','presentation_messages','presentation_turn_count','awaiting_ai_reply']:
+                st.session_state.pop(k, None)
+            safe_rerun()
+    with col2:
+        if st.button("📝 Change Topic"):
+            # go back to topic input
+            st.session_state.presentation_step = 1
+            # clear messages, but keep level
+            st.session_state.presentation_messages.clear()
+            st.session_state.presentation_turn_count = 0
+            st.session_state['awaiting_ai_reply'] = False
+            safe_rerun()
+    with col3:
+        if st.button("🔧 Change Level"):
+            # restart at level selection
+            st.session_state.presentation_step = 0
+            # clear all topic/chat state
+            for k in ['presentation_messages','presentation_turn_count','presentation_topic', 'a2_keywords','a2_keyword_progress','awaiting_ai_reply']:
+                st.session_state.pop(k, None)
+            safe_rerun()
+
 # Invoke stage 7 when appropriate
 stage_7()
