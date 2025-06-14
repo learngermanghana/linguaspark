@@ -634,9 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-Here's the complete, fully updated code for your `stage_7` function with your requested enhancements:
-
-```python
 def stage_7():
     if st.session_state.get("step") != 7:
         return
