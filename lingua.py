@@ -830,7 +830,7 @@ def stage_7():
         if done:
             st.success("🎉 Presentation practice complete! 🎉")
             # Display final conversation
-            final = "
+                        final = "
 
 ".join([
                 f"👤 {msg['content']}" if msg['role']=='user' else f"🧑‍🏫 {msg['content']}"
