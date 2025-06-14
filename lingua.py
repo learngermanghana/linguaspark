@@ -635,119 +635,121 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 def stage_7():
-    if st.session_state.get("step") != 7:
-        return
+if st.session_state.get("step") != 7:
+    return
 
-    # --- Initialize defaults ---
-    st.session_state.setdefault("presentation_step", 0)
-    st.session_state.setdefault("presentation_level", None)
-    st.session_state.setdefault("presentation_topic", "")
-    st.session_state.setdefault("a2_keywords", None)
-    st.session_state.setdefault("a2_keyword_progress", set())
-    st.session_state.setdefault("presentation_messages", [])
-    st.session_state.setdefault("presentation_turn_count", 0)
+# --- Initialize defaults ---
+st.session_state.setdefault("presentation_step", 0)
+st.session_state.setdefault("presentation_level", None)
+st.session_state.setdefault("presentation_topic", "")
+st.session_state.setdefault("a2_keywords", None)
+st.session_state.setdefault("a2_keyword_progress", set())
+st.session_state.setdefault("presentation_messages", [])
+st.session_state.setdefault("presentation_turn_count", 0)
 
-    # --- Daily limit ---
-    today = str(date.today())
-    code = st.session_state.get("student_code", "(unknown)")
-    key = f"{code}_{today}"
-    st.session_state.setdefault("daily_usage", {})
-    st.session_state["daily_usage"].setdefault(key, 0)
-    used = st.session_state["daily_usage"][key]
-    st.info(f"Student code: `{code}` | Chats today: {used}/25")
-    if used >= 25:
-        st.warning("You’ve reached today’s limit of 25 chat turns. Please come back tomorrow.")
-        return
+# --- Daily limit ---
+today = str(date.today())
+code = st.session_state.get("student_code", "(unknown)")
+key = f"{code}_{today}"
+st.session_state.setdefault("daily_usage", {})
+st.session_state["daily_usage"].setdefault(key, 0)
+used = st.session_state["daily_usage"][key]
+st.info(f"Student code: `{code}` | Chats today: {used}/25")
+if used >= 25:
+    st.warning("You’ve reached today’s limit of 25 chat turns. Please come back tomorrow.")
+    return
 
-    st.header("🎤 Presentation Practice (A2 & B1)")
+st.header("🎤 Presentation Practice (A2 & B1)")
 
-    def safe_rerun():
-        try:
-            st.experimental_rerun()
-        except Exception:
-            pass
+def safe_rerun():
+    try:
+        st.experimental_rerun()
+    except Exception:
+        pass
 
-    def generate_ai_reply_and_rerun():
-        placeholder = st.empty()
-        placeholder.info("🧑‍🏫 Herr Felix is typing...")
+def generate_ai_reply_and_rerun():
+    placeholder = st.empty()
+    placeholder.info("🧑‍🏫 Herr Felix is typing...")
 
-        if st.session_state.presentation_level == 'A2':
-            kws = list(st.session_state.a2_keywords or [])
-            next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
-            system = (
-                f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-                "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct English, and ask a German follow-up question."
-            )
-        else:  # B1
-            steps = [
-                "Ask the student's opinion on the topic in German and give positive feedback in English.",
-                "Also share your opinion so the student can pick some points from you also.",
-                "Ask the student to list advantages and disadvantages in German, praise, and provide an English tip.",
-                "Ask how this topic relates to their homeland in German, then encouraging English feedback.",
-                "Ask for a conclusion or recommendation in German, cheer on in English.",
-                "Summarize points in German, highlight progress, motivate further learning."
-            ]
-            idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-            system = steps[idx]
+    if st.session_state.presentation_level == 'A2':
+        kws = list(st.session_state.a2_keywords or [])
+        next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
+        system = (
+            f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
+            "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct English, and ask a German follow-up question."
+        )
+    else:  # B1
+        steps = [
+            "Ask the student's opinion on the topic in German and give positive feedback in English.",
+            "Also share your opinion so the student can pick some points from you also.",
+            "Ask the student to list advantages and disadvantages in German, praise, and provide an English tip.",
+            "Ask how this topic relates to their homeland in German, then encouraging English feedback.",
+            "Ask for a conclusion or recommendation in German, cheer on in English.",
+            "Summarize points in German, highlight progress, motivate further learning."
+        ]
+        idx = min(st.session_state.presentation_turn_count, len(steps)-1)
+        system = steps[idx]
 
-        last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
-        messages = [{'role':'system','content':system}]
-        if last:
-            messages.append(last)
+    last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
+    messages = [{'role':'system','content':system}]
+    if last:
+        messages.append(last)
 
-        try:
-            resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                model='gpt-4o', messages=messages
-            )
-            reply = resp.choices[0].message.content
-        except Exception:
-            reply = "Sorry, something went wrong."
+    try:
+        resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+            model='gpt-4o', messages=messages
+        )
+        reply = resp.choices[0].message.content
+    except Exception:
+        reply = "Sorry, something went wrong."
 
-        placeholder.empty()
-        st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
-        st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    placeholder.empty()
+    st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
+    st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    safe_rerun()
+
+# Stage 0: select level
+if st.session_state.presentation_step == 0:
+    lvl = st.radio("Select your level:", ["A2","B1"], horizontal=True)
+    if st.button("Start Presentation Practice"):
+        st.session_state.presentation_level = lvl
+        st.session_state.presentation_step = 1
+        st.session_state.presentation_messages.clear()
+        st.session_state.presentation_turn_count = 0
+        st.session_state.a2_keywords = None
+        st.session_state.a2_keyword_progress.clear()
+        st.session_state.presentation_topic = ""
         safe_rerun()
+    return
 
-    # Stage 0: select level
-    if st.session_state.presentation_step == 0:
-        lvl = st.radio("Select your level:", ["A2","B1"], horizontal=True)
-        if st.button("Start Presentation Practice"):
-            st.session_state.presentation_level = lvl
-            st.session_state.presentation_step = 1
-            st.session_state.presentation_messages.clear()
-            st.session_state.presentation_turn_count = 0
-            st.session_state.a2_keywords = None
-            st.session_state.a2_keyword_progress.clear()
-            st.session_state.presentation_topic = ""
-            safe_rerun()
-        return
+# Stage 1: topic input
+if st.session_state.presentation_step == 1:
+    st.info("Please enter your presentation topic (English or German). 🔖")
+    t = st.text_input("Topic:", key="topic_input")
+    if st.button("Submit Topic") and t:
+        st.session_state.presentation_topic = t
+        st.session_state.presentation_messages.append({'role':'user','content':t})
+        st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
+        safe_rerun()
+    return
 
-    # Stage 1: topic input
-    if st.session_state.presentation_step == 1:
-        st.info("Please enter your presentation topic (English or German). 🔖")
-        t = st.text_input("Topic:", key="topic_input")
-        if st.button("Submit Topic") and t:
-            st.session_state.presentation_topic = t
-            st.session_state.presentation_messages.append({'role':'user','content':t})
-            st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
-            safe_rerun()
-        return
-
-    # Stage 2: keywords input (A2 only)
-    if st.session_state.presentation_step == 2:
-        st.info("Enter 3–4 German keywords, comma-separated.")
+# Stage 2: keywords input (A2 only)
+if st.session_state.presentation_step == 2:
+    st.info(
+        "Enter 3–4 German keywords, comma-separated.\n\n"
         "Example: **Schule, Hausaufgaben, Lehrer, Prüfung**"
     )
-        kw = st.text_input("Keywords:", key="kw_input")
-        if st.button("Submit Keywords"):
-            arr = [x.strip() for x in kw.split(',') if x.strip()]
-            if len(arr) >= 3:
-                st.session_state.a2_keywords = arr[:4]
-                st.session_state.presentation_step = 3
-                safe_rerun()
-            else:
-                st.warning("Enter at least 3 keywords.")
-        return
+    kw = st.text_input("Keywords:", key="kw_input")
+    if st.button("Submit Keywords"):
+        arr = [x.strip() for x in kw.split(',') if x.strip()]
+        if len(arr) >= 3:
+            st.session_state.a2_keywords = arr[:4]
+            st.session_state.presentation_step = 3
+            safe_rerun()
+        else:
+            st.warning("Enter at least 3 keywords.")
+    return
+
 
     # Automatically start AI interaction after topic/keyword input
     if st.session_state.presentation_step == 3:
