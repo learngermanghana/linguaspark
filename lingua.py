@@ -355,6 +355,7 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
+
 # ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
@@ -365,9 +366,21 @@ if st.session_state["step"] == 5:
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
     st.info(
-        f"Student code: `{student_code}` | "
-        f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
-    )
+    f"Student code: `{student_code}` | Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT} | "
+    f"Turns used: {st.session_state['turn_count']}/{max_turns}"
+)
+
+# Progress Bar
+if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
+    total_keywords = len(st.session_state["a2_keywords"])
+    completed_keywords = len(st.session_state["a2_keyword_progress"])
+    st.progress(completed_keywords / total_keywords)
+    st.markdown("**Progress:** " + " | ".join([
+        f"✅ `{kw}`" if kw in st.session_state["a2_keyword_progress"] else f"⬜ `{kw}`"
+        for kw in st.session_state["a2_keywords"]
+    ]))
+else:
+    st.progress(st.session_state['turn_count'] / max_turns)
 
     is_b1_teil3 = (
         st.session_state.get("selected_mode", "").startswith("Geführte") and
@@ -375,7 +388,6 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Show progress tracker if custom A2 chat
     if st.session_state.get("custom_chat_level") == "A2" and st.session_state.get("a2_keywords"):
         st.subheader("📊 Presentation Keyword Progress")
         completed = st.session_state["a2_keyword_progress"]
@@ -410,14 +422,12 @@ if st.session_state["step"] == 5:
                 pdf.output(pdf_output)
                 st.download_button("📥 Download My Practice (PDF)", data=pdf_output.getvalue(), file_name="A2_Presentation_Practice.pdf")
 
-        # Auto-track progress based on most recent user input
         if st.session_state.get("messages") and st.session_state["messages"][-1]["role"] == "user":
             latest_input = st.session_state["messages"][-1]["content"].lower()
             for kw in st.session_state["a2_keywords"]:
                 if kw.lower() in latest_input:
                     st.session_state["a2_keyword_progress"].add(kw)
 
-    # --- Custom Chat: Level selection comes first
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -485,6 +495,7 @@ if st.session_state["step"] == 5:
             if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
                 if not st.session_state.get("a2_keywords") and len(user_words) >= 3:
                     st.session_state["a2_keywords"] = user_words[:4]
+                    st.success(f"✅ Thanks! I've added these keywords to your presentation: {', '.join(st.session_state['a2_keywords'])}")
 
                 if not st.session_state.get("a2_keywords"):
                     ai_system_prompt = (
