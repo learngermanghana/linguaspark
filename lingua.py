@@ -635,6 +635,10 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 def stage_7():
+
+st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
+
+
     if st.session_state.get("step") != 7:
         return
 
