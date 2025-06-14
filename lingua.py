@@ -676,7 +676,7 @@ def generate_ai_reply_and_rerun():
         next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
         system = (
             f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-            "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct English, and ask a German follow-up question."
+            "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct in English, and ask a German follow-up question."
         )
     else:  # B1
         steps = [
@@ -688,7 +688,7 @@ def generate_ai_reply_and_rerun():
             "Summarize points in German, highlight progress, motivate further learning."
         ]
         idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-        system = steps[idx]
+        system = steps[idx] + " If you correct a sentence or answer, always give the correction/explanation in English."
 
     last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
     messages = [{'role':'system','content':system}]
@@ -750,7 +750,6 @@ if st.session_state.presentation_step == 2:
             st.warning("Enter at least 3 keywords.")
     return
 
-
     # Automatically start AI interaction after topic/keyword input
     if st.session_state.presentation_step == 3:
         if not st.session_state.presentation_messages or st.session_state.presentation_messages[-1]['role'] != 'assistant':
@@ -803,3 +802,4 @@ if st.session_state.presentation_step == 2:
 
 # invoke
 stage_7()
+
