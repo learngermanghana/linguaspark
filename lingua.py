@@ -681,7 +681,7 @@ def stage_7():
             total = max_turns
             done = st.session_state.presentation_turn_count
             label = f"Turn {done} of {total}"
-        ratio = done / total
+        ratio = min(done / total, 1.0)  # clamp to [0,1] to avoid invalid values
         st.progress(ratio)
         st.markdown(f"**Progress:** {label}")
         st.markdown("---")
