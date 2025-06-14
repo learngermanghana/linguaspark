@@ -793,17 +793,22 @@ def stage_7():
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_reply})
             safe_rerun()
 
-        # Check if practice is complete
-    a2_done = (st.session_state.presentation_level == 'A2' and len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or []))
-    b1_done = (st.session_state.presentation_level == 'B1' and st.session_state.presentation_turn_count >= 8)
+                # Check if practice is complete
+    a2_done = (
+        st.session_state.presentation_level == 'A2' and
+        len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or [])
+    )
+    b1_done = (
+        st.session_state.presentation_level == 'B1' and
+        st.session_state.presentation_turn_count >= 8
+    )
     if a2_done or b1_done:
         st.success("🎉 Practice complete! 🎉")
-                final = "
+        # Build final summary
+        final = "
 
 ".join([
             f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
-            for m in st.session_state.presentation_messages
-        ])}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
             for m in st.session_state.presentation_messages
         ])
         st.subheader("📄 Your Presentation Summary")
@@ -818,8 +823,7 @@ def stage_7():
             # Provide example sentences for each keyword
             st.markdown("**Keyword Examples:**")
             for kw in st.session_state.a2_keywords or []:
-                st.markdown(f"- **{kw}**: Beispiel: ___{kw} ist sehr wichtig.
-")
+                st.markdown(f"- **{kw}**: Beispiel: {kw} ist sehr wichtig.")
         else:
             turns = st.session_state.presentation_turn_count
             score = min(turns, 8)
