@@ -736,11 +736,14 @@ def stage_7():
         st.session_state['awaiting_ai_reply'] = False
         # build prompts
         if st.session_state.presentation_level == 'A2':
-            system = (
-                "You are Herr Felix, an A2 teacher. Use the student's keywords and user messages to guide: "
-                + ", ".join(st.session_state.a2_keywords)
-                + ". Provide English suggestions, German examples, a starter sentence, an English correction, and a follow-up German question."
-            )
+                        if st.session_state.presentation_level == 'A2':
+                kws = st.session_state.a2_keywords or []
+                kw_str = ", ".join(kws)
+                system = (
+                    "You are Herr Felix, an A2 teacher. Use the student's keywords and user messages to guide: "
+                    + (kw_str if kw_str else "(no keywords provided)")
+                    + ". Provide English suggestions, German examples, a starter sentence, an English correction, and a follow-up German question."
+                )
         else:
             system = (
                 "You are Herr Felix, a B1 teacher. First, provide structure and ideas for the topic, then test understanding by asking clear questions in German, giving feedback in English."
@@ -796,3 +799,4 @@ def stage_7():
 
 # Invoke stage 7 when appropriate
 stage_7()
+
