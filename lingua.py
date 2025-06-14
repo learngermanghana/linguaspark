@@ -739,7 +739,7 @@ def stage_7():
             safe_rerun()
         return
 
-    # --- Stage 2: keywords input (A2 only) ---
+ def presentation_keywords_input():
     if st.session_state.presentation_step == 2:
         st.info(
             "Enter 3–4 German keywords, comma-separated.\n\n"
@@ -751,6 +751,11 @@ def stage_7():
             if len(arr) >= 3:
                 st.session_state.a2_keywords = arr[:4]
                 st.session_state.presentation_step = 3
+                # Initialize first message so chat is never blank
+                st.session_state.presentation_messages = [{
+                    'role': 'assistant',
+                    'content': "Super! Let's start your presentation. Please type your first answer below."
+                }]
                 safe_rerun()
             else:
                 st.warning("Enter at least 3 keywords.")
@@ -760,8 +765,13 @@ def presentation_chat_loop():
     if st.session_state.presentation_step != 3:
         return
 
-    # Only generate an AI reply if the last message is from the user,
-    # and if there isn't already a fresh AI reply.
+    # Ensure there's always at least one message when chat starts
+    if not st.session_state.presentation_messages:
+        st.session_state.presentation_messages.append({
+            'role': 'assistant',
+            'content': "Let's start your presentation! Please type your first answer below."
+        })
+
     msgs = st.session_state.presentation_messages
     need_ai = (
         msgs and msgs[-1]['role'] == 'user' and
@@ -789,7 +799,6 @@ def presentation_chat_loop():
                     st.session_state.a2_keyword_progress.add(k)
         generate_ai_reply_and_rerun()
 
-    # Progress bar and session end (unchanged)
     max_turns = 12
     done = st.session_state.presentation_turn_count
     st.progress(min(done / max_turns, 1.0))
@@ -812,7 +821,8 @@ def presentation_chat_loop():
                 'a2_keywords', 'a2_keyword_progress'
             ]:
                 st.session_state.pop(k, None)
-            safe_rerun()    
+            safe_rerun()
+
 
 # ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
 if st.session_state.get("step") == 7:
