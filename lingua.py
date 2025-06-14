@@ -634,7 +634,8 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-# stage 7: Module-level configuration for default session state
+# Module-level defaults for Presentation Practice (Stage 7)
+
 STATE_DEFAULTS = {
     "presentation_step": 0,
     "presentation_level": None,
@@ -781,7 +782,7 @@ def handle_chat_loop():
             prefix = '🧑‍🏫 Herr Felix:' if msg['role']=='assistant' else '🗣️'
             st.markdown(f"{prefix} {msg['content']}")
 
-    if st.session_state.get("presentation_step", 0) >= 3:
+    if st.session_state.presentation_step >= 3:
         user_msg = st.chat_input(f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'...", key="chat_input")
         if user_msg:
             st.session_state.presentation_messages.append({"role":"user","content":user_msg})
@@ -796,17 +797,17 @@ def handle_chat_loop():
 
 def stage_7():
     initialize_state()
-    st.header("🎤 Presentation Practice (A2 & B1)")  
-    if st.session_state.get("presentation_step", 0) == 0:
+    st.header("🎤 Presentation Practice (A2 & B1)")
+    if st.session_state.presentation_step == 0:
         handle_level_selection()
-    elif st.session_state.get("presentation_step", 0) == 1:
+    elif st.session_state.presentation_step == 1:
         handle_topic_input()
-    elif st.session_state.get("presentation_step", 0) == 2:
+    elif st.session_state.presentation_step == 2:
         handle_keywords_input()
     else:
         handle_chat_loop()
 
-    if st.session_state.get("presentation_step", 0) >= 3:
+    if st.session_state.presentation_step >= 3:
         done = (
             len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or [])
             if st.session_state.presentation_level == "A2"
@@ -838,4 +839,5 @@ def stage_7():
             reset_state(btn['reset_keys'])
             safe_rerun()
 
+# Invoke Stage 7
 stage_7()
