@@ -635,21 +635,22 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 def stage_7():
+    # --- DEBUG INFO: see what step you are on ---
+    st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
 
-st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
-
-
+    # Ensure we're in the correct app stage
     if st.session_state.get("step") != 7:
         return
 
-    # --- Initialize defaults ---
-    st.session_state.setdefault("presentation_step", 0)
-    st.session_state.setdefault("presentation_level", None)
-    st.session_state.setdefault("presentation_topic", "")
-    st.session_state.setdefault("a2_keywords", None)
-    st.session_state.setdefault("a2_keyword_progress", set())
-    st.session_state.setdefault("presentation_messages", [])
-    st.session_state.setdefault("presentation_turn_count", 0)
+    # --- Always reset the step if missing or broken (for new sessions) ---
+    if "presentation_step" not in st.session_state or st.session_state["presentation_step"] not in [0,1,2,3]:
+        st.session_state["presentation_step"] = 0
+        st.session_state["presentation_level"] = None
+        st.session_state["presentation_topic"] = ""
+        st.session_state["a2_keywords"] = None
+        st.session_state["a2_keyword_progress"] = set()
+        st.session_state["presentation_messages"] = []
+        st.session_state["presentation_turn_count"] = 0
 
     # --- Daily limit ---
     today = str(date.today())
