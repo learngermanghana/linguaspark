@@ -753,7 +753,7 @@ def stage_7():
 
     # --- Stage 3+: conversation/chat loop ---
     if st.session_state.presentation_step == 3:
-        # Auto-call AI if last message is from user or if just entering the chat stage
+        # Only call if last message is from the user (or after stage change)
         if st.session_state.presentation_messages and st.session_state.presentation_messages[-1]['role'] == 'user':
             generate_ai_reply_and_rerun()
 
