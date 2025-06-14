@@ -751,60 +751,63 @@ def stage_7():
                 st.warning("Enter at least 3 keywords.")
         return
 
-    # --- Stage 3+: conversation/chat loop ---
-    if st.session_state.presentation_step == 3:
-        # Only call if last message is from the user (or after stage change)
-        if st.session_state.presentation_messages and st.session_state.presentation_messages[-1]['role'] == 'user':
-            generate_ai_reply_and_rerun()
+def presentation_chat_loop():
+    if st.session_state.presentation_step != 3:
+        return
 
-        # Show chat history
-        for m in st.session_state.presentation_messages:
-            pnl = "👤" if m['role']=='user' else "🧑‍🏫"
-            st.markdown(f"**{pnl}**: {m['content']}")
+    # Only generate an AI reply if the last message is from the user,
+    # and if there isn't already a fresh AI reply.
+    msgs = st.session_state.presentation_messages
+    need_ai = (
+        msgs and msgs[-1]['role'] == 'user' and
+        (len(msgs) < 2 or msgs[-2]['role'] != 'assistant')
+    )
+    if need_ai:
+        generate_ai_reply_and_rerun()
 
-        inp = st.chat_input("Type your response...")
-        if inp:
-            st.session_state['daily_usage'][key] += 1
-            st.session_state.presentation_messages.append({'role':'user','content':inp})
-            st.session_state.presentation_turn_count += 1
-            if st.session_state.presentation_level == 'A2':
-                for k in st.session_state.a2_keywords or []:
-                    if k.lower() in inp.lower():
-                        st.session_state.a2_keyword_progress.add(k)
-            generate_ai_reply_and_rerun()
+    # Show chat history
+    for m in st.session_state.presentation_messages:
+        pnl = "👤" if m['role'] == 'user' else "🧑‍🏫"
+        st.markdown(f"**{pnl}**: {m['content']}")
 
-        # Progress bar
-        max_turns = 12
+    inp = st.chat_input("Type your response...")
+    if inp:
+        today = str(date.today())
+        code = st.session_state.get("student_code", "(unknown)")
+        key = f"{code}_{today}"
+        st.session_state['daily_usage'][key] += 1
+        st.session_state.presentation_messages.append({'role': 'user', 'content': inp})
+        st.session_state.presentation_turn_count += 1
         if st.session_state.presentation_level == 'A2':
-            kws = st.session_state.a2_keywords or []
-            done = len(st.session_state.a2_keyword_progress)
-            total = max(1, len(kws))
-            st.progress(done/total)
-            st.markdown(f"**Progress:** {done}/{total} keywords used")
-        else:
-            done = st.session_state.presentation_turn_count
-            st.progress(min(done/max_turns, 1.0))
-            st.markdown(f"**Progress:** Turn {done}/{max_turns}")
-        st.markdown("---")
+            for k in st.session_state.a2_keywords or []:
+                if k.lower() in inp.lower():
+                    st.session_state.a2_keyword_progress.add(k)
+        generate_ai_reply_and_rerun()
 
-        # Completion
-        a2_done = (st.session_state.presentation_level == 'A2' and done >= total)
-        b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
-        if a2_done or b1_done:
-            st.success("Practice complete! 🎉")
-            lines = [
-                f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
-                for m in st.session_state.presentation_messages
-            ]
-            st.subheader("Your Session Summary")
-            st.markdown("\n\n".join(lines))
-            if st.button("Restart Practice"):
-                for k in [
-                    'presentation_step', 'presentation_messages', 'presentation_turn_count',
-                    'a2_keywords', 'a2_keyword_progress'
-                ]:
-                    st.session_state.pop(k, None)
-                safe_rerun
+    # Progress bar and session end (unchanged)
+    max_turns = 12
+    done = st.session_state.presentation_turn_count
+    st.progress(min(done / max_turns, 1.0))
+    st.markdown(f"**Progress:** Turn {done}/{max_turns}")
+    st.markdown("---")
+
+    a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
+    b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
+    if a2_done or b1_done:
+        st.success("Practice complete! 🎉")
+        lines = [
+            f"👤 {m['content']}" if m['role'] == 'user' else f"🧑‍🏫 {m['content']}"
+            for m in st.session_state.presentation_messages
+        ]
+        st.subheader("Your Session Summary")
+        st.markdown("\n\n".join(lines))
+        if st.button("Restart Practice"):
+            for k in [
+                'presentation_step', 'presentation_messages', 'presentation_turn_count',
+                'a2_keywords', 'a2_keyword_progress'
+            ]:
+                st.session_state.pop(k, None)
+            safe_rerun()    
 
 # ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
 if st.session_state.get("step") == 7:
