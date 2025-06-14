@@ -432,7 +432,7 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Custom Chat: Level selection comes first, no chat box yet ---
+    # --- Custom Chat: Level selection comes first
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -445,13 +445,23 @@ if st.session_state["step"] == 5:
         )
         if st.button("Start Custom Chat"):
             st.session_state["custom_chat_level"] = level
+            st.session_state["a2_keywords"] = None
+            st.session_state["custom_topic_acknowledged"] = False
             st.session_state["messages"] = [{
                 "role": "assistant",
-                "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
+                "content": (
+                    "🎤 **Presentation Practice – A2 Level**\n\n"
+                    "Please write one short sentence to tell me your presentation topic. ✍️\n\n"
+                    "**Examples:**\n"
+                    "- Ich möchte über meine Familie sprechen.\n"
+                    "- Ich will über mein Lieblingsessen sprechen.\n"
+                    "- I want to talk about my school.\n\n"
+                    "💡 *Then I will help you step by step — first, I’ll ask for 3–4 keywords, then we’ll build your presentation together!*"
+                )
             }]
-        st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
+        st.stop()
 
-    # --- B1 Teil 3: First message
+    # --- Load first message for B1 Teil 3
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -464,29 +474,10 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
-    # --- Custom Chat: Ensure greeting if messages is empty (safety)
-    elif (
-        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
-        and st.session_state.get("custom_chat_level")
-        and not st.session_state["messages"]
-    ):
-        st.session_state["messages"].append({
-            "role": "assistant",
-            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
-        })
-
-    # --- Exam Mode: insert standard exam prompt
-    elif (
-        st.session_state.get("selected_mode", "").startswith("Geführte")
-        and not st.session_state["messages"]
-    ):
-        prompt = st.session_state.get("initial_prompt")
-        st.session_state["messages"].append({"role": "assistant", "content": prompt})
-
-    # -- Student input (audio or text) --
+    # --- Student input (text or audio)
     uploaded = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
-        type=["wav","mp3","ogg","m4a"],
+        type=["wav", "mp3", "ogg", "m4a"],
         key="stage5_audio_upload"
     )
     typed = st.chat_input("💬 Oder tippe deine Antwort hier...", key="stage5_typed_input")
@@ -514,7 +505,7 @@ if st.session_state["step"] == 5:
     used_today       = st.session_state["daily_usage"][usage_key]
     ai_just_replied  = False
 
-    # --- Build system prompt dynamically before OpenAI call ---
+    # === Handle user message ===
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning(
@@ -522,96 +513,49 @@ if st.session_state["step"] == 5:
                 "Please come back tomorrow or contact your tutor!"
             )
         else:
-            st.session_state["messages"].append({"role":"user","content":user_input})
+            st.session_state["messages"].append({"role": "user", "content": user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
             log_usage(student_code)
 
-            # SYSTEM PROMPT LOGIC
-            if is_b1_teil3:
-                b1_topic = st.session_state["current_b1_teil3_topic"]
-                ai_system_prompt = (
-                    "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
-                    f"The topic of your presentation is: {b1_topic}. "
-                    "The student is supposed to ask you TWO questions about your presentation and give you ONE positive feedback. "
-                    "1. Read the student's message. "
-                    "2. Tell the student if they have written two valid questions about the topic and one positive feedback (praise them if so, otherwise say politely what is missing). "
-                    "3. If the questions are good, answer them briefly (in simple German). "
-                    "4. Always end with clear encouragement in English. "
-                    "Be friendly, supportive, and exam-like. Never break character."
-                )
-            elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                lvl = st.session_state.get("custom_chat_level", "A2")
-                if lvl == "A2":
+            # === SYSTEM PROMPT for A2 Custom Chat with topic + keywords ===
+            if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
+                if not st.session_state.get("a2_keywords"):
                     ai_system_prompt = (
-                        "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
-                        "Reply at A2-level, using simple German sentences. "
-                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
-                        "Your reply format:\n"
-                        "- Your answer (German)\n"
-                        "- Correction (if needed, in German)\n"
-                        "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German)\n"
+                        "You are Herr Felix, an A2-level German teacher."
+                        " If a student gives you a topic (e.g. 'Ich möchte über meine Familie sprechen'), acknowledge the topic in English, and ask them to provide 3–4 German keywords they want to use."
+                        " Give examples like: Eltern, Bruder, Schule, Wochenende."
+                        " Do not continue with grammar help or follow-up questions until the keywords are provided."
                     )
                 else:
                     ai_system_prompt = (
-                        "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
-                        "Reply at B1-level in German. "
-                        "Correct and give a grammar tip for the student's last answer (always in English). "
-                        "Your reply format:\n"
-                        "- Your answer (German)\n"
-                        "- Correction (if needed, in German)\n"
-                        "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German)\n"
+                        "You are Herr Felix, an A2-level German teacher."
+                        " Use the keywords the student gave you to help them build a short presentation."
+                        " Suggest ideas in German, provide a sentence starter, give correction (in German), a grammar tip (in English), and a follow-up question."
                     )
             else:
-                lvl = st.session_state["selected_exam_level"]
-                if lvl == "A2":
-                    ai_system_prompt = (
-                        "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
-                        "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
-                        "1. Answer the student's message in very simple A2-level German (max 2–3 sentences). "
-                        "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                        "3. Give a short grammar tip (in English, one short sentence). "
-                        "4. If the answer is perfect, say so and still give a tip in English. "
-                        "5. End with a next question or prompt in German. "
-                        "Format your reply:\n"
-                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
-                    )
-                else:
-                    ai_system_prompt = (
-                        "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                        "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
-                        "1. Answer the student's message in B1-level German (max 2–3 sentences). "
-                        "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                        "3. Give a short grammar tip (in English, one short sentence). "
-                        "4. If the answer is perfect, say so and still give a tip in English. "
-                        "5. End with a next question or prompt in German. "
-                        "Format your reply:\n"
-                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
-                    )
+                ai_system_prompt = "You are Herr Felix. Just reply in German."
 
-            # --- Call OpenAI with only the last user message ---
             conversation = [
-                {"role":"system","content":ai_system_prompt},
+                {"role": "system", "content": ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
+
             try:
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp   = client.chat.completions.create(
-                    model="gpt-4o", messages=conversation
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation
                 )
                 ai_reply = resp.choices[0].message.content
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
 
-            st.session_state["messages"].append(
-                {"role":"assistant","content":ai_reply}
-            )
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
             ai_just_replied = True
 
-    # --- Render chat history with formatted AI replies ---
+    # === Render chat ===
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -624,21 +568,21 @@ if st.session_state["step"] == 5:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # --- Navigation buttons (single instance) ---
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
             prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
             st.session_state.update({
-                "step":prev,
-                "messages":[],
-                "turn_count":0,
-                "custom_chat_level":None,
-                "custom_level_prompted":False,
+                "step": prev,
+                "messages": [],
+                "turn_count": 0,
+                "custom_chat_level": None,
+                "a2_keywords": None
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
 
 # STAGE 6: Session Summary & Restart
 
