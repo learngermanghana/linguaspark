@@ -355,7 +355,6 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
-    
 # ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
@@ -384,7 +383,32 @@ if st.session_state["step"] == 5:
         remaining = total - completed
 
         st.markdown("**Completed:** " + ", ".join([f"✅ `{kw}`" for kw in completed]) if completed else "**Completed:** -")
-        st.markdown("**Remaining:** " + ", ".join([f"🕓 `{kw}`" for kw in remaining]) if remaining else "**Remaining:** 🎉 All done!")
+        st.markdown("**Remaining:** " + ", ".join([f"🕓 `{kw}`" for kw in remaining]) if remaining else "**Remaining:** 🎉 All keywords completed!")
+
+        if not remaining:
+            st.success("🎉 Great job! You've covered all your keywords. Now let's build your final presentation!")
+            if st.button("🧩 Build My Final Presentation"):
+                all_sentences = []
+                for msg in st.session_state["messages"]:
+                    if msg["role"] == "user":
+                        all_sentences.append(f"👤 {msg['content']}")
+                    elif msg["role"] == "assistant":
+                        all_sentences.append(f"🧑‍🏫 {msg['content']}")
+                final_presentation = "\n\n".join(all_sentences)
+                st.markdown("---")
+                st.subheader("📄 Your Final Presentation")
+                st.markdown(final_presentation)
+
+                import io
+                from fpdf import FPDF
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", size=12)
+                for line in final_presentation.split("\n"):
+                    pdf.multi_cell(0, 10, line)
+                pdf_output = io.BytesIO()
+                pdf.output(pdf_output)
+                st.download_button("📥 Download My Practice (PDF)", data=pdf_output.getvalue(), file_name="A2_Presentation_Practice.pdf")
 
         # Auto-track progress based on most recent user input
         if st.session_state.get("messages") and st.session_state["messages"][-1]["role"] == "user":
@@ -515,8 +539,8 @@ if st.session_state["step"] == 5:
                 reply_text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "\n\n🔹 **Idea Suggestions (in English):**", reply_text)
                 reply_text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "\n\n🔹 **Sentence Starter:**", reply_text)
                 reply_text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "\n\n✏️ **Correction:**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip:**", reply_text)
-                reply_text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip (English Explanation):**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question (in German):**", reply_text)
                 show_formatted_ai_reply(reply_text)
         else:
             with st.chat_message("user"):
