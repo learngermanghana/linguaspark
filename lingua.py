@@ -32,7 +32,7 @@ st.markdown(
 # File/database constants
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
-max_turns = 6
+max_turns = 15
 TEACHER_PASSWORD = "Felix029"
 USAGE_LOG_FILE = "usage_log.csv"
 
