@@ -637,22 +637,23 @@ if st.session_state.get("step") == 7:
     from fpdf import FPDF
     from openai import OpenAI
 
-    # Set up state defaults
-    for k, v in {
-        "presentation_step": 0,
-        "presentation_level": None,
-        "presentation_topic": "",
-        "a2_keywords": None,
-        "a2_keyword_progress": set(),
-        "presentation_messages": [],
-        "presentation_turn_count": 0
-    }.items():
+    # -------- Session state defaults for Stage 7 --------
+    defaults = dict(
+        presentation_step=0,
+        presentation_level=None,
+        presentation_topic="",
+        a2_keywords=None,
+        a2_keyword_progress=set(),
+        presentation_messages=[],
+        presentation_turn_count=0,
+    )
+    for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
     st.header("🎤 Presentation Practice (A2 & B1)")
 
-    # Step 0: Level selection
+    # ------ Step 0: Level selection ------
     if st.session_state.presentation_step == 0:
         level = st.radio("Select your level:", ["A2", "B1"], horizontal=True, key="pres_level_radio")
         if st.button("Start Presentation Practice"):
@@ -664,7 +665,7 @@ if st.session_state.get("step") == 7:
             st.session_state.a2_keyword_progress = set()
             st.session_state.presentation_topic = ""
 
-    # Step 1: Topic input
+    # ------ Step 1: Topic input ------
     elif st.session_state.presentation_step == 1:
         st.info(
             "Write a short sentence to tell me your presentation topic (in English or German).\n\n"
@@ -676,7 +677,7 @@ if st.session_state.get("step") == 7:
                 st.session_state.presentation_topic = topic.strip()
                 st.session_state.presentation_messages = [{"role": "user", "content": topic.strip()}]
                 if st.session_state.presentation_level == "B1":
-                    # Auto-respond and move to chat (step 3)
+                    # B1: Auto-generate first AI response with ideas, then move to chat
                     prompt = (
                         "You are Herr Felix, a B1 teacher. The student wants to prepare a presentation on this topic. "
                         "Suggest 2-3 main points, pros/cons, and help with structure, connectors, and grammar tips in English. "
@@ -693,12 +694,12 @@ if st.session_state.get("step") == 7:
                     except Exception as e:
                         ai_reply = "Sorry, something went wrong."
                     st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-                    st.session_state.presentation_step = 3  # <-- IMPORTANT
+                    st.session_state.presentation_step = 3
                 else:
-                    st.session_state.presentation_step = 2  # for A2
+                    st.session_state.presentation_step = 2
 
-    # Step 2: (A2 only) Keyword input, then advance to chat
-    elif st.session_state.presentation_step == 2 and st.session_state.presentation_level == "A2" and st.session_state.a2_keywords is None:
+    # ------ Step 2 (A2 only): Keywords input ------
+    elif st.session_state.presentation_step == 2 and st.session_state.presentation_level == "A2":
         st.info("Now enter **3–4 German keywords** you want to use, separated by commas. (z.B. Eltern, Bruder, Wochenende)")
         keywords = st.text_input("Your keywords:", key="presentation_keywords")
         if st.button("Submit Keywords"):
@@ -706,6 +707,7 @@ if st.session_state.get("step") == 7:
             if len(kws) >= 3:
                 st.session_state.a2_keywords = kws[:4]
                 st.session_state.a2_keyword_progress = set()
+                # AI responds immediately with ideas for those keywords
                 highlighted = ", ".join([f"**{kw}**" for kw in kws])
                 prompt = (
                     f"You are Herr Felix, an A2 German teacher helping a student with a presentation. "
@@ -722,19 +724,13 @@ if st.session_state.get("step") == 7:
                 except Exception as e:
                     ai_reply = "Sorry, something went wrong."
                 st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-                st.session_state.presentation_step = 3  # <-- CRITICAL: Advance to chat after keywords
+                st.session_state.presentation_step = 3
+            else:
+                st.warning("Please enter at least 3 keywords.")
 
-    # Step 3+: Chat input always appears
+    # ------ Step 3+: Chat and Progress ------
     if st.session_state.presentation_step >= 3:
-        # ... chat logic as before ...
-        # Display chat input, etc.
-        typed = st.chat_input("💬 Type your sentence or answer here...")
-        # (rest of chat code)
-
-
-    # Step 3+: Chat
-    elif st.session_state.presentation_step >= 3:
-        # Progress bar for A2
+        # Progress bar for A2 only
         if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
             total = len(st.session_state.a2_keywords)
             done = len(st.session_state.a2_keyword_progress)
@@ -745,36 +741,7 @@ if st.session_state.get("step") == 7:
             ]))
             st.markdown("---")
 
-        typed = st.chat_input("💬 Type your sentence or answer here...")
-        user_input = typed.strip() if typed else None
-
-        if user_input:
-            st.session_state.presentation_messages.append({"role": "user", "content": user_input})
-            st.session_state.presentation_turn_count += 1
-            # Mark keyword as covered (A2)
-            if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
-                for kw in st.session_state.a2_keywords:
-                    if kw.lower() in user_input.lower():
-                        st.session_state.a2_keyword_progress.add(kw)
-            # Prompt for AI
-            if st.session_state.presentation_level == "A2":
-                kws = st.session_state.a2_keywords
-                highlighted = ", ".join([f"**{kw}**" for kw in kws]) if kws else ""
-                prompt = (f"You are Herr Felix, an A2 German teacher helping a student with a presentation. "
-                          f"Use the keywords: {highlighted}. Give ideas in English, examples in German, a sentence starter, a correction (explain error in English), and a follow-up question in German.")
-            else:
-                prompt = ("You are Herr Felix, a B1 teacher. Guide the student to make a structured B1 presentation: introduction, 2–3 main points, conclusion. "
-                          "Give grammar feedback in English and encourage use of connectors.")
-            conversation = [{"role": "system", "content": prompt}] + st.session_state.presentation_messages[-2:]
-            try:
-                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp = client.chat.completions.create(model="gpt-4o", messages=conversation)
-                ai_reply = resp.choices[0].message.content
-            except Exception as e:
-                ai_reply = "Sorry, something went wrong."
-            st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-
-        # Chat history
+        # Show chat history
         for msg in st.session_state.presentation_messages:
             if msg["role"] == "assistant":
                 with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -789,7 +756,45 @@ if st.session_state.get("step") == 7:
                 with st.chat_message("user"):
                     st.markdown(f"🗣️ {msg['content']}")
 
-        # Finish: all keywords (A2) or max turns
+        # Chat input always available at this stage
+        typed = st.chat_input("💬 Type your sentence or answer here...")
+        if typed and typed.strip():
+            user_input = typed.strip()
+            st.session_state.presentation_messages.append({"role": "user", "content": user_input})
+            st.session_state.presentation_turn_count += 1
+
+            # Keyword progress (A2)
+            if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
+                for kw in st.session_state.a2_keywords:
+                    if kw.lower() in user_input.lower():
+                        st.session_state.a2_keyword_progress.add(kw)
+
+            # Prompt for next AI reply
+            if st.session_state.presentation_level == "A2":
+                kws = st.session_state.a2_keywords
+                highlighted = ", ".join([f"**{kw}**" for kw in kws]) if kws else ""
+                prompt = (
+                    f"You are Herr Felix, an A2 German teacher. Continue the chat for the student's presentation. "
+                    f"Use the keywords: {highlighted}. Each reply should focus on one keyword, offer a correction with English explanation, and a follow-up question in German."
+                )
+            else:
+                prompt = (
+                    "You are Herr Felix, a B1 teacher. Guide the student to make a structured B1 presentation: introduction, 2–3 main points, conclusion. "
+                    "Give grammar feedback in English and encourage use of connectors."
+                )
+            conversation = [
+                {"role": "system", "content": prompt},
+                st.session_state.presentation_messages[-1],
+            ]
+            try:
+                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                resp = client.chat.completions.create(model="gpt-4o", messages=conversation)
+                ai_reply = resp.choices[0].message.content
+            except Exception as e:
+                ai_reply = "Sorry, something went wrong."
+            st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
+
+        # --- Finish condition (all keywords covered for A2, or 8 turns) ---
         done = False
         if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
             if len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords):
@@ -822,5 +827,6 @@ if st.session_state.get("step") == 7:
                     "a2_keywords", "a2_keyword_progress",
                     "presentation_messages", "presentation_turn_count"
                 ]:
-                    if key in st.session_state:
-                        del st.session_state[key]
+                    if key in st.session_state: del st.session_state[key]
+                st.session_state["step"] = 7
+                st.experimental_rerun()
