@@ -635,12 +635,7 @@ if st.session_state["step"] == 6:
             st.session_state["corrections"] = [] 
 
 
-import streamlit as st
-from fpdf import FPDF
-from openai import OpenAI
-import io
-
-# Module-level configuration for default session state
+# stage 7: Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
     "presentation_level": None,
@@ -772,6 +767,7 @@ def handle_chat_loop():
                 except Exception:
                     ai_text = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_text})
+            safe_rerun()
 
     render_progress_bar()
     for msg in st.session_state.presentation_messages:
@@ -779,7 +775,6 @@ def handle_chat_loop():
             prefix = '🧑‍🏫 Herr Felix:' if msg['role']=='assistant' else '🗣️'
             st.markdown(f"{prefix} {msg['content']}")
 
-    user_msg = None
     if st.session_state.presentation_step >= 3:
         user_msg = st.chat_input(f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'...", key="chat_input")
         if user_msg:
@@ -790,11 +785,9 @@ def handle_chat_loop():
                     if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
                         st.session_state.a2_keyword_progress.append(kw)
             st.session_state.awaiting_ai_reply = True
-            safe_rerun()
 
 
 def stage_7():
-    # Always initialize and show header + selection
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
 
@@ -808,7 +801,6 @@ def stage_7():
     else:
         handle_chat_loop()
 
-    # Completion check
     if st.session_state.presentation_step >= 3:
         if st.session_state.presentation_level == "A2":
             done = len(st.session_state.a2_keyword_progress) == len(st.session_state.a2_keywords or [])
@@ -829,7 +821,6 @@ def stage_7():
             st.download_button("📥 Download PDF", data=pdf_bytes, file_name="Presentation_Practice.pdf")
             return
 
-    # Bottom controls
     cols = st.columns(len(action_buttons))
     for i, btn in enumerate(action_buttons):
         if cols[i].button(btn['label']):
@@ -838,5 +829,4 @@ def stage_7():
             reset_state(btn['reset_keys'])
             safe_rerun()
 
-# Run module
 stage_7()
