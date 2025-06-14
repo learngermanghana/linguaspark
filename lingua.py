@@ -812,7 +812,7 @@ def stage_7():
 
     # --- Chat loop (A2/B1) ---
     if st.session_state.presentation_step == 3:
-        presentation_chat_loop(generate_ai_reply_and_rerun, st.experimental_rerun)
+        presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
         return
 
 # --------- ACTIVATE STAGE 7 TAB WHEN NEEDED ---------
