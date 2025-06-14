@@ -666,9 +666,22 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     if need_ai:
         generate_ai_reply_and_rerun()
 
+    # --- Speech bubble chat history ---
     for m in st.session_state.presentation_messages:
-        pnl = "👤" if m['role'] == 'user' else "🧑‍🏫"
-        st.markdown(f"**{pnl}**: {m['content']}")
+        if m['role'] == 'user':
+            # User speech bubble: soft blue, left-aligned
+            st.markdown(
+                f"<div style='background:#e3f2fd; color:#1565c0; padding:0.7em 1em; border-radius:1em; display:inline-block; margin-bottom:6px;'>"
+                f"<b>👤</b> {m['content']}</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            # Herr Felix speech bubble: soft green, right-aligned
+            st.markdown(
+                f"<div style='background:#e8f5e9; color:#2e7d32; padding:0.7em 1em; border-radius:1em; display:inline-block; margin-bottom:6px; float:right;'>"
+                f"<b>🧑‍🏫 Herr Felix:</b> {m['content']}</div><div style='clear:both;'></div>",
+                unsafe_allow_html=True
+            )
 
     inp = st.chat_input("Type your response...")
     if inp:
@@ -690,6 +703,33 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
+    # ---- Extra Controls: Restart, Change Topic, Change Level ----
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔁 Restart Practice"):
+            for k in [
+                'presentation_step', 'presentation_messages', 'presentation_turn_count',
+                'a2_keywords', 'a2_keyword_progress'
+            ]:
+                st.session_state.pop(k, None)
+            safe_rerun()
+    with col2:
+        if st.button("✏️ Change Topic"):
+            st.session_state["presentation_step"] = 1
+            st.session_state["presentation_topic"] = ""
+            st.session_state["presentation_messages"] = []
+            safe_rerun()
+    with col3:
+        if st.button("⬆️ Change Level"):
+            for k in [
+                'presentation_step', 'presentation_level', 'presentation_topic',
+                'presentation_messages', 'presentation_turn_count',
+                'a2_keywords', 'a2_keyword_progress'
+            ]:
+                st.session_state.pop(k, None)
+            st.session_state["presentation_step"] = 0
+            safe_rerun()
+
     a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
     b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
     if a2_done or b1_done:
@@ -700,13 +740,7 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
         ]
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
-        if st.button("Restart Practice"):
-            for k in [
-                'presentation_step', 'presentation_messages', 'presentation_turn_count',
-                'a2_keywords', 'a2_keyword_progress'
-            ]:
-                st.session_state.pop(k, None)
-            safe_rerun()
+        # Optionally, add the three controls here too if you want them on the summary screen.
 
 
 def generate_ai_reply_and_rerun():
