@@ -646,11 +646,7 @@ def presentation_keywords_input(safe_rerun):
             if len(arr) >= 3:
                 st.session_state.a2_keywords = arr[:4]
                 st.session_state.presentation_step = 3
-                # Initialize first message so chat is never blank
-                st.session_state.presentation_messages = [{
-                    'role': 'assistant',
-                    'content': "Super! Let's start your presentation. Please type your first answer below."
-                }]
+                # Do NOT set a starter assistant message here! (AI will start the chat)
                 safe_rerun()
             else:
                 st.warning("Enter at least 3 keywords.")
@@ -660,16 +656,12 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     if st.session_state.presentation_step != 3:
         return
 
-    if not st.session_state.presentation_messages:
-        st.session_state.presentation_messages.append({
-            'role': 'assistant',
-            'content': "Let's start your presentation! Please type your first answer below."
-        })
-
     msgs = st.session_state.presentation_messages
+
+    # AUTO-START: If chat is empty or last is user, AI replies
     need_ai = (
-        msgs and msgs[-1]['role'] == 'user' and
-        (len(msgs) < 2 or msgs[-2]['role'] != 'assistant')
+        not msgs or
+        (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
     )
     if need_ai:
         generate_ai_reply_and_rerun()
@@ -716,38 +708,6 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
                 st.session_state.pop(k, None)
             safe_rerun()
 
-def stage_7():
-    st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
-    if st.session_state.get("step") != 7:
-        return
-
-    if "presentation_step" not in st.session_state or st.session_state["presentation_step"] not in [0,1,2,3]:
-        st.session_state["presentation_step"] = 0
-        st.session_state["presentation_level"] = None
-        st.session_state["presentation_topic"] = ""
-        st.session_state["a2_keywords"] = None
-        st.session_state["a2_keyword_progress"] = set()
-        st.session_state["presentation_messages"] = []
-        st.session_state["presentation_turn_count"] = 0
-
-    today = str(date.today())
-    code = st.session_state.get("student_code", "(unknown)")
-    key = f"{code}_{today}"
-    st.session_state.setdefault("daily_usage", {})
-    st.session_state["daily_usage"].setdefault(key, 0)
-    used = st.session_state["daily_usage"][key]
-    st.info(f"Student code: `{code}` | Chats today: {used}/25")
-    if used >= 25:
-        st.warning("You’ve reached today’s limit of 25 chat turns. Please come back tomorrow.")
-        return
-
-    st.header("🎤 Presentation Practice (A2 & B1)")
-
-    def safe_rerun():
-        try:
-            st.experimental_rerun()
-        except Exception:
-            pass
 
 def generate_ai_reply_and_rerun():
     placeholder = st.empty()
