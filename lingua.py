@@ -731,19 +731,18 @@ def stage_7():
     st.markdown(f"**Progress:** {label}")
     st.markdown("---")
 
-    # AI reply block
+        # AI reply block
     if st.session_state.get('awaiting_ai_reply'):
         st.session_state['awaiting_ai_reply'] = False
-        # build prompts
+        # build system prompt
         if st.session_state.presentation_level == 'A2':
-                        if st.session_state.presentation_level == 'A2':
-                kws = st.session_state.a2_keywords or []
-                kw_str = ", ".join(kws)
-                system = (
-                    "You are Herr Felix, an A2 teacher. Use the student's keywords and user messages to guide: "
-                    + (kw_str if kw_str else "(no keywords provided)")
-                    + ". Provide English suggestions, German examples, a starter sentence, an English correction, and a follow-up German question."
-                )
+            kws = st.session_state.a2_keywords or []
+            kw_str = ", ".join(kws) if kws else "(no keywords provided)"
+            system = (
+                "You are Herr Felix, an A2 teacher. Use the student's keywords and user messages to guide: "
+                + kw_str
+                + ". Provide English suggestions, German examples, a starter sentence, an English correction, and a follow-up German question."
+            )
         else:
             system = (
                 "You are Herr Felix, a B1 teacher. First, provide structure and ideas for the topic, then test understanding by asking clear questions in German, giving feedback in English."
@@ -762,7 +761,7 @@ def stage_7():
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_reply})
             safe_rerun()
 
-    # Display chat history (skip system roles)
+# Display chat history (skip system roles)
     for msg in st.session_state.presentation_messages:
         if msg['role'] == 'user':
             with st.chat_message('user'):
