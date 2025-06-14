@@ -637,7 +637,7 @@ if st.session_state.get("step") == 7:
     from fpdf import FPDF
     from openai import OpenAI
 
-    # Session state defaults
+    # Set up state defaults
     for k, v in {
         "presentation_step": 0,
         "presentation_level": None,
@@ -675,8 +675,8 @@ if st.session_state.get("step") == 7:
             if topic.strip():
                 st.session_state.presentation_topic = topic.strip()
                 st.session_state.presentation_messages = [{"role": "user", "content": topic.strip()}]
-                # For B1, generate AI response right away!
                 if st.session_state.presentation_level == "B1":
+                    # Auto-respond and move to chat (step 3)
                     prompt = (
                         "You are Herr Felix, a B1 teacher. The student wants to prepare a presentation on this topic. "
                         "Suggest 2-3 main points, pros/cons, and help with structure, connectors, and grammar tips in English. "
@@ -693,11 +693,11 @@ if st.session_state.get("step") == 7:
                     except Exception as e:
                         ai_reply = "Sorry, something went wrong."
                     st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-                    st.session_state.presentation_step = 3
+                    st.session_state.presentation_step = 3  # <-- IMPORTANT
                 else:
-                    st.session_state.presentation_step = 2
+                    st.session_state.presentation_step = 2  # for A2
 
-    # Step 2: A2 only – Keyword input & auto AI response
+    # Step 2: (A2 only) Keyword input, then advance to chat
     elif st.session_state.presentation_step == 2 and st.session_state.presentation_level == "A2" and st.session_state.a2_keywords is None:
         st.info("Now enter **3–4 German keywords** you want to use, separated by commas. (z.B. Eltern, Bruder, Wochenende)")
         keywords = st.text_input("Your keywords:", key="presentation_keywords")
@@ -722,7 +722,15 @@ if st.session_state.get("step") == 7:
                 except Exception as e:
                     ai_reply = "Sorry, something went wrong."
                 st.session_state.presentation_messages.append({"role": "assistant", "content": ai_reply})
-                st.session_state.presentation_step = 3
+                st.session_state.presentation_step = 3  # <-- CRITICAL: Advance to chat after keywords
+
+    # Step 3+: Chat input always appears
+    if st.session_state.presentation_step >= 3:
+        # ... chat logic as before ...
+        # Display chat input, etc.
+        typed = st.chat_input("💬 Type your sentence or answer here...")
+        # (rest of chat code)
+
 
     # Step 3+: Chat
     elif st.session_state.presentation_step >= 3:
