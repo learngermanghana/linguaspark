@@ -666,47 +666,47 @@ def stage_7():
             st.experimental_rerun()
         except Exception:
             pass
+def generate_ai_reply_and_rerun():
+    placeholder = st.empty()
+    placeholder.info("🧑‍🏫 Herr Felix is typing...")
 
-    def generate_ai_reply_and_rerun():
-        placeholder = st.empty()
-        placeholder.info("🧑‍🏫 Herr Felix is typing...")
+    if st.session_state.presentation_level == 'A2':
+        kws = list(st.session_state.a2_keywords or [])
+        next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
+        system = (
+            f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
+            "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct in English, and ask a German follow-up question."
+        )
+    else:  # B1
+        topic = st.session_state.presentation_topic
+        steps = [
+            f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
+            f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
+            f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
+            f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
+            f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
+            f"Summarize student's points in German and highlight progress. Explanations/corrections in English."
+        ]
+        idx = min(st.session_state.presentation_turn_count, len(steps)-1)
+        system = steps[idx]
 
-        if st.session_state.presentation_level == 'A2':
-            kws = list(st.session_state.a2_keywords or [])
-            next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
-            system = (
-                f"You are Herr Felix, an engaging A2 teacher. Focus solely on the keyword '{next_kw}'. "
-                "Encourage warmly, suggest an English sentence, give a German example, hint for sentence start, correct in English, and ask a German follow-up question."
-            )
-        else:  # B1
-            steps = [
-                "Ask the student's opinion on the topic in German and give positive feedback in English.",
-                "Also share your opinion so the student can pick some points from you also.",
-                "Ask the student to list advantages and disadvantages in German, praise, and provide an English tip.",
-                "Ask how this topic relates to their homeland in German, then encouraging English feedback.",
-                "Ask for a conclusion or recommendation in German, cheer on in English.",
-                "Summarize points in German, highlight progress, motivate further learning."
-            ]
-            idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-            system = steps[idx] + " If you correct a sentence or answer, always give the correction/explanation in English."
+    last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
+    messages = [{'role':'system','content':system}]
+    if last:
+        messages.append(last)
 
-        last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
-        messages = [{'role':'system','content':system}]
-        if last:
-            messages.append(last)
+    try:
+        resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+            model='gpt-4o', messages=messages
+        )
+        reply = resp.choices[0].message.content
+    except Exception:
+        reply = "Sorry, something went wrong."
 
-        try:
-            resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                model='gpt-4o', messages=messages
-            )
-            reply = resp.choices[0].message.content
-        except Exception:
-            reply = "Sorry, something went wrong."
-
-        placeholder.empty()
-        st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
-        st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-        safe_rerun()
+    placeholder.empty()
+    st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
+    st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    safe_rerun()
 
     # Stage 0: select level
     if st.session_state.presentation_step == 0:
