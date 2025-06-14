@@ -636,10 +636,45 @@ if st.session_state["step"] == 6:
 
 # --- Presentation Practice Module ---
 
-def initialize_state(defaults):
-    """Initialize session state defaults."""
+# Module-level configuration for default session state
+STATE_DEFAULTS = {
+    "presentation_step": 0,
+    "presentation_level": None,
+    "presentation_topic": "",
+    "a2_keywords": None,
+    "a2_keyword_progress": set(),
+    "presentation_messages": [],
+    "presentation_turn_count": 0,
+    "b1_init_done": False,
+    "awaiting_ai_reply": False
+}
+
+# Bottom button configurations
+action_buttons = [
+    {"label": "🔄 Restart Practice", "reset_keys": list(STATE_DEFAULTS.keys()), "set_step": None},
+    {"label": "📝 Change Topic", "reset_keys": ["presentation_messages", "presentation_turn_count", "awaiting_ai_reply", "b1_init_done"], "set_step": 1},
+    {"label": "🔧 Change Level", "reset_keys": list(STATE_DEFAULTS.keys()), "set_step": 0},
+]
+
+
+def initialize_state(defaults=STATE_DEFAULTS):
+    """Initialize session state defaults using STATE_DEFAULTS by default."""
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
+
+
+def safe_rerun():
+    """Gracefully rerun the Streamlit app without error."""
+    try:
+        st.experimental_rerun()
+    except AttributeError:
+        pass
+
+
+def reset_state(keys):
+    """Remove specified keys from session state."""
+    for k in keys:
+        st.session_state.pop(k, None)
 
 
 def handle_level_selection():
@@ -648,9 +683,11 @@ def handle_level_selection():
     if st.button("Start Presentation Practice"):
         st.session_state.presentation_level = level
         st.session_state.presentation_step = 1
-        reset_state(["presentation_messages", "presentation_turn_count",
-                     "a2_keywords", "a2_keyword_progress",
-                     "b1_init_done", "awaiting_ai_reply"])
+        reset_state([
+            "presentation_messages", "presentation_turn_count",
+            "a2_keywords", "a2_keyword_progress",
+            "b1_init_done", "awaiting_ai_reply"
+        ])
         safe_rerun()
 
 
@@ -661,11 +698,7 @@ def handle_topic_input():
     if st.button("Submit Topic") and topic.strip():
         st.session_state.presentation_topic = topic.strip()
         st.session_state.presentation_messages = [{"role": "user", "content": topic.strip()}]
-        # Next stage depends on level
-        if st.session_state.presentation_level == "A2":
-            st.session_state.presentation_step = 2
-        else:
-            st.session_state.presentation_step = 3
+        st.session_state.presentation_step = 2 if st.session_state.presentation_level == "A2" else 3
         st.session_state.awaiting_ai_reply = True
         st.session_state.b1_init_done = False
         safe_rerun()
@@ -674,6 +707,8 @@ def handle_topic_input():
 def handle_keywords_input():
     """Stage 2: Collect 3–4 A2 keywords."""
     st.info("Enter 3–4 German keywords separated by commas.")
+    topic = st.session_state.presentation_topic or "Ihres Themas"
+    st.caption(f"Beispiel: 'Familie, Freunde, Hobby, Arbeit' basierend auf {topic}.")
     kws = st.text_input("Keywords (comma-separated):", key="keywords_input")
     if st.button("Submit Keywords"):
         arr = [kw.strip() for kw in kws.split(",") if kw.strip()]
@@ -694,7 +729,10 @@ def render_progress_bar():
         kws = st.session_state.a2_keywords or []
         total = max(len(kws), 1)
         done = len(st.session_state.a2_keyword_progress)
-        label = " | ".join([f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}" for kw in kws])
+        label = " | ".join([
+            f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}"
+            for kw in kws
+        ])
     else:
         total = max_turns
         done = st.session_state.presentation_turn_count
@@ -737,7 +775,6 @@ def handle_chat_loop():
     if user_msg:
         st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
         st.session_state.presentation_turn_count += 1
-        # Track A2 keyword usage
         if st.session_state.presentation_level == "A2":
             for kw in (st.session_state.a2_keywords or []):
                 if kw.lower() in user_msg.lower():
@@ -751,14 +788,14 @@ def handle_chat_loop():
         if last_user:
             with st.spinner("Thinking..."):
                 try:
-                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY'])
-                    result = resp.chat.completions.create(model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user])
-                    ai_text = result.choices[0].message.content
+                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+                        model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user]
+                    )
+                    ai_text = resp.choices[0].message.content
                 except Exception:
                     ai_text = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_text})
             safe_rerun()
-    # Display history
     for msg in st.session_state.presentation_messages:
         role = 'user' if msg['role']=='user' else 'assistant'
         avatar = None if role=='user' else '🧑‍🏫'
@@ -770,20 +807,8 @@ def stage_7():
     """Orchestrate Presentation Practice stages based on session state."""
     if st.session_state.get("step") != 7:
         return
-    defaults = {
-        "presentation_step": 0,
-        "presentation_level": None,
-        "presentation_topic": "",
-        "a2_keywords": None,
-        "a2_keyword_progress": set(),
-        "presentation_messages": [],
-        "presentation_turn_count": 0,
-        "b1_init_done": False,
-        "awaiting_ai_reply": False
-    }
-    initialize_state(defaults)
+    initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
-    # Map stages to handlers
     stage = st.session_state.presentation_step
     if stage == 0:
         handle_level_selection()
@@ -793,19 +818,14 @@ def stage_7():
         handle_keywords_input()
     else:
         handle_chat_loop()
-    # Bottom control buttons
-    cols = st.columns(3)
-    if cols[0].button("🔄 Restart Practice"):
-        initialize_state(defaults)
-        safe_rerun()
-    if cols[1].button("📝 Change Topic"):
-        st.session_state.presentation_step = 1
-        reset_state(["presentation_messages","presentation_turn_count","awaiting_ai_reply","b1_init_done"])
-        safe_rerun()
-    if cols[2].button("🔧 Change Level"):
-        st.session_state.presentation_step = 0
-        initialize_state(defaults)
-        safe_rerun()
+    # Bottom control buttons generated from config
+    cols = st.columns(len(action_buttons))
+    for i, btn in enumerate(action_buttons):
+        if cols[i].button(btn["label"]):
+            if btn["set_step"] is not None:
+                st.session_state.presentation_step = btn["set_step"]
+            reset_state(btn["reset_keys"])
+            safe_rerun()
 
 # Execute stage 7
 stage_7()
