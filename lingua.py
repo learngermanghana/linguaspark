@@ -633,7 +633,6 @@ if st.session_state["step"] == 6:
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
-
 def stage_7():
     # Only run this stage if step == 7
     if st.session_state.get("step") != 7:
@@ -809,55 +808,9 @@ def stage_7():
         for m in st.session_state.get('presentation_messages', []):
             prefix = "👤" if m['role']=='user' else "🧑‍🏫"
             lines.append(f"{prefix} {m['content']}")
-        final = "
+                final = "
 
-".join(lines)
-        st.subheader("📄 Your Presentation Summary")
-        st.markdown(final)
-        # Scoring & feedback
-        if st.session_state.get('presentation_level') == 'A2':
-            total_kw = len(st.session_state.get('a2_keywords') or [])
-            covered = len(st.session_state.get('a2_keyword_progress', []))
-            score = int((covered / total_kw) * 10) if total_kw else 0
-            st.markdown(f"**Your score:** {score}/10 keywords covered.")
-            st.markdown("**Tips:** Practice using the remaining keywords in sentences, and review the examples provided.")
-            # Provide example sentences for each keyword
-            st.markdown("**Keyword Examples:**")
-            for kw in st.session_state.get('a2_keywords') or []:
-                st.markdown(f"- **{kw}**: {kw} ist sehr wichtig.")
-        else:
-            turns = st.session_state.get('presentation_turn_count', 0)
-            score = min(turns, 8)
-            st.markdown(f"**Your score:** {score}/8 conversation turns completed.")
-            st.markdown("**Tips:** Expand on your answers with more details, and use varied connectors to improve fluency.")
-        st.markdown("---")
-        return
-
-    # Display history
-    for msg in st.session_state.presentation_messages:
-        if msg['role'] == 'user':
-            with st.chat_message('user'):
-                st.markdown(f"🗣️ {msg['content']}")
-        else:
-            with st.chat_message('assistant', avatar='🧑‍🏫'):
-                st.markdown(f"**🧑‍🏫 Herr Felix:** {msg['content']}", unsafe_allow_html=True)
-
-    # Bottom controls
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("🔄 Restart Practice"):
-            for k in ['presentation_step','presentation_level','presentation_topic','a2_keywords','a2_keyword_progress','presentation_messages','presentation_turn_count','awaiting_ai_reply']:
-                st.session_state.pop(k, None)
-            safe_rerun()
-    with c2:
-        if st.button("📝 Change Topic"):
-            st.session_state.presentation_step = 1
-            st.session_state.presentation_messages.clear()
-            st.session_state.presentation_turn_count = 0
-            st.session_state['awaiting_ai_reply'] = False
-            safe_rerun()
-    with c3:
-        if st.button("🔧 Change Level"):
+".join(lines)):
             st.session_state.presentation_step = 0
             for k in ['presentation_messages','presentation_turn_count','presentation_topic','a2_keywords','a2_keyword_progress','awaiting_ai_reply']:
                 st.session_state.pop(k, None)
