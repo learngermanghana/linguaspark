@@ -640,7 +640,6 @@ if st.session_state["step"] == 5:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
 
-
 # STAGE 6: Session Summary & Restart
 
 if st.session_state["step"] == 6:
@@ -654,14 +653,32 @@ if st.session_state["step"] == 6:
         "Start again or choose another mode?",
         unsafe_allow_html=True
     )
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔁 Start New Session", key="stage6_restart"):
-            st.session_state["step"] = 1
+            # Reset based on the previous mode
+            if st.session_state.get("selected_mode") == "Geführte Prüfungssimulation (Exam Mode)":
+                st.session_state["step"] = 4  # Restart from exam part selection
+            else:
+                st.session_state["step"] = 5  # Continue in Custom Chat mode
+
+            # Clear session state
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["custom_topic"] = ""
+            st.session_state["initial_prompt"] = ""
+            st.session_state["custom_chat_level"] = None
+            st.session_state["selected_exam_level"] = ""
+            st.session_state["selected_teil"] = ""
+
+    with col2:
+        if st.button("⬅️ Back to Mode Selection", key="stage6_back"):
+            st.session_state["step"] = 3
+            st.session_state["messages"] = []
+            st.session_state["turn_count"] = 0
+            st.session_state["corrections"] = []
     with col2:
         if st.button("⬅️ Back to Mode Selection", key="stage6_back"):
             st.session_state["step"] = 3
