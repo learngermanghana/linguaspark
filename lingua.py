@@ -783,9 +783,9 @@ def stage_7():
             f"👤 {m['content']}" if m['role']=='user' else f"🧑‍🏫 {m['content']}"
             for m in st.session_state.presentation_messages
         ]
-        summary = "
+                summary = "
 
-".join(lines)
+".join(lines).join(lines)
         st.subheader("📄 Your Session Summary")
         st.markdown(summary)
         # Scoring, strengths, weaknesses, suggestions
@@ -808,3 +808,4 @@ def stage_7():
             for k in ['presentation_step','presentation_messages','presentation_turn_count','a2_keywords','a2_kw_counts']:
                 st.session_state.pop(k, None)
             safe_rerun()
+
