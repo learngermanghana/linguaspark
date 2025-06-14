@@ -630,26 +630,26 @@ if st.session_state["step"] == 6:
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
-
+            
 # ------ STAGE 7: Presentation Practice ------
 if st.session_state.get("step") == 7:
-import re, io
-from fpdf import FPDF
-from openai import OpenAI
+    import re, io
+    from fpdf import FPDF
+    from openai import OpenAI
 
-# Initialize defaults
-defaults = {
-"presentation_step": 0,
-"presentation_level": None,
-"presentation_topic": "",
-"a2_keywords": None,
-"a2_keyword_progress": set(),
-"presentation_messages": [],
-"presentation_turn_count": 0,
-}
-for key, val in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = val
+    # Initialize defaults
+    defaults = {
+        "presentation_step": 0,
+        "presentation_level": None,
+        "presentation_topic": "",
+        "a2_keywords": None,
+        "a2_keyword_progress": set(),
+        "presentation_messages": [],
+        "presentation_turn_count": 0,
+    }
+    for key, val in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
 st.header("🎤 Presentation Practice (A2 & B1)")
 
