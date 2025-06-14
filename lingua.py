@@ -633,10 +633,6 @@ if st.session_state["step"] == 6:
             
 # ------ STAGE 7: Presentation Practice ------
 if st.session_state.get("step") == 7:
-    import re
-    from fpdf import FPDF
-    from openai import OpenAI
-
     # -------- Session state defaults for Stage 7 --------
     defaults = dict(
         presentation_step=0,
@@ -733,8 +729,8 @@ if st.session_state.get("step") == 7:
         # Progress bar for A2 only
         if st.session_state.presentation_level == "A2" and st.session_state.a2_keywords:
             total = len(st.session_state.a2_keywords)
-            done = len(st.session_state.a2_keyword_progress)
-            st.progress(done / total)
+            done_count = len(st.session_state.a2_keyword_progress)
+            st.progress(done_count / total)
             st.markdown("**Progress:** " + " | ".join([
                 f"✅ `{kw}`" if kw in st.session_state.a2_keyword_progress else f"⬜ `{kw}`"
                 for kw in st.session_state.a2_keywords
@@ -812,14 +808,16 @@ if st.session_state.get("step") == 7:
             st.subheader("📄 Your Final Presentation")
             st.markdown(final_presentation)
 
+            # --- PDF Generation (fixed for FPDF 1.x and 2.x) ---
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
             for line in final_presentation.split("\n"):
                 pdf.multi_cell(0, 10, line)
-            pdf_output = io.BytesIO()
-            pdf.output(pdf_output)
-            st.download_button("📥 Download PDF", data=pdf_output.getvalue(), file_name="Presentation_Practice.pdf")
+
+            # Use output(dest='S') for cross-version safety
+            pdf_bytes = pdf.output(dest="S").encode("latin1")
+            st.download_button("📥 Download PDF", data=pdf_bytes, file_name="Presentation_Practice.pdf")
 
             if st.button("🔁 Start New Practice"):
                 for key in [
@@ -827,6 +825,7 @@ if st.session_state.get("step") == 7:
                     "a2_keywords", "a2_keyword_progress",
                     "presentation_messages", "presentation_turn_count"
                 ]:
-                    if key in st.session_state: del st.session_state[key]
+                    if key in st.session_state:
+                        del st.session_state[key]
                 st.session_state["step"] = 7
                 st.experimental_rerun()
