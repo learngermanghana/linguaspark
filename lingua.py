@@ -658,7 +658,7 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
 
     msgs = st.session_state.presentation_messages
 
-    # AUTO-START: If chat is empty or last is user, AI replies
+    # --- AUTO-START: AI replies if chat is empty or last is user ---
     need_ai = (
         not msgs or
         (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
@@ -666,23 +666,32 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     if need_ai:
         generate_ai_reply_and_rerun()
 
-    # --- Speech bubble chat history ---
+    # --- SPEECH BUBBLES: Show chat history ---
     for m in st.session_state.presentation_messages:
         if m['role'] == 'user':
-            # User speech bubble: soft blue, left-aligned
+            # User speech bubble: left
             st.markdown(
-                f"<div style='background:#e3f2fd; color:#1565c0; padding:0.7em 1em; border-radius:1em; display:inline-block; margin-bottom:6px;'>"
-                f"<b>👤</b> {m['content']}</div>",
-                unsafe_allow_html=True
+                f"""
+                <div style='display:flex;align-items:flex-start;margin-bottom:10px;'>
+                  <div style='background:#e3f2fd;color:#1565c0;padding:0.7em 1em;border-radius:1em 1em 1em 0;max-width:80%;display:inline-block;'>
+                    <b>👤</b> {m['content']}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True
             )
         else:
-            # Herr Felix speech bubble: soft green, right-aligned
+            # Herr Felix speech bubble: right
             st.markdown(
-                f"<div style='background:#e8f5e9; color:#2e7d32; padding:0.7em 1em; border-radius:1em; display:inline-block; margin-bottom:6px; float:right;'>"
-                f"<b>🧑‍🏫 Herr Felix:</b> {m['content']}</div><div style='clear:both;'></div>",
-                unsafe_allow_html=True
+                f"""
+                <div style='display:flex;justify-content:flex-end;margin-bottom:10px;'>
+                  <div style='background:#e8f5e9;color:#2e7d32;padding:0.7em 1em;border-radius:1em 1em 0 1em;max-width:80%;display:inline-block;'>
+                    <b>🧑‍🏫 Herr Felix:</b> {m['content']}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True
             )
 
+    # --- INPUT ---
     inp = st.chat_input("Type your response...")
     if inp:
         today = str(date.today())
@@ -697,38 +706,50 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
                     st.session_state.a2_keyword_progress.add(k)
         generate_ai_reply_and_rerun()
 
+    # --- PROGRESS & CONTROLS ---
     max_turns = 12
     done = st.session_state.presentation_turn_count
     st.progress(min(done / max_turns, 1.0))
     st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
-    # ---- Extra Controls: Restart, Change Topic, Change Level ----
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🔁 Restart Practice"):
-            for k in [
-                'presentation_step', 'presentation_messages', 'presentation_turn_count',
-                'a2_keywords', 'a2_keyword_progress'
-            ]:
-                st.session_state.pop(k, None)
-            safe_rerun()
-    with col2:
-        if st.button("✏️ Change Topic"):
-            st.session_state["presentation_step"] = 1
-            st.session_state["presentation_topic"] = ""
-            st.session_state["presentation_messages"] = []
-            safe_rerun()
-    with col3:
-        if st.button("⬆️ Change Level"):
-            for k in [
-                'presentation_step', 'presentation_level', 'presentation_topic',
-                'presentation_messages', 'presentation_turn_count',
-                'a2_keywords', 'a2_keyword_progress'
-            ]:
-                st.session_state.pop(k, None)
-            st.session_state["presentation_step"] = 0
-            safe_rerun()
+    a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
+    b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
+    if a2_done or b1_done:
+        st.success("Practice complete! 🎉")
+        lines = [
+            f"👤 {m['content']}" if m['role'] == 'user' else f"🧑‍🏫 {m['content']}"
+            for m in st.session_state.presentation_messages
+        ]
+        st.subheader("Your Session Summary")
+        st.markdown("\n\n".join(lines))
+
+        # --- Controls: Restart, Change Topic, Change Level ---
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("🔁 Restart Practice"):
+                for k in [
+                    'presentation_step', 'presentation_messages', 'presentation_turn_count',
+                    'a2_keywords', 'a2_keyword_progress'
+                ]:
+                    st.session_state.pop(k, None)
+                safe_rerun()
+        with col2:
+            if st.button("✏️ Change Topic"):
+                st.session_state["presentation_step"] = 1
+                st.session_state["presentation_topic"] = ""
+                st.session_state["presentation_messages"] = []
+                safe_rerun()
+        with col3:
+            if st.button("⬆️ Change Level"):
+                for k in [
+                    'presentation_step', 'presentation_level', 'presentation_topic',
+                    'presentation_messages', 'presentation_turn_count',
+                    'a2_keywords', 'a2_keyword_progress'
+                ]:
+                    st.session_state.pop(k, None)
+                st.session_state["presentation_step"] = 0
+                safe_rerun()
 
     a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
     b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
