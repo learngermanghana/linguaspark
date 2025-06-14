@@ -412,7 +412,6 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
-
 # ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
@@ -461,7 +460,6 @@ if st.session_state["step"] == 5:
             }]
         st.stop()
 
-    # --- Load first message for B1 Teil 3
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -474,7 +472,6 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
-    # --- Student input (text or audio)
     uploaded = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav", "mp3", "ogg", "m4a"],
@@ -505,7 +502,6 @@ if st.session_state["step"] == 5:
     used_today       = st.session_state["daily_usage"][usage_key]
     ai_just_replied  = False
 
-    # === Handle user message ===
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning(
@@ -518,20 +514,24 @@ if st.session_state["step"] == 5:
             st.session_state["daily_usage"][usage_key] += 1
             log_usage(student_code)
 
-            # === SYSTEM PROMPT for A2 Custom Chat with topic + keywords ===
+            import re
+            user_words = re.findall(r"\b[a-zäöüß]+\b", user_input.lower())
+
             if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
+                if not st.session_state.get("a2_keywords") and len(user_words) >= 3:
+                    st.session_state["a2_keywords"] = user_words[:4]
+
                 if not st.session_state.get("a2_keywords"):
                     ai_system_prompt = (
-                        "You are Herr Felix, an A2-level German teacher."
-                        " If a student gives you a topic (e.g. 'Ich möchte über meine Familie sprechen'), acknowledge the topic in English, and ask them to provide 3–4 German keywords they want to use."
-                        " Give examples like: Eltern, Bruder, Schule, Wochenende."
-                        " Do not continue with grammar help or follow-up questions until the keywords are provided."
+                        "You are Herr Felix, an A2-level German teacher. The student gave a topic but not their 3–4 German keywords yet."
+                        " Ask once in English with examples like 'Eltern, Bruder, Wochenende'."
+                        " Do not repeat this request if they already gave them."
                     )
                 else:
                     ai_system_prompt = (
-                        "You are Herr Felix, an A2-level German teacher."
-                        " Use the keywords the student gave you to help them build a short presentation."
-                        " Suggest ideas in German, provide a sentence starter, give correction (in German), a grammar tip (in English), and a follow-up question."
+                        "You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
+                        " Use their keywords to give idea suggestions (in German), a sentence starter, a correction (in German),"
+                        " a grammar tip (in English), and a follow-up question (in German)."
                     )
             else:
                 ai_system_prompt = "You are Herr Felix. Just reply in German."
@@ -555,7 +555,6 @@ if st.session_state["step"] == 5:
             st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
             ai_just_replied = True
 
-    # === Render chat ===
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
