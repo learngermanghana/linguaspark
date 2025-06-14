@@ -634,11 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-import streamlit as st
-from fpdf import FPDF
-from openai import OpenAI
-import io
-
 # Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
@@ -663,7 +658,6 @@ action_buttons = [
 def initialize_state(defaults=STATE_DEFAULTS):
     """Initialize session state defaults using STATE_DEFAULTS by default."""
     for k, v in defaults.items():
-        # For mutable defaults like lists, ensure we get a fresh copy
         if isinstance(v, list):
             st.session_state.setdefault(k, v.copy())
         else:
@@ -734,9 +728,7 @@ def render_progress_bar():
         kws = st.session_state.a2_keywords or []
         total = len(kws)
         done = len(st.session_state.a2_keyword_progress)
-        # Start and end included: 0/total at start, total/total at end
         ratio = done / total if total else 0
-        # Visual labels for each keyword
         label = " | ".join([
             f"✅ {kw}" if kw in st.session_state.a2_keyword_progress else f"⬜ {kw}" 
             for kw in kws
@@ -783,20 +775,7 @@ def build_system_prompt():
 
 def handle_chat_loop():
     """Stage 3+: Process user chat input and AI responses."""
-    # Always render progress bar at start of loop
-    render_progress_bar()
-
-    placeholder = f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'..."
-    user_msg = st.chat_input(placeholder, key="chat_input")
-    if user_msg:
-        st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
-        st.session_state.presentation_turn_count += 1
-        if st.session_state.presentation_level == "A2":
-            for kw in (st.session_state.a2_keywords or []):
-                if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
-                    st.session_state.a2_keyword_progress.append(kw)
-        st.session_state.awaiting_ai_reply = True
-
+    # If an AI response is pending, generate it immediately
     if st.session_state.awaiting_ai_reply:
         st.session_state.awaiting_ai_reply = False
         prompt = build_system_prompt()
@@ -811,9 +790,9 @@ def handle_chat_loop():
                 except Exception:
                     ai_text = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_text})
-            safe_rerun()
 
-    # Display full conversation so far
+    # Always render progress bar and conversation
+    render_progress_bar()
     for msg in st.session_state.presentation_messages:
         if msg['role'] == 'user':
             with st.chat_message('user'):
@@ -821,6 +800,19 @@ def handle_chat_loop():
         else:
             with st.chat_message('assistant', avatar='🧑‍🏫'):
                 st.markdown(f"**🧑‍🏫 Herr Felix:** {msg['content']}", unsafe_allow_html=True)
+
+    # Then render the chat input box
+    placeholder = f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'..."
+    user_msg = st.chat_input(placeholder, key="chat_input")
+    if user_msg:
+        st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
+        st.session_state.presentation_turn_count += 1
+        if st.session_state.presentation_level == "A2":
+            for kw in (st.session_state.a2_keywords or []):
+                if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
+                    st.session_state.a2_keyword_progress.append(kw)
+        st.session_state.awaiting_ai_reply = True
+        safe_rerun()
 
 
 def stage_7():
@@ -881,3 +873,4 @@ def stage_7():
 
 # Execute the Presentation Practice module
 stage_7()
+
