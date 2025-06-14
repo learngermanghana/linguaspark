@@ -810,6 +810,6 @@ def presentation_chat_loop():
             safe_rerun()    
 
 # ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
-if st.session_state.get("step") == 7:
+if st.session_state.get("step") == 3:
     stage_7()
 
