@@ -634,8 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-# --- Presentation Practice Module ---
-
 import streamlit as st
 from fpdf import FPDF
 from openai import OpenAI
@@ -777,7 +775,9 @@ def handle_chat_loop():
         if last_user:
             with st.spinner("Thinking..."):
                 try:
-                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user])
+                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+                        model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user]
+                    )
                     ai_text = resp.choices[0].message.content
                 except Exception:
                     ai_text = "Sorry, something went wrong."
@@ -794,7 +794,8 @@ def handle_chat_loop():
 
 def stage_7():
     """Orchestrate Presentation Practice stages based on session state."""
-    if st.session_state.get("step") != 7:
+    # only run when the flow has started
+    if st.session_state.get("presentation_step", 0) == 0:
         return
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
@@ -836,7 +837,7 @@ def stage_7():
             st.download_button("📥 Download PDF", data=buf.getvalue(), file_name="Presentation_Practice.pdf")
             return
 
-    # Bottom control buttons generated from config
+    # Bottom control buttons
     cols = st.columns(len(action_buttons))
     for i, btn in enumerate(action_buttons):
         if cols[i].button(btn["label"]):
@@ -845,5 +846,6 @@ def stage_7():
             reset_state(btn["reset_keys"])
             safe_rerun()
 
-# Execute stage 7
+# Execute the Presentation Practice module
 stage_7()
+
