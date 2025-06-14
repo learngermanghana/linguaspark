@@ -162,6 +162,7 @@ with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=F
             st.session_state["teacher_authenticated"] = False
 
 # ---- Global session state for app navigation ----
+# Core keys for general navigation
 if "step" not in st.session_state:
     st.session_state["step"] = 1
 if "student_code" not in st.session_state:
@@ -174,20 +175,21 @@ if "corrections" not in st.session_state:
     st.session_state["corrections"] = []
 if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
-# STAGE 3: Student Login, Welcome, and Mode Selection
 
-# ------ Stage 1: Student Login ------
-if st.session_state["step"] == 1:
-    st.title("Student Login")
-    code = st.text_input("🔑 Enter your student code to begin:")
-    if st.button("Next ➡️", key="stage1_next"):
-        code_clean = code.strip().lower()
-        df_codes = load_codes()
-        if code_clean in df_codes["code"].dropna().tolist():
-            st.session_state["student_code"] = code_clean
-            st.session_state["step"] = 2
-        else:
-            st.error("This code is not recognized. Please check with your tutor.")
+# --- Robust: Always initialize presentation session keys (for stage_7) ---
+presentation_defaults = {
+    "presentation_step": 0,
+    "presentation_level": None,
+    "presentation_topic": "",
+    "a2_keywords": None,
+    "a2_keyword_progress": set(),
+    "presentation_messages": [],
+    "presentation_turn_count": 0
+}
+for k, v in presentation_defaults.items():
+    if k not in st.session_state:
+        # Use .copy() for mutable types so session_state doesn't share references
+        st.session_state[k] = v.copy() if isinstance(v, (list, set, dict)) else v
 
 # ------ Stage 2: Welcome ------
 elif st.session_state["step"] == 2:
