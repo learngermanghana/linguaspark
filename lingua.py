@@ -633,6 +633,7 @@ if st.session_state["step"] == 6:
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
+
 TypeError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
 Traceback:
 
