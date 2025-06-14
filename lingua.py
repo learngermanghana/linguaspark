@@ -634,7 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-
 # stage 7: Module-level configuration for default session state
 STATE_DEFAULTS = {
     "presentation_step": 0,
@@ -746,7 +745,7 @@ def build_system_prompt():
         kws = st.session_state.a2_keywords or []
         used = st.session_state.a2_keyword_progress
         next_kw = next((kw for kw in kws if kw not in used), None) or (kws[-1] if kws else "(no keywords)")
-        return f"You are Herr Felix, an A2 teacher. Focus on keyword '{next_kw}'. Provide an English suggestion sentence using it, a German example sentence, a sentence starter, an English correction, and then ask a follow-up question in German using this keyword."
+        return f"You are Herr Felix, an A2 teacher. Focus on keyword '{next_kw}'. Provide an English suggestion sentence using it, a German example sentence, a hint on how to start your own sentence, an English correction, and then ask a follow-up question in German using this keyword."
     else:
         if not st.session_state.b1_init_done:
             st.session_state.b1_init_done = True
@@ -755,6 +754,7 @@ def build_system_prompt():
 
 
 def handle_chat_loop():
+    # AI responds immediately if flagged
     if st.session_state.awaiting_ai_reply:
         st.session_state.awaiting_ai_reply = False
         prompt = build_system_prompt()
@@ -762,22 +762,28 @@ def handle_chat_loop():
         if last_user:
             with st.spinner("Thinking..."):
                 try:
-                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user])
+                    resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+                        model='gpt-4o', messages=[{'role':'system','content':prompt}, last_user]
+                    )
                     ai_text = resp.choices[0].message.content
                 except Exception:
                     ai_text = "Sorry, something went wrong."
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_text})
+            # rerun to display AI message
             safe_rerun()
 
+    # Always show progress and conversation
     render_progress_bar()
     for msg in st.session_state.presentation_messages:
         with st.chat_message(msg['role'], avatar='🧑‍🏫' if msg['role']=='assistant' else None):
             prefix = '🧑‍🏫 Herr Felix:' if msg['role']=='assistant' else '🗣️'
             st.markdown(f"{prefix} {msg['content']}")
 
+    # Only prompt user once chat has started
     if st.session_state.presentation_step >= 3:
         user_msg = st.chat_input(f"💬 Antwort zum Thema '{st.session_state.presentation_topic}'...", key="chat_input")
         if user_msg:
+            # add user message and trigger AI reply, then rerun to show immediately
             st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
             st.session_state.presentation_turn_count += 1
             if st.session_state.presentation_level == "A2":
@@ -785,9 +791,9 @@ def handle_chat_loop():
                     if kw.lower() in user_msg.lower() and kw not in st.session_state.a2_keyword_progress:
                         st.session_state.a2_keyword_progress.append(kw)
             st.session_state.awaiting_ai_reply = True
+            safe_rerun()
 
-
-def stage_7():
+def stage_7()():
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
 
