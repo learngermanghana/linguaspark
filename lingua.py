@@ -665,12 +665,9 @@ if st.session_state.get("step") == 7:
     if st.session_state["presentation_step"] == 1:
         with st.form("topic_form"):
             st.info(
-                "Write a short sentence for your presentation topic (in German or English).
-
-"
+                "Write a short sentence for your presentation topic (in German or English)."
                 "Examples:
-- Ich möchte über meine Familie sprechen.
-"
+- Ich möchte über meine Familie sprechen."
                 "- I want to talk about my school."
             )
             topic = st.text_input("Your presentation topic:")
