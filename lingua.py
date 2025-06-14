@@ -633,8 +633,8 @@ if st.session_state["step"] == 6:
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
+
 def stage_7():
-    # Only run this stage if step == 7
     if st.session_state.get("step") != 7:
         return
 
@@ -710,14 +710,11 @@ def stage_7():
         return
 
     # Stage 3+: Chat loop
-    # Input
     user_msg = st.chat_input("💬 Type your response here... (You’ll see it instantly)")
     if user_msg:
-        # enforce daily limit
         st.session_state['daily_usage'][key] += 1
         st.session_state.presentation_messages.append({"role": "user", "content": user_msg})
         st.session_state.presentation_turn_count += 1
-        # track A2 keywords
         if st.session_state.presentation_level == "A2":
             for kw in (st.session_state.a2_keywords or []):
                 if kw.lower() in user_msg.lower():
@@ -792,7 +789,7 @@ def stage_7():
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_reply})
             safe_rerun()
 
-                    # Check if practice is complete
+    # Check if practice is complete
     a2_done = (
         st.session_state.get('presentation_level') == 'A2' and
         len(st.session_state.get('a2_keyword_progress', [])) == len(st.session_state.get('a2_keywords') or [])
@@ -808,12 +805,17 @@ def stage_7():
         for m in st.session_state.get('presentation_messages', []):
             prefix = "👤" if m['role']=='user' else "🧑‍🏫"
             lines.append(f"{prefix} {m['content']}")
-                final = "
-
-".join(lines)):
-            st.session_state.presentation_step = 0
-            for k in ['presentation_messages','presentation_turn_count','presentation_topic','a2_keywords','a2_keyword_progress','awaiting_ai_reply']:
-                st.session_state.pop(k, None)
-            safe_rerun()
+        final = "\n\n".join(lines)
+        st.markdown("### 💬 Session Summary")
+        st.markdown(final)
+        # Reset session for a new run
+        st.session_state.presentation_step = 0
+        for k in [
+            'presentation_messages','presentation_turn_count',
+            'presentation_topic','a2_keywords',
+            'a2_keyword_progress','awaiting_ai_reply'
+        ]:
+            st.session_state.pop(k, None)
+        st.button("Start Again", on_click=safe_rerun)
 
 stage_7()
