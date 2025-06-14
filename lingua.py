@@ -647,6 +647,7 @@ def stage_7():
     st.session_state.setdefault("presentation_messages", [])
     st.session_state.setdefault("presentation_turn_count", 0)
 
+    # --- Student code & daily limit ---
     today = str(date.today())
     code = st.session_state.get("student_code", "(unknown)")
     key = f"{code}_{today}"
@@ -667,7 +668,9 @@ def stage_7():
             pass
 
     def generate_ai_reply_and_rerun():
-        # Determine what prompt to send
+        # show typing indicator
+        placeholder = st.chat_message("assistant", avatar="🧑‍🏫", is_typing=True)
+        # build system prompt
         if st.session_state.presentation_level == 'A2':
             kws = list(st.session_state.a2_keywords or [])
             used = st.session_state.a2_keyword_progress
@@ -702,16 +705,18 @@ def stage_7():
                 system = (
                     "Summarize their points in German, highlight their progress, and motivate them to keep learning!"
                 )
-        # Pick the last user message
         last_user = next((m for m in reversed(st.session_state.presentation_messages) if m['role']=='user'), None)
         if last_user:
             try:
                 resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                    model='gpt-4o', messages=[{'role':'system','content':system}, last_user]
+                    model='gpt-4o',
+                    messages=[{'role':'system','content':system}, last_user]
                 )
                 ai_reply = resp.choices[0].message.content
             except Exception:
                 ai_reply = "Sorry, something went wrong."
+            placeholder.empty()
+            st.chat_message("assistant", avatar="🧑‍🏫").markdown(ai_reply)
             st.session_state.presentation_messages.append({'role':'assistant','content':ai_reply})
         safe_rerun()
 
@@ -736,13 +741,12 @@ def stage_7():
         if st.button("Submit Topic") and topic.strip():
             st.session_state.presentation_topic = topic.strip()
             st.session_state.presentation_messages = [{"role": "user", "content": topic.strip()}]
-            # For A2: ask for keywords. For B1: start chat immediately!
-            if st.session_state.presentation_level == "A2":
-                st.session_state.presentation_step = 2
-                safe_rerun()
-            else:
-                st.session_state.presentation_step = 3
+            # next stage
+            st.session_state.presentation_step = 2 if st.session_state.presentation_level == "A2" else 3
+            # immediate AI for B1
+            if st.session_state.presentation_level == "B1":
                 generate_ai_reply_and_rerun()
+            safe_rerun()
         return
 
     # Stage 2: A2 keywords input
@@ -760,10 +764,10 @@ def stage_7():
         return
 
     # Stage 3+: Chat loop
+    # show history
     for m in st.session_state.get('presentation_messages', []):
         prefix = "👤" if m['role'] == 'user' else "🧑‍🏫"
         st.markdown(f"**{prefix}**: {m['content']}")
-
     user_msg = st.chat_input("💬 Type your response here... (You’ll see it instantly)")
     if user_msg:
         st.session_state['daily_usage'][key] += 1
@@ -792,7 +796,7 @@ def stage_7():
     st.markdown(f"**Progress:** {label}")
     st.markdown("---")
 
-    # Completion and summary
+    # Completion
     a2_done = (
         st.session_state.get('presentation_level') == 'A2' and
         len(st.session_state.get('a2_keyword_progress', [])) == len(st.session_state.get('a2_keywords') or [])
@@ -808,15 +812,14 @@ def stage_7():
             prefix = "👤" if m['role']=='user' else "🧑‍🏫"
             lines.append(f"{prefix} {m['content']}")
         final = "\n\n".join(lines)
-        st.markdown("### 💬 Session Summary")
+        st.subheader("📄 Your Presentation Summary")
         st.markdown(final)
+        # Reset and restart button
         st.session_state.presentation_step = 0
-        for k in [
-            'presentation_messages','presentation_turn_count',
-            'presentation_topic','a2_keywords',
-            'a2_keyword_progress','awaiting_ai_reply'
-        ]:
+        for k in ['presentation_messages','presentation_turn_count','presentation_topic','a2_keywords','a2_keyword_progress']:
             st.session_state.pop(k, None)
-        st.button("Start Again", on_click=safe_rerun)
+        if st.button("Start Again"):
+            safe_rerun()
 
 stage_7()
+
