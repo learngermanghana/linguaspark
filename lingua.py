@@ -819,7 +819,7 @@ def stage_7():
     else:
         handle_chat_loop()
 
-    # Check for completion and stop chat when done
+        # Check for completion and stop chat when done
     if st.session_state.presentation_step >= 3:
         if st.session_state.presentation_level == "A2":
             kws = st.session_state.a2_keywords or []
@@ -829,7 +829,7 @@ def stage_7():
             done = st.session_state.presentation_turn_count >= max_turns
         if done:
             st.success("🎉 Presentation practice complete! 🎉")
-                        # Display final conversation
+            # Display final conversation
             final = "
 
 ".join([
@@ -860,5 +860,10 @@ def stage_7():
                 st.session_state.presentation_step = btn["set_step"]
             reset_state(btn["reset_keys"])
             safe_rerun()
+
+# Execute stage 7
+stage_7()
+stage_7()
+
 
 
