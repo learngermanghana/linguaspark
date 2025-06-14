@@ -793,7 +793,7 @@ def handle_chat_loop():
             st.session_state.awaiting_ai_reply = True
             safe_rerun()
 
-def stage_7()():
+def stage_7():
     initialize_state()
     st.header("🎤 Presentation Practice (A2 & B1)")
 
