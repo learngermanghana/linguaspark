@@ -634,19 +634,6 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
-"""
-"""
-Stage 7: Presentation Practice (A2 & B1)
-
-Handles user interactions for presentation practice:
-- Level selection (A2/B1)
-- Topic input
-- A2 keyword input
-- Interactive chat loop with AI
-- Progress tracking via progress bar
-- Bottom controls to restart/change topic/level
-"""
-
 def stage_7():
     # Only run this stage if step == 7
     if st.session_state.get("step") != 7:
