@@ -774,7 +774,7 @@ def stage_7():
             generate_ai_reply_and_rerun()
 
         # Progress bar
-        max_turns = 8
+        max_turns = 12
         if st.session_state.presentation_level == 'A2':
             kws = st.session_state.a2_keywords or []
             done = len(st.session_state.a2_keyword_progress)
