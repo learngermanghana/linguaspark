@@ -355,63 +355,7 @@ def show_formatted_ai_reply(ai_reply):
     if followup:
         text = followup.group(1).strip()
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
-        
-# ------ STAGE 5: Chat & Correction ------
-def show_formatted_ai_reply(ai_reply):
-    # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
-    import re
-    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
-    main, correction, grammatik, followup = '', '', '', ''
-    curr_section = 'main'
-
-    for line in lines:
-        header = line.lower()
-        if header.startswith('correction:') or header.startswith('- correction:'):
-            curr_section = 'correction'
-            line = line.split(':',1)[-1].strip()
-            if line: correction += line + ' '
-            continue
-        elif header.startswith('grammar tip:') or header.startswith('- grammar tip:') \
-             or header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
-            curr_section = 'grammatik'
-            line = line.split(':',1)[-1].strip()
-            if line: grammatik += line + ' '
-            continue
-        elif header.startswith('next question:') or header.startswith('- next question:') \
-             or header.startswith('follow-up question') or header.startswith('folgefrage'):
-            curr_section = 'followup'
-            line = line.split(':',1)[-1].strip()
-            if line: followup += line + ' '
-            continue
-        if curr_section == 'main':
-            main += line + ' '
-        elif curr_section == 'correction':
-            correction += line + ' '
-        elif curr_section == 'grammatik':
-            grammatik += line + ' '
-        elif curr_section == 'followup':
-            followup += line + ' '
-
-    # In case the followup got stuck inside main/grammatik
-    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
-        candidates = [l.strip() for l in block.split('\n') if l.strip()]
-        if candidates:
-            last = candidates[-1]
-            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
-                followup = last
-                if setter == 'grammatik':
-                    grammatik = grammatik.replace(last, '').strip()
-                else:
-                    main = main.replace(last, '').strip()
-
-    st.markdown(f"**📝 Answer:**  \n{main.strip()}", unsafe_allow_html=True)
-    if correction.strip():
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Correction:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
-    if grammatik.strip():
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammar Tip:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
-    if followup.strip():
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
-
+    
 # ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
@@ -479,6 +423,120 @@ if st.session_state["step"] == 5:
             }]
         st.stop()
 
+    uploaded = st.file_uploader("Upload an audio file (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "ogg", "m4a"])
+    typed = st.chat_input("💬 Or type your message here...")
+    user_input = None
+
+    if uploaded:
+        uploaded.seek(0)
+        data = uploaded.read()
+        st.audio(data, format=uploaded.type)
+        try:
+            suffix = "." + uploaded.name.split(".")[-1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(data); tmp.flush()
+            client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1", file=open(tmp.name, "rb")
+            )
+            user_input = transcript.text
+        except:
+            st.warning("Transcription failed; please type your message.")
+    elif typed:
+        user_input = typed
+
+    session_ended = st.session_state["turn_count"] >= max_turns
+    if user_input and not session_ended:
+        if st.session_state["daily_usage"][usage_key] >= DAILY_LIMIT:
+            st.warning("You’ve reached today’s free practice limit. Please come back tomorrow or contact your tutor!")
+        else:
+            st.session_state["messages"].append({"role": "user", "content": user_input})
+            st.session_state["turn_count"] += 1
+            st.session_state["daily_usage"][usage_key] += 1
+            log_usage(student_code)
+
+            import re
+            user_words = re.findall(r"\b[a-zäöüß]+\b", user_input.lower())
+
+            if st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)" and st.session_state["custom_chat_level"] == "A2":
+                if not st.session_state.get("a2_keywords") and len(user_words) >= 3:
+                    st.session_state["a2_keywords"] = user_words[:4]
+
+                if not st.session_state.get("a2_keywords"):
+                    ai_system_prompt = (
+                        "You are Herr Felix, an A2-level German teacher. The student gave a topic but not their 3–4 German keywords yet."
+                        " Ask once in English with examples like 'Eltern, Bruder, Wochenende'."
+                        " Do not repeat this request if they already gave them."
+                    )
+                elif not st.session_state.get("custom_topic_acknowledged"):
+                    st.session_state["custom_topic_acknowledged"] = True
+                    keywords = st.session_state["a2_keywords"]
+                    highlighted = ", ".join([f"**{kw}**" for kw in keywords])
+                    ai_system_prompt = (
+                        f"You are Herr Felix, an A2-level German teacher helping a student prepare a presentation."
+                        f" Use the keywords: {highlighted} to give initial ideas."
+                        " Provide idea suggestions (in English), with German examples. Also give one sentence starter (German), one correction (German), one grammar tip (English), and one follow-up question (German)."
+                    )
+                else:
+                    keywords = st.session_state["a2_keywords"]
+                    highlighted = ", ".join([f"**{kw}**" for kw in keywords])
+                    ai_system_prompt = (
+                        f"You are Herr Felix, an A2-level teacher. The student has already chosen a topic and keywords: {highlighted}."
+                        " Now continue the conversation in a natural way using these keywords."
+                        " Each response should focus on one keyword or question. Give one correction and one follow-up question only."
+                    )
+            else:
+                ai_system_prompt = "You are Herr Felix. Just reply in German."
+
+            conversation = [
+                {"role": "system", "content": ai_system_prompt},
+                st.session_state["messages"][-1]
+            ]
+
+            try:
+                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation
+                )
+                ai_reply = resp.choices[0].message.content
+            except Exception as e:
+                ai_reply = "Sorry, there was a problem generating a response."
+                st.error(str(e))
+
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+
+    for msg in st.session_state["messages"]:
+        if msg["role"] == "assistant":
+            with st.chat_message("assistant", avatar="🧑‍🏫"):
+                st.markdown("<span style='color:#33691e;font-weight:bold'>🧑‍🏫 Herr Felix:</span>", unsafe_allow_html=True)
+                import re
+                reply_text = msg["content"]
+                reply_text = re.sub(r"(?i)\*\*Ideenvorschl[äa]ge:?\*\*", "\n\n🔹 **Idea Suggestions (in English):**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Satzanfang:?\*\*", "\n\n🔹 **Sentence Starter:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Korrektur:?\*\*", "\n\n✏️ **Correction:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Grammatiktipp:?\*\*", "\n\n📘 **Grammar Tip:**", reply_text)
+                reply_text = re.sub(r"(?i)\*\*Folgefrage:?\*\*", "\n\n➡️ **Next Question:**", reply_text)
+                show_formatted_ai_reply(reply_text)
+        else:
+            with st.chat_message("user"):
+                st.markdown(f"🗣️ {msg['content']}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅️ Back", key="stage5_back"):
+            prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
+            st.session_state.update({
+                "step": prev,
+                "messages": [],
+                "turn_count": 0,
+                "custom_chat_level": None,
+                "a2_keywords": None,
+                "a2_keyword_progress": set()
+            })
+    with col2:
+        if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
+            st.session_state["step"] = 6
 
 
 # STAGE 6: Session Summary & Restart
