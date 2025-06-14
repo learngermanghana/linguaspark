@@ -646,6 +646,18 @@ Handles user interactions for presentation practice:
 - Bottom controls to restart/change topic/level
 """
 
+"""
+Stage 7: Presentation Practice (A2 & B1)
+
+Handles user interactions for presentation practice:
+- Level selection (A2/B1)
+- Topic input
+- A2 keyword input
+- Interactive chat loop with AI
+- Progress tracking via progress bar
+- Bottom controls to restart/change topic/level
+"""
+
 def stage_7():
     # Only run this stage if step == 7
     if st.session_state.get("step") != 7:
@@ -765,9 +777,12 @@ def stage_7():
             )
         else:
             if not st.session_state.b1_init_done:
+                # Initial B1 prompt includes main topic context
+                topic = st.session_state.presentation_topic
                 system = (
-                    "You are Herr Felix, a B1 teacher. Provide structure and ideas: introduction, main points, conclusion, connectors. "
-                    "Then ask the first follow-up question in German."
+                    f"You are Herr Felix, a B1 teacher. The student will present on '{topic}'. "
+                    "First, provide structure and presentation ideas: introduction, main points, conclusion, and connectors specifically for this topic. "
+                    "Then ask the first follow-up question in German related to this topic."
                 )
                 st.session_state.b1_init_done = True
             else:
