@@ -11,15 +11,39 @@ from fpdf import FPDF
 from gtts import gTTS
 from openai import OpenAI
 
+CODES_FILE = "student_codes.csv"
+DAILY_LIMIT = 25
+MAX_TURNS = 6
 
-# Streamlit page config
+# ---- Exam topic lists ----
+A2_TEIL1 = [ ... ]  # full lists
+A2_TEIL2 = [ ... ]
+A2_TEIL3 = [ ... ]
+B1_TEIL1 = [ ... ]
+B1_TEIL2 = [ ... ]
+B1_TEIL3 = [ ... ]
+
+def load_codes():
+    if os.path.exists(CODES_FILE):
+        df = pd.read_csv(CODES_FILE)
+        if "code" not in df.columns:
+            df = pd.DataFrame(columns=["code"])
+        df["code"] = df["code"].astype(str).str.strip().str.lower()
+    else:
+        df = pd.DataFrame(columns=["code"])
+    return df
+
+def safe_rerun():
+    try:
+        st.experimental_rerun()
+    except Exception:
+        pass
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
-# ---- Falowen / Herr Felix Header ----
 st.markdown(
     """
     <div style='display:flex;align-items:center;gap:18px;margin-bottom:22px;'>
@@ -32,150 +56,13 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# File/database constants
-CODES_FILE = "student_codes.csv"
-DAILY_LIMIT = 25
-max_turns = 6
-TEACHER_PASSWORD = "Felix029"
-
-# Exam topic lists
-A2_TEIL1 = [
-    "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
-    "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
-    "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
-]
-A2_TEIL2 = [
-    "Was machen Sie mit Ihrem Geld?",
-    "Was machen Sie am Wochenende?",
-    "Wie verbringen Sie Ihren Urlaub?",
-    "Wie oft gehen Sie einkaufen und was kaufen Sie?",
-    "Was für Musik hören Sie gern?",
-    "Wie feiern Sie Ihren Geburtstag?",
-    "Welche Verkehrsmittel nutzen Sie?",
-    "Wie bleiben Sie gesund?",
-    "Was machen Sie gern mit Ihrer Familie?",
-    "Wie sieht Ihr Traumhaus aus?",
-    "Welche Filme oder Serien mögen Sie?",
-    "Wie oft gehen Sie ins Restaurant?",
-    "Was ist Ihr Lieblingsfeiertag?",
-    "Was machen Sie morgens als Erstes?",
-    "Wie lange schlafen Sie normalerweise?",
-    "Welche Hobbys hatten Sie als Kind?",
-    "Machen Sie lieber Urlaub am Meer oder in den Bergen?",
-    "Wie sieht Ihr Lieblingszimmer aus?",
-    "Was ist Ihr Lieblingsgeschäft?",
-    "Wie sieht ein perfekter Tag für Sie aus?"
-]
-A2_TEIL3 = [
-    "Zusammen ins Kino gehen", "Ein Café besuchen", "Gemeinsam einkaufen gehen",
-    "Ein Picknick im Park organisieren", "Eine Fahrradtour planen",
-    "Zusammen in die Stadt gehen", "Einen Ausflug ins Schwimmbad machen",
-    "Eine Party organisieren", "Zusammen Abendessen gehen",
-    "Gemeinsam einen Freund/eine Freundin besuchen", "Zusammen ins Museum gehen",
-    "Einen Spaziergang im Park machen", "Ein Konzert besuchen",
-    "Zusammen eine Ausstellung besuchen", "Einen Wochenendausflug planen",
-    "Ein Theaterstück ansehen", "Ein neues Restaurant ausprobieren",
-    "Einen Kochabend organisieren", "Einen Sportevent besuchen", "Eine Wanderung machen"
-]
-
-B1_TEIL1 = [
-    "Mithilfe beim Sommerfest", "Eine Reise nach Köln planen",
-    "Überraschungsparty organisieren", "Kulturelles Ereignis (Konzert, Ausstellung) planen",
-    "Museumsbesuch organisieren"
-]
-B1_TEIL2 = [
-    "Ausbildung", "Auslandsaufenthalt", "Behinderten-Sport", "Berufstätige Eltern",
-    "Berufswahl", "Bio-Essen", "Chatten", "Computer für jeden Kursraum", "Das Internet",
-    "Einkaufen in Einkaufszentren", "Einkaufen im Internet", "Extremsport", "Facebook",
-    "Fertigessen", "Freiwillige Arbeit", "Freundschaft", "Gebrauchte Kleidung",
-    "Getrennter Unterricht für Jungen und Mädchen", "Haushalt", "Haustiere", "Heiraten",
-    "Hotel Mama", "Ich bin reich genug", "Informationen im Internet", "Kinder und Fernsehen",
-    "Kinder und Handys", "Kinos sterben", "Kreditkarten", "Leben auf dem Land oder in der Stadt",
-    "Makeup für Kinder", "Marken-Kleidung", "Mode", "Musikinstrument lernen",
-    "Musik im Zeitalter des Internets", "Rauchen", "Reisen", "Schokolade macht glücklich",
-    "Sport treiben", "Sprachenlernen", "Sprachenlernen mit dem Internet",
-    "Stadtzentrum ohne Autos", "Studenten und Arbeit in den Ferien", "Studium", "Tattoos",
-    "Teilzeitarbeit", "Unsere Idole", "Umweltschutz", "Vegetarische Ernährung", "Zeitungslesen"
-]
-B1_TEIL3 = [
-    "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
-    "Etwas überraschend finden oder planen", "Weitere Details erfragen"
-]
-
-def load_codes():
-    if os.path.exists(CODES_FILE):
-        df = pd.read_csv(CODES_FILE)
-        if "code" not in df.columns:
-            df = pd.DataFrame(columns=["code"])
-        df["code"] = df["code"].astype(str).str.strip().str.lower()
-    else:
-        df = pd.DataFrame(columns=["code"])
-    return df
-# STAGE 2: Teacher Area Sidebar & Session State Setup
-
-# ---- Teacher Dashboard (Sidebar) ----
-with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
-    if "teacher_authenticated" not in st.session_state:
-        st.session_state["teacher_authenticated"] = False
-
-    # Teacher login prompt
-    if not st.session_state["teacher_authenticated"]:
-        st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
-        pwd = st.text_input("Teacher Login (for admin only)", type="password")
-        login_btn = st.button("Login (Teacher)")
-        if login_btn:
-            if pwd == TEACHER_PASSWORD:
-                st.session_state["teacher_authenticated"] = True
-                st.success("Access granted!")
-            elif pwd != "":
-                st.error("Incorrect password. Please try again.")
-
-    # Teacher dashboard/settings
-    else:
-        st.header("👩‍🏫 Teacher Dashboard")
-        df_codes = load_codes()
-        st.subheader("Current Codes")
-        st.dataframe(df_codes, use_container_width=True)
-
-        new_code = st.text_input("Add a new student code")
-        if st.button("Add Code"):
-            new_code_clean = new_code.strip().lower()
-            if new_code_clean and new_code_clean not in df_codes["code"].values:
-                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
-                df_codes.to_csv(CODES_FILE, index=False)
-                st.success(f"Code '{new_code_clean}' added!")
-            elif not new_code_clean:
-                st.warning("Enter a code to add.")
-            else:
-                st.warning("Code already exists.")
-
-        remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
-        if st.button("Remove Selected Code"):
-            if remove_code:
-                df_codes = df_codes[df_codes["code"] != remove_code]
-                df_codes.to_csv(CODES_FILE, index=False)
-                st.success(f"Code '{remove_code}' removed!")
-            else:
-                st.warning("Choose a code to remove.")
-
-        if st.button("Log out (Teacher)"):
-            st.session_state["teacher_authenticated"] = False
-
 # ---- Global session state for app navigation ----
-if "step" not in st.session_state:
-    st.session_state["step"] = 1
-if "student_code" not in st.session_state:
-    st.session_state["student_code"] = ""
-if "daily_usage" not in st.session_state:
-    st.session_state["daily_usage"] = {}
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
-if "corrections" not in st.session_state:
-    st.session_state["corrections"] = []
-if "turn_count" not in st.session_state:
-    st.session_state["turn_count"] = 0
-# STAGE 3: Student Login, Welcome, and Mode Selection
-
+for var, default in [
+    ("step", 1), ("student_code", ""), ("daily_usage", {}), ("messages", []),
+    ("corrections", []), ("turn_count", 0)
+]:
+    if var not in st.session_state:
+        st.session_state[var] = default
 # ------ Stage 1: Student Login ------
 if st.session_state["step"] == 1:
     st.title("Student Login")
@@ -255,8 +142,8 @@ elif st.session_state["step"] == 3:
             elif mode == "Eigenes Thema/Frage (Custom Topic Chat)":
                 st.session_state["step"] = 5
             elif mode == "Präsentationstraining (Presentation Practice)":
-                st.session_state["step"] = 7  # <-- This triggers your new presentation practice tab
-# ------ STAGE 4: Exam Part Selection ------
+                st.session_state["step"] = 7
+# ------ Stage 4: Exam Part Selection ------
 elif st.session_state["step"] == 4:
     st.header("Prüfungsteil wählen / Choose exam part")
     exam_level = st.selectbox(
@@ -320,12 +207,9 @@ elif st.session_state["step"] == 4:
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
 
-
-        
 # ------ STAGE 5: Chat & Correction ------
 def show_formatted_ai_reply(ai_reply):
     # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
-    import re
     lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
     main, correction, grammatik, followup = '', '', '', ''
     curr_section = 'main'
@@ -358,18 +242,6 @@ def show_formatted_ai_reply(ai_reply):
         elif curr_section == 'followup':
             followup += line + ' '
 
-    # In case the followup got stuck inside main/grammatik
-    for block, setter in [(grammatik, 'grammatik'), (main, 'main')]:
-        candidates = [l.strip() for l in block.split('\n') if l.strip()]
-        if candidates:
-            last = candidates[-1]
-            if (last.endswith('?') or (last.endswith('.') and len(last.split()) < 14)) and not followup:
-                followup = last
-                if setter == 'grammatik':
-                    grammatik = grammatik.replace(last, '').strip()
-                else:
-                    main = main.replace(last, '').strip()
-
     st.markdown(f"**📝 Answer:**  \n{main.strip()}", unsafe_allow_html=True)
     if correction.strip():
         st.markdown(f"<div style='color:#c62828'><b>✏️ Correction:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
@@ -378,8 +250,6 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
-
-# ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
@@ -476,7 +346,7 @@ if st.session_state["step"] == 5:
     elif typed:
         user_input = typed
 
-    session_ended    = st.session_state["turn_count"] >= max_turns
+    session_ended    = st.session_state["turn_count"] >= MAX_TURNS
     used_today       = st.session_state["daily_usage"][usage_key]
     ai_just_replied  = False
 
@@ -599,14 +469,11 @@ if st.session_state["step"] == 5:
                 "messages":[],
                 "turn_count":0,
                 "custom_chat_level":None,
-                "custom_level_prompted":False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
-
-# STAGE 6: Session Summary & Restart
+# ------ STAGE 6: Session Summary & Restart ------
 
 if st.session_state["step"] == 6:
     st.title("🎉 Congratulations!")
@@ -632,11 +499,9 @@ if st.session_state["step"] == 6:
             st.session_state["step"] = 3
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = [] 
+            st.session_state["corrections"] = []
 
-from datetime import date
-import streamlit as st
-from openai import OpenAI
+# ------ STAGE 7: Presentation Practice Module ------
 
 def presentation_keywords_input(safe_rerun):
     if st.session_state.presentation_step == 2:
@@ -650,7 +515,6 @@ def presentation_keywords_input(safe_rerun):
             if len(arr) >= 3:
                 st.session_state.a2_keywords = arr[:4]
                 st.session_state.presentation_step = 3
-                # No starter assistant message—AI auto-starts
                 safe_rerun()
             else:
                 st.warning("Enter at least 3 keywords.")
@@ -714,7 +578,6 @@ def generate_ai_reply_and_rerun():
     placeholder.empty()
     st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-    # Auto-advance
     safe_rerun()
 
 def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
@@ -755,7 +618,6 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
-    # --- Extra Controls: Restart, Change Topic, Change Level ---
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🔁 Restart Practice"):
@@ -792,10 +654,8 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
         ]
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
-        # You can add the three controls again here if you want, or leave it clean.
 
 def stage_7():
-    st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
     if st.session_state.get("step") != 7:
         return
 
@@ -821,12 +681,6 @@ def stage_7():
         return
 
     st.header("🎤 Presentation Practice (A2 & B1)")
-
-    def safe_rerun():
-        try:
-            st.experimental_rerun()
-        except Exception:
-            pass
 
     # Stage 0: select level
     if st.session_state.presentation_step == 0:
