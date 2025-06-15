@@ -296,7 +296,6 @@ def stage_5_chat():
     usage_key = f"{student_code}_{today_str}"
     st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
-    st.session_state.setdefault("ai_replying", False)
 
     st.markdown(
         f"<div style='margin-bottom:0.5em'>"
@@ -307,7 +306,6 @@ def stage_5_chat():
     )
 
     def show_formatted_ai_reply(ai_reply):
-        # Parse AI sections: answer, correction, explanation, next question
         lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
         answer, correction, explanation, followup = '', '', '', ''
         curr = 'answer'
@@ -340,7 +338,6 @@ def stage_5_chat():
         if followup.strip():
             st.markdown(f"<div style='color:#32a852'><b>Next Question:</b><br>{followup.strip()}</div>", unsafe_allow_html=True)
 
-    # Styled chat bubbles: Sir Felix right, Student left
     def render_chat():
         for i, msg in enumerate(st.session_state["messages"]):
             if msg["role"] == "assistant":
@@ -362,38 +359,23 @@ def stage_5_chat():
                     st.markdown(msg["content"])
                     st.markdown("</div></div>", unsafe_allow_html=True)
 
-    def get_ai_reply(conversation, api_key, output_key):
-        try:
-            client = OpenAI(api_key=api_key)
-            resp = client.chat.completions.create(
-                model="gpt-4o",
-                messages=conversation
-            )
-            ai_reply = resp.choices[0].message.content
-        except Exception as e:
-            ai_reply = "Sorry, there was a problem generating a response."
-            st.error(str(e))
-        st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
-        st.session_state[output_key] = True
-        st.experimental_rerun()
-
     render_chat()
 
     # --- Input form (always shows) ---
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_area("Type your reply or exam answer here...", height=70)
         submitted = st.form_submit_button("Send")
+
     session_ended = st.session_state["turn_count"] >= MAX_TURNS
     used_today = st.session_state["daily_usage"][usage_key]
 
-    if submitted and user_input and not session_ended and not st.session_state["ai_replying"]:
+    if submitted and user_input and not session_ended:
         st.session_state["messages"].append({"role": "user", "content": user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
-        st.session_state["ai_replying"] = False
-        render_chat()
+
         with st.spinner("Sir Felix is typing..."):
-            # Build SYSTEM PROMPT for AI
+            # SYSTEM PROMPT LOGIC
             if st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
                 if lvl == "A2":
@@ -450,8 +432,18 @@ def stage_5_chat():
                 {"role": "system", "content": system_prompt},
                 st.session_state["messages"][-1]
             ]
-            st.session_state["ai_replying"] = False
-            get_ai_reply(conversation, st.secrets["general"]["OPENAI_API_KEY"], "ai_replying")
+            try:
+                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation
+                )
+                ai_reply = resp.choices[0].message.content
+            except Exception as e:
+                ai_reply = "Sorry, there was a problem generating a response."
+                st.error(str(e))
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+            st.experimental_rerun()  # Only here to refresh the form after AI answer
 
     col1, col2 = st.columns(2)
     with col1:
@@ -466,6 +458,7 @@ def stage_5_chat():
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
 
 # ===============================
 #         STAGE 6: SESSION SUMMARY & RESTART
