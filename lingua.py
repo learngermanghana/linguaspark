@@ -536,12 +536,29 @@ def get_max_turns():
     else:
         return 12
 
-import streamlit as st
-from openai import OpenAI
-from datetime import date
-
 def safe_rerun():
     st.experimental_rerun()
+
+def stage_7():
+    # --- Always initialize state at the very start of the function! ---
+    defaults = {
+        "presentation_step": 0,
+        "presentation_level": None,
+        "presentation_topic": "",
+        "a2_keywords": None,
+        "a2_keyword_progress": [],   # List, not set!
+        "presentation_messages": [],
+        "presentation_turn_count": 0,
+        "pending_presentation_message": None,
+        "ai_already_replied": False,
+        "custom_chat_level": None,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v.copy() if isinstance(v, (list, dict)) else v
+
+    # --- Now it's safe to start your UI/layout code below ---
+    st.header("🎤 Presentation Practice")
 
 def presentation_keywords_input():
     if st.session_state.presentation_step == 2:
