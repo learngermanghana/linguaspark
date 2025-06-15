@@ -724,7 +724,6 @@ def generate_ai_reply_and_rerun():
 
     placeholder.empty()
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-    safe_rerun()
 
 
 def stage_7():
