@@ -391,7 +391,7 @@ if st.session_state["step"] == 5:
             st.session_state["custom_chat_level"] = level
             st.session_state["messages"] = [{
                 "role": "assistant",
-                "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
+                "content": "Hallo! 👋 What would you like to talk about? Give me details of what you want so I can understand."
             }]
         st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
 
@@ -399,10 +399,9 @@ if st.session_state["step"] == 5:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
         init = (
-            f"Ich habe gerade eine kurze Präsentation über **{topic}** gehalten.\n\n"
-            "Deine Aufgabe jetzt:\n"
-            "- Stelle mir **zwei Fragen** zu meiner Präsentation (auf Deutsch).\n"
-            "- Gib mir **eine positive Rückmeldung** auf Deutsch.\n\n"
+            f"Imagine am done with my presentation on **{topic}** .\n\n"
+            "Your task now:\n"
+            "- Ask me **one question** about my presentation (In German).\n"
             "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
@@ -414,7 +413,7 @@ if st.session_state["step"] == 5:
     ):
         st.session_state["messages"].append({
             "role": "assistant",
-            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
+            "content": "Hallo! 👋 What would you like to discuss? Schreib dein Präsentationsthema oder eine Frage."
         })
 
     elif (
@@ -470,11 +469,11 @@ if st.session_state["step"] == 5:
                 ai_system_prompt = (
                     "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
                     f"The topic of your presentation is: {b1_topic}. "
-                    "The student is supposed to ask you TWO questions about your presentation and give you ONE positive feedback. "
+                    "The student is supposed to ask you One question about your presentation. "
                     "1. Read the student's message. "
-                    "2. Tell the student if they have written two valid questions about the topic and one positive feedback (praise them if so, otherwise say politely what is missing). "
+                    "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
                     "3. If the questions are good, answer them briefly (in simple German). "
-                    "4. Always end with clear encouragement in English. "
+                    "4. Always end with clear exams tips in English. "
                     "Be friendly, supportive, and exam-like. Never break character."
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
@@ -484,6 +483,7 @@ if st.session_state["step"] == 5:
                         "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
                         "Reply at A2-level, using simple German sentences. "
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Give them ideas when necessary. "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
                         "- Correction (if needed, in German)\n"
@@ -495,7 +495,7 @@ if st.session_state["step"] == 5:
                         "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                         "Reply at B1-level in German. "
                         "Always be sure to stay on students topic. "
-                        "Ask student creative question that will force student to be create. "
+                        "Ask student creative question that will force student to be creative. "
                         "Correct and give a grammar tip for the student's last answer (always in English). "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
