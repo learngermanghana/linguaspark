@@ -12,6 +12,9 @@ from fpdf import FPDF
 from gtts import gTTS
 from openai import OpenAI
 
+def safe_rerun():
+    st.experimental_rerun()
+
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
     layout="centered",
