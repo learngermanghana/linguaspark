@@ -618,7 +618,7 @@ def presentation_chat_loop():
     if st.session_state.presentation_step != 3:
         return
 
-    # 1. If a pending message, process it (do NOT rerun here!)
+    # 1. Process pending user input if exists
     pending = st.session_state.get("pending_presentation_message", None)
     if pending is not None:
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
@@ -628,13 +628,11 @@ def presentation_chat_loop():
                 if k.lower() in pending.lower():
                     st.session_state.a2_keyword_progress.add(k)
         st.session_state['pending_presentation_message'] = None
-        generate_ai_reply_presentation()  # AI reply happens here
+        generate_ai_reply_presentation()  # AI replies immediately here
         return
 
-    msgs = st.session_state.presentation_messages
-
-    # 2. Show chat history and input field
-    for m in msgs:
+    # 2. Display chat messages
+    for m in st.session_state.presentation_messages:
         if m['role'] == 'user':
             st.markdown(
                 f"""
@@ -656,14 +654,14 @@ def presentation_chat_loop():
                 """, unsafe_allow_html=True
             )
 
-    # 3. Input field
+    # 3. Input box
     inp = st.chat_input("Type your response...")
     if inp:
         st.session_state['pending_presentation_message'] = inp
         st.experimental_rerun()
         return
 
-    # 4. Progress & controls
+    # 4. Progress bar and completion controls
     max_turns = 12
     done = st.session_state.presentation_turn_count
     st.progress(min(done / max_turns, 1.0))
@@ -681,7 +679,7 @@ def presentation_chat_loop():
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
 
-        # --- Controls: Restart, Change Topic, Change Level ---
+        # Buttons for restart/change topic/level
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("🔁 Restart Practice"):
@@ -708,6 +706,60 @@ def presentation_chat_loop():
                 st.session_state["presentation_step"] = 0
                 st.experimental_rerun()
 
+
+def stage_7():
+    # Initialize session state keys if missing
+    defaults = {
+        "presentation_step": 0,
+        "presentation_level": None,
+        "presentation_topic": "",
+        "a2_keywords": None,
+        "a2_keyword_progress": set(),
+        "presentation_messages": [],
+        "presentation_turn_count": 0,
+        "pending_presentation_message": None,
+        "ai_already_replied": False,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v.copy() if isinstance(v, (list, set, dict)) else v
+
+    st.header("🎤 Presentation Practice")
+
+    # Level selection
+    if st.session_state.presentation_step == 0:
+        lvl = st.radio("Select your level:", ["A2", "B1"], horizontal=True)
+        if st.button("Start Presentation Practice"):
+            st.session_state.presentation_level = lvl
+            st.session_state.presentation_step = 1
+            st.session_state.presentation_messages.clear()
+            st.session_state.presentation_turn_count = 0
+            st.session_state.a2_keywords = None
+            st.session_state.a2_keyword_progress = set()
+            st.session_state.presentation_topic = ""
+            st.experimental_rerun()
+        return
+
+    # Topic input
+    if st.session_state.presentation_step == 1:
+        st.info("Please enter your presentation topic (English or German). 🔖")
+        t = st.text_input("Topic:", key="topic_input")
+        if st.button("Submit Topic") and t:
+            st.session_state.presentation_topic = t
+            st.session_state.presentation_messages.append({'role':'user','content':t})
+            st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
+            st.experimental_rerun()
+        return
+
+    # Keywords input (A2 only)
+    if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
+        presentation_keywords_input()
+        return
+
+    # Chat loop (A2/B1)
+    if st.session_state.presentation_step == 3:
+        presentation_chat_loop()
+        return
 
 # ---- Main navigation ----
 if "step" not in st.session_state:
