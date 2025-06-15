@@ -769,37 +769,12 @@ if "step" not in st.session_state:
     st.session_state["step"] = 1
 
 if st.session_state["step"] == 1:
-    st.title("Student Login")
-    code = st.text_input("🔑 Enter your student code to begin:")
-    if st.button("Next ➡️"):
-        code_clean = code.strip().lower()
-        df_codes = load_codes()
-        if code_clean in df_codes["code"].dropna().tolist():
-            st.session_state["student_code"] = code_clean
-            st.session_state["step"] = 2
-        else:
-            st.error("This code is not recognized. Please check with your tutor.")
+    stage_1()
 elif st.session_state["step"] == 2:
-    st.header("🧑‍🏫 Welcome!")
-    if st.button("Next ➡️"):
-        st.session_state["step"] = 3
+    stage_2()
 elif st.session_state["step"] == 3:
-    st.header("Select mode")
-    mode = st.radio(
-        "Choose your practice mode:",
-        [
-            "Geführte Prüfungssimulation (Exam Mode)",
-            "Eigenes Thema/Frage (Custom Topic Chat)",
-            "Präsentationstraining (Presentation Practice)"
-        ],
-        index=0
-    )
-    st.session_state["selected_mode"] = mode
-    if st.button("Start"):
-        if mode == "Präsentationstraining (Presentation Practice)":
-            st.session_state["step"] = 7
-        else:
-            st.session_state["step"] = 4
+    stage_3()
+elif st.session_state["step"] in (4, 5, 6):
+    stage_4_5_6()
 elif st.session_state["step"] == 7:
     stage_7()
-
