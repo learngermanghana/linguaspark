@@ -486,8 +486,7 @@ if st.session_state["step"] == 5:
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
-                        "Stay strictly on the topic:** {a2_topic}. " 
-                        "First, give a few practical ideas/examples (in German) on how a B1 student can build a presentation about this topic.  "
+                        "Always stay on the student's chosen topic for the session. "
                         "Reply at A2-level, using simple German sentences. "
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
                         "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
@@ -502,8 +501,6 @@ if st.session_state["step"] == 5:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                             "The student has just given you their presentation topic. "
-                            f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
-                            "Teach students how to develop points on chosen topic. "
                             "1. First, give a few practical ideas/examples (in German) on how a B1 student can build a presentation about this topic. "
                             "2. Suggest possible points: Meinung (opinion), Vorteil (advantage), Nachteil (disadvantage), Situation im Heimatland (situation in home country), etc. "
                             "3. Then ask the student ONE question about their opinion (Meinung) on the topic (in German). "
