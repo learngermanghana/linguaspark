@@ -779,6 +779,7 @@ def stage_7():
         presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
         return
 
+print(st.session_state)  # See what is set and what is missing
 
 # ---- Main navigation ----
 if "step" not in st.session_state:
