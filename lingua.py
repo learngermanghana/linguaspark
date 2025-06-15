@@ -527,27 +527,28 @@ def stage_4_5_6():
                 st.session_state["messages"] = []
                 st.session_state["turn_count"] = 0
                 st.session_state["corrections"] = []
-
-def presentation_keywords_input(safe_rerun):
-    if st.session_state.presentation_step == 2:
-        st.info(
-            "Enter 2–4 German keywords, comma-separated.\n\n"
-            "Example: **Schule, Hausaufgaben, Lehrer, Prüfung**"
-        )
-        kw = st.text_input("Keywords:", key="kw_input")
-        if st.button("Submit Keywords"):
-            arr = [x.strip() for x in kw.split(',') if x.strip()]
-            if len(arr) >= 2:
-                st.session_state.a2_keywords = arr[:4]
-                st.session_state.presentation_step = 3
-                safe_rerun()
-            else:
-                st.warning("Enter at least 2 keywords.")
-        return
-
 def presentation_chat_loop(generate_ai_reply):
     if st.session_state.presentation_step != 3:
         return
+
+    # --- Insert starter prompt if chat is empty ---
+    if not st.session_state.presentation_messages:
+        if st.session_state.presentation_level == "A2":
+            st.session_state.presentation_messages.append({
+                'role': 'assistant',
+                'content': (
+                    "Let's begin your presentation practice! "
+                    "Use your keywords to build your answers. Try to answer in full sentences. 😊"
+                )
+            })
+        else:  # B1
+            st.session_state.presentation_messages.append({
+                'role': 'assistant',
+                'content': (
+                    "Let's start your B1 presentation. Give your opinion on the topic in German. "
+                    "I'll help you build and improve your presentation step by step."
+                )
+            })
 
     # --- 1. If a pending message, process it (do NOT rerun here!) ---
     pending = st.session_state.get("pending_presentation_message", None)
@@ -561,6 +562,8 @@ def presentation_chat_loop(generate_ai_reply):
         st.session_state['pending_presentation_message'] = None
         generate_ai_reply()  # AI reply happens here
         return
+
+    msgs = st.session_state.presentation_messages
 
     msgs = st.session_state.presentation_messages
 
