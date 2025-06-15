@@ -526,8 +526,10 @@ def stage_4_5_6():
                 st.session_state["corrections"] = []
 
 
-# --------- Presentation Chat Helper Functions ---------
+# === STAGE 7: Presentation Practice ===
+
 def presentation_keywords_input(safe_rerun):
+    """Prompt user for keywords in A2 presentation."""
     if st.session_state.presentation_step == 2:
         st.info(
             "Enter 3–4 German keywords, comma-separated.\n\n"
@@ -701,7 +703,6 @@ def generate_ai_reply_and_rerun():
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
     safe_rerun()
 
-# --------- STAGE 7: Presentation Practice Tab ---------
 def stage_7():
     # Ensure all session keys exist
     defaults = {
@@ -730,7 +731,7 @@ def stage_7():
             st.session_state.a2_keywords = None
             st.session_state.a2_keyword_progress = set()
             st.session_state.presentation_topic = ""
-            st.experimental_rerun()
+            safe_rerun()
         return
 
     # --- Topic input ---
@@ -741,18 +742,19 @@ def stage_7():
             st.session_state.presentation_topic = t
             st.session_state.presentation_messages.append({'role':'user','content':t})
             st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
-            st.experimental_rerun()
+            safe_rerun()
         return
 
     # --- Keyword input (A2 only) ---
     if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
-        presentation_keywords_input(st.experimental_rerun)
+        presentation_keywords_input(safe_rerun)
         return
 
     # --- Chat loop (A2/B1) ---
     if st.session_state.presentation_step == 3:
-        presentation_chat_loop(generate_ai_reply_and_rerun, st.experimental_rerun)
+        presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
         return
+
 
 # ---- Main navigation ----
 if "step" not in st.session_state:
