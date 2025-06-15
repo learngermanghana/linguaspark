@@ -489,7 +489,7 @@ if st.session_state["step"] == 5:
                         "Always stay on the student's chosen topic for the session. "
                         "1. First, give a few practical ideas/examples (in German) on how a B1 student can build a presentation about this topic. "
                         "2. Reply at A2-level, using simple German sentences. "
-                        " 3. Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Never repeat this ideas/tips message again in this chat session."
                         "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
