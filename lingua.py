@@ -448,31 +448,48 @@ def stage_4_exam_part():
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
-# ===============================
-#         STAGE 5: Live Chat, Correction, and Styled UI
-# ===============================
-
 def stage_5_chat():
     if st.session_state.get("step") != 5:
         return
 
+    # Current level and exam part
+    user_level = st.session_state.get("user_level", "A1")
+    teil = st.session_state.get("selected_teil", "Teil 1")
+
+    # Instructions and ability to switch exam part
+    st.markdown(f"**Current Level:** {user_level} | **Current Part:** {teil}")
+    new_teil = st.selectbox(
+        "Change exam part (Teil):",
+        LEVEL_TEIL_OPTIONS[user_level],
+        index=LEVEL_TEIL_OPTIONS[user_level].index(teil),
+        key="stage5_change_teil"
+    )
+    if new_teil != teil:
+        # Reset chat for new part
+        st.session_state["selected_teil"] = new_teil
+        prompt = PROMPT_BANK[user_level][new_teil]()
+        st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
+        st.session_state["turn_count"] = 0
+        return
+
+    # Usage tracking
     today_str = str(date.today())
     student_code = st.session_state["student_code"]
     usage_key = f"{student_code}_{today_str}"
     st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
-    # Always show the first AI prompt if messages got reset
+    # Initialize first AI prompt if needed
     if not st.session_state["messages"]:
-        user_level = st.session_state.get("user_level", "A1")
-        teil = st.session_state.get("selected_teil", "Teil 1")
         prompt = PROMPT_BANK[user_level][teil]()
         st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
 
+    # Display usage info
     st.markdown(
         f"<div style='margin-bottom:0.5em'>"
         f"<span style='background:#bee3f8;border-radius:0.5em;padding:0.3em 0.8em;'>"
-        f"Student code: <b>{student_code}</b> &nbsp; | &nbsp; Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
+        f"Student code: <b>{student_code}</b> &nbsp; | &nbsp; "
+        f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
         f"</span></div>",
         unsafe_allow_html=True
     )
@@ -480,82 +497,61 @@ def stage_5_chat():
     # --- Chat bubble rendering ---
     def show_formatted_ai_reply(ai_reply):
         lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
-        answer, correction, explanation, followup = '', '', '', ''
+        sections = {'answer': '', 'correction': '', 'explanation': '', 'followup': ''}
         curr = 'answer'
         for line in lines:
-            header = line.lower()
-            if 'correction:' in header:
-                curr = 'correction'
-                line = line.split(':', 1)[-1].strip()
-            elif 'grammar tip:' in header or 'explanation:' in header or 'tip:' in header:
-                curr = 'explanation'
-                line = line.split(':', 1)[-1].strip()
-            elif 'next question:' in header or 'follow-up' in header:
-                curr = 'followup'
-                line = line.split(':', 1)[-1].strip()
-            if curr == 'answer':
-                answer += line + ' '
-            elif curr == 'correction':
-                correction += line + ' '
-            elif curr == 'explanation':
-                explanation += line + ' '
-            elif curr == 'followup':
-                followup += line + ' '
+            low = line.lower()
+            if 'correction:' in low:
+                curr = 'correction'; line = line.split(':', 1)[1].strip()
+            elif 'explanation:' in low or 'tip:' in low:
+                curr = 'explanation'; line = line.split(':', 1)[1].strip()
+            elif 'next question:' in low or 'follow-up' in low:
+                curr = 'followup'; line = line.split(':', 1)[1].strip()
+            sections[curr] += line + ' '
 
-        if answer.strip():
-            st.markdown(f"<div style='font-size:1.05em;line-height:1.6'><b>Answer:</b><br>{answer.strip()}</div>", unsafe_allow_html=True)
-        if correction.strip():
-            st.markdown(f"<div style='color:#ea574b'><b>Correction (English):</b><br>{correction.strip()}</div>", unsafe_allow_html=True)
-        if explanation.strip():
-            st.markdown(f"<div style='color:#375be3'><b>Explanation (English):</b><br>{explanation.strip()}</div>", unsafe_allow_html=True)
-        if followup.strip():
-            st.markdown(f"<div style='color:#32a852'><b>Next Question:</b><br>{followup.strip()}</div>", unsafe_allow_html=True)
+        if sections['answer'].strip():
+            st.markdown(f"**Answer:** {sections['answer'].strip()}")
+        if sections['correction'].strip():
+            st.markdown(f":red[**Correction (English):** {sections['correction'].strip()}]")
+        if sections['explanation'].strip():
+            st.markdown(f":blue[**Explanation (English):** {sections['explanation'].strip()}]")
+        if sections['followup'].strip():
+            st.markdown(f":green[**Next Question:** {sections['followup'].strip()}]")
 
     def render_chat():
         for msg in st.session_state["messages"]:
             if msg["role"] == "assistant":
                 with st.chat_message("assistant", avatar="🧑‍🏫"):
-                    st.markdown("""
-                    <div style='display:flex;flex-direction:row-reverse;align-items:flex-end;'>
-                      <div style='background:linear-gradient(90deg,#bee3f8,#98f5e1);color:#174562;padding:1em 1.2em;margin:6px 0 6px 64px;border-radius:1.1em 1.1em 0.1em 1.1em;max-width:65vw;min-width:110px;box-shadow:0 1px 6px #d9ecfa;'>
-                        <b>Sir Felix</b><br>
-                        """, unsafe_allow_html=True)
+                    st.markdown(f"**Sir Felix:**")
                     show_formatted_ai_reply(msg["content"])
-                    st.markdown("</div></div>", unsafe_allow_html=True)
             else:
                 with st.chat_message("user", avatar="🧑"):
-                    st.markdown("""
-                    <div style='display:flex;flex-direction:row;align-items:flex-end;'>
-                      <div style='background:#f1f1f1;color:#181818;padding:1em 1.2em;margin:6px 64px 6px 0;border-radius:1.1em 1.1em 1.1em 0.1em;max-width:65vw;min-width:110px;box-shadow:0 1px 4px #e5e5e5;'>
-                        <b>Student</b><br>
-                    """, unsafe_allow_html=True)
-                    st.markdown(msg["content"])
-                    st.markdown("</div></div>", unsafe_allow_html=True)
+                    st.markdown(f"**Student:** {msg['content']}")
 
     render_chat()
 
+    # English instruction for student
+    st.markdown("Please answer the question above in German. You will receive corrections in English.")
+
     # --- Input form ---
     with st.form("chat_form", clear_on_submit=True):
-        user_input = st.text_area("Type your reply or exam answer here...", height=70)
+        user_input = st.text_area("Your reply or exam answer:", height=80)
         submitted = st.form_submit_button("Send")
 
     session_ended = st.session_state["turn_count"] >= MAX_TURNS
-    used_today = st.session_state["daily_usage"][usage_key]
 
     if submitted and user_input and not session_ended:
+        # Append user message
         st.session_state["messages"].append({"role": "user", "content": user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
+        # Get AI reply
         with st.spinner("Sir Felix is typing..."):
-            level = st.session_state["user_level"]
-            teil = st.session_state["selected_teil"]
-            # One universal system prompt:
             system_prompt = (
                 f"You are Sir Felix, a German teacher and exam coach. "
-                f"The student is level {level}, doing {teil}. "
-                "Adapt your reply to the level. Always correct and explain in ENGLISH. "
-                "Use A1/A2 language for beginners, more advanced German for B1/B2/C1."
+                f"The student is level {user_level}, part {teil}. "
+                "Adapt your reply accordingly. Always correct and explain in English."
             )
             conversation = [
                 {"role": "system", "content": system_prompt},
@@ -564,27 +560,28 @@ def stage_5_chat():
             try:
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
                 resp = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=conversation
+                    model="gpt-4o", messages=conversation
                 )
                 ai_reply = resp.choices[0].message.content
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
-            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
-            st.experimental_rerun()
 
+        # Append AI message
+        st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+
+    # --- Navigation ---
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("⬅️ Back", key="stage5_back"):
+        if st.button("⬅️ Back to Part Selection"):
             st.session_state["step"] = 4
             st.session_state["messages"] = []
             st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
-            st.experimental_rerun()
+            return
     with col2:
-        if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
+        if session_ended and st.button("Finish Session"):
             st.session_state["step"] = 6
+            return
 
 # ===============================
 #         STAGE 6: Session Summary & Restart
