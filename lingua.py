@@ -485,7 +485,8 @@ if st.session_state["step"] == 5:
                 # ------ UPDATED LOGIC HERE ------
                 if lvl == "A2":
                     ai_system_prompt = (
-                        "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
+                        "You are Herr Felix, a supportive A2 German teacher and presentation trainer. "
+                        "First, give a few practical ideas/examples (in English and a bit of German) on how a A2 student can build a presentation about this topic. "
                         "Always stay on the student's chosen topic for the session. "
                         "Reply at A2-level, using simple German sentences. "
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
