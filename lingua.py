@@ -608,7 +608,7 @@ def presentation_chat_loop(generate_ai_reply):
     inp = st.chat_input("Type your response...")
     if inp:
         st.session_state['pending_presentation_message'] = inp
-        st.experimental_rerun()
+        safe_rerun()
         return
 
     # 5. Progress bar & summary controls
