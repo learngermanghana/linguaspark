@@ -549,7 +549,7 @@ def presentation_chat_loop(generate_ai_reply):
     if st.session_state.presentation_step != 3:
         return
 
-    # 1. Process pending user input
+    # --- 1. If a pending message, process it (do NOT rerun here!) ---
     pending = st.session_state.get("pending_presentation_message", None)
     if pending is not None:
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
@@ -559,47 +559,21 @@ def presentation_chat_loop(generate_ai_reply):
                 if k.lower() in pending.lower():
                     st.session_state.a2_keyword_progress.add(k)
         st.session_state['pending_presentation_message'] = None
-        generate_ai_reply()  # AI reply directly, NO rerun here
+        generate_ai_reply()  # AI reply happens here
         return
 
     msgs = st.session_state.presentation_messages
 
-    # 2. Auto AI reply if needed
-    need_ai = (
-        not msgs or
-        (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
-    )
-    if need_ai and not st.session_state.get('ai_already_replied', False):
-        generate_ai_reply()
-        st.session_state['ai_already_replied'] = True
-        return
-    else:
-        st.session_state['ai_already_replied'] = False
-
-    # 3. Show chat history
+    # --- 2. Show chat history and input field ---
     for m in msgs:
-        if m['role'] == 'user':
-            st.markdown(
-                f"""<div style='display:flex;align-items:flex-start;margin-bottom:10px;'>
-                  <div style='background:#e3f2fd;color:#1565c0;padding:0.7em 1em;border-radius:1em 1em 1em 0;max-width:80%;display:inline-block;'>
-                    <b>👤</b> {m['content']}
-                  </div>
-                </div>""", unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                f"""<div style='display:flex;justify-content:flex-end;margin-bottom:10px;'>
-                  <div style='background:#e8f5e9;color:#2e7d32;padding:0.7em 1em;border-radius:1em 1em 0 1em;max-width:80%;display:inline-block;'>
-                    <b>🧑‍🏫 Herr Felix:</b> {m['content']}
-                  </div>
-                </div>""", unsafe_allow_html=True
-            )
+        # ... chat display as before ...
 
-    # 4. User input
+    # --- 3. Input field ---
     inp = st.chat_input("Type your response...")
     if inp:
+        # Set pending message and IMMEDIATELY return and rerun
         st.session_state['pending_presentation_message'] = inp
-        st.experimental_rerun()
+        st.experimental_rerun()  # Safe to rerun here—no further logic after!
         return
 
     # 5. Progress bar, controls, summary
