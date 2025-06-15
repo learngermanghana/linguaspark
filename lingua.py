@@ -108,14 +108,13 @@ def load_codes():
     else:
         df = pd.DataFrame(columns=["code"])
     return df
+
 # STAGE 2: Teacher Area Sidebar & Session State Setup
 
-# ---- Teacher Dashboard (Sidebar) ----
 with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
     if "teacher_authenticated" not in st.session_state:
         st.session_state["teacher_authenticated"] = False
 
-    # Teacher login prompt
     if not st.session_state["teacher_authenticated"]:
         st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
         pwd = st.text_input("Teacher Login (for admin only)", type="password")
@@ -127,7 +126,6 @@ with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=F
             elif pwd != "":
                 st.error("Incorrect password. Please try again.")
 
-    # Teacher dashboard/settings
     else:
         st.header("👩‍🏫 Teacher Dashboard")
         df_codes = load_codes()
@@ -171,9 +169,9 @@ if "corrections" not in st.session_state:
     st.session_state["corrections"] = []
 if "turn_count" not in st.session_state:
     st.session_state["turn_count"] = 0
+
 # STAGE 3: Student Login, Welcome, and Mode Selection
 
-# ------ Stage 1: Student Login ------
 if st.session_state["step"] == 1:
     st.title("Student Login")
     code = st.text_input("🔑 Enter your student code to begin:")
@@ -186,7 +184,6 @@ if st.session_state["step"] == 1:
         else:
             st.error("This code is not recognized. Please check with your tutor.")
 
-# ------ Stage 2: Welcome ------
 elif st.session_state["step"] == 2:
     fun_facts = [
         "🇬🇭 Herr Felix was born in Ghana and mastered German up to C1 level!",
@@ -223,7 +220,6 @@ elif st.session_state["step"] == 2:
         if st.button("Next ➡️", key="stage2_next"):
             st.session_state["step"] = 3
 
-# ------ Stage 3: Mode Selection ------
 elif st.session_state["step"] == 3:
     st.header("Wie möchtest du üben? (How would you like to practice?)")
     mode = st.radio(
@@ -233,8 +229,6 @@ elif st.session_state["step"] == 3:
         key="mode_selector"
     )
     st.session_state["selected_mode"] = mode
-
-    # --- REMOVE the custom_topic input! ---
 
     col1, col2 = st.columns(2)
     with col1:
@@ -250,8 +244,6 @@ elif st.session_state["step"] == 3:
             else:
                 st.session_state["step"] = 4
 
-
-# ------ STAGE 4: Exam Part Selection ------
 elif st.session_state["step"] == 4:
     st.header("Prüfungsteil wählen / Choose exam part")
     exam_level = st.selectbox(
@@ -314,34 +306,7 @@ elif st.session_state["step"] == 4:
             st.session_state["step"] = 5
 
 def show_formatted_ai_reply(ai_reply):
-    corr_pat = r'(?:-?\s*Correction:)\s*(.*?)(?=\n-?\s*Grammatik-Tipp:|\Z)'
-    gram_pat = r'(?:-?\s*Grammatik-Tipp:)\s*(.*?)(?=\n-?\s*(?:Follow-up question|Folgefrage)|\Z)'
-    foll_pat = r'(?:-?\s*(?:Follow-up question|Folgefrage):?)\s*(.*)'
-
-    import re
-    correction = re.search(corr_pat, ai_reply, re.DOTALL)
-    grammatik  = re.search(gram_pat, ai_reply, re.DOTALL)
-    followup   = re.search(foll_pat, ai_reply, re.DOTALL)
-
-    main = ai_reply
-    if correction:
-        main = ai_reply.split(correction.group(0))[0].strip()
-
-    st.markdown(f"**📝 Antwort:**  \n{main}", unsafe_allow_html=True)
-    if correction:
-        text = correction.group(1).strip()
-        st.markdown(f"<div style='color:#c62828'><b>✏️ Korrektur:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if grammatik:
-        text = grammatik.group(1).strip()
-        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammatik-Tipp:</b>  \n{text}</div>", unsafe_allow_html=True)
-    if followup:
-        text = followup.group(1).strip()
-        st.markdown(f"<div style='color:#388e3c'><b>➡️ Folgefrage:</b>  \n{text}</div>", unsafe_allow_html=True)
-        
-# ------ STAGE 5: Chat & Correction ------
-def show_formatted_ai_reply(ai_reply):
     # Formatting for AI output: Answer, Correction, Grammar Tip (English), Next Question (German)
-    import re
     lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
     main, correction, grammatik, followup = '', '', '', ''
     curr_section = 'main'
@@ -394,8 +359,6 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
-
-# ------ STAGE 5 Logic ------
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
@@ -414,7 +377,6 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Custom Chat: Level selection comes first, no chat box yet ---
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -433,7 +395,6 @@ if st.session_state["step"] == 5:
             }]
         st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
 
-    # --- B1 Teil 3: First message
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
@@ -446,7 +407,6 @@ if st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
-    # --- Custom Chat: Ensure greeting if messages is empty (safety)
     elif (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and st.session_state.get("custom_chat_level")
@@ -457,7 +417,6 @@ if st.session_state["step"] == 5:
             "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
         })
 
-    # --- Exam Mode: insert standard exam prompt
     elif (
         st.session_state.get("selected_mode", "").startswith("Geführte")
         and not st.session_state["messages"]
@@ -465,7 +424,6 @@ if st.session_state["step"] == 5:
         prompt = st.session_state.get("initial_prompt")
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
 
-    # -- Student input (audio or text) --
     uploaded = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav","mp3","ogg","m4a"],
@@ -496,7 +454,6 @@ if st.session_state["step"] == 5:
     used_today       = st.session_state["daily_usage"][usage_key]
     ai_just_replied  = False
 
-    # --- Build system prompt dynamically before OpenAI call ---
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning(
@@ -508,7 +465,6 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-            # SYSTEM PROMPT LOGIC
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
                 ai_system_prompt = (
@@ -572,7 +528,6 @@ if st.session_state["step"] == 5:
                         "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
                     )
 
-            # --- Call OpenAI with only the last user message ---
             conversation = [
                 {"role":"system","content":ai_system_prompt},
                 st.session_state["messages"][-1]
@@ -592,7 +547,6 @@ if st.session_state["step"] == 5:
             )
             ai_just_replied = True
 
-    # --- Render chat history with formatted AI replies ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -605,7 +559,6 @@ if st.session_state["step"] == 5:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
-    # --- Navigation buttons (single instance) ---
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
@@ -620,9 +573,6 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
-
-# STAGE 6: Session Summary & Restart
 
 if st.session_state["step"] == 6:
     st.title("🎉 Congratulations!")
