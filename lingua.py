@@ -528,30 +528,47 @@ def stage_4_5_6():
                 st.session_state["turn_count"] = 0
                 st.session_state["corrections"] = []
 
+def presentation_keywords_input():
+    if st.session_state.presentation_step == 2:
+        st.info(
+            "Enter 2–4 German keywords, comma-separated.\n\n"
+            "Example: **Schule, Hausaufgaben, Lehrer, Prüfung**"
+        )
+        kw = st.text_input("Keywords:", key="kw_input")
+        if st.button("Submit Keywords"):
+            arr = [x.strip() for x in kw.split(',') if x.strip()]
+            if len(arr) >= 2:
+                st.session_state.a2_keywords = arr[:4]
+                st.session_state.presentation_step = 3
+                st.experimental_rerun()
+            else:
+                st.warning("Enter at least 2 keywords.")
+        return
+
 def presentation_chat_loop(generate_ai_reply):
     if st.session_state.presentation_step != 3:
         return
 
-    # --- Insert starter prompt if chat is empty ---
+    # 1. Insert initial AI prompt if chat is empty
     if not st.session_state.presentation_messages:
         if st.session_state.presentation_level == "A2":
             st.session_state.presentation_messages.append({
                 'role': 'assistant',
                 'content': (
-                    "Let's begin your presentation practice! "
-                    "Use your keywords to build your answers. Try to answer in full sentences. 😊"
+                    "Let's begin! Use your first keyword to make a full sentence about your topic. "
+                    "I'll help you make your answer longer, step by step."
                 )
             })
-        else:  # B1
+        else:
             st.session_state.presentation_messages.append({
                 'role': 'assistant',
                 'content': (
-                    "Let's start your B1 presentation. Give your opinion on the topic in German. "
-                    "I'll help you build and improve your presentation step by step."
+                    "Let's start your B1 presentation! Give your opinion about your topic in German. "
+                    "I'll help you make your argument stronger with each step."
                 )
             })
 
-    # --- 1. If a pending message, process it (do NOT rerun here!) ---
+    # 2. If there's a pending message, process it and call AI reply
     pending = st.session_state.get("pending_presentation_message", None)
     if pending is not None:
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
@@ -561,13 +578,11 @@ def presentation_chat_loop(generate_ai_reply):
                 if k.lower() in pending.lower():
                     st.session_state.a2_keyword_progress.add(k)
         st.session_state['pending_presentation_message'] = None
-        generate_ai_reply()  # AI reply happens here
+        generate_ai_reply()  # Will add AI message
         return
 
-    msgs = st.session_state.presentation_messages
-
-    # --- 2. Display chat history ---
-    for m in msgs:
+    # 3. Display chat history
+    for m in st.session_state.presentation_messages:
         if m['role'] == 'user':
             st.markdown(
                 f"""
@@ -589,14 +604,14 @@ def presentation_chat_loop(generate_ai_reply):
                 """, unsafe_allow_html=True
             )
 
-    # --- 3. Input field ---
+    # 4. Input field for next user turn
     inp = st.chat_input("Type your response...")
     if inp:
-        # Set pending message ONLY, don't rerun
         st.session_state['pending_presentation_message'] = inp
+        st.experimental_rerun()
         return
 
-    # --- 4. Progress and controls (unchanged) ---
+    # 5. Progress bar & summary controls
     max_turns = 12
     done = st.session_state.presentation_turn_count
     st.progress(min(done / max_turns, 1.0))
@@ -619,7 +634,7 @@ def presentation_chat_loop(generate_ai_reply):
             if st.button("🔁 Restart Practice"):
                 for k in [
                     'presentation_step', 'presentation_messages', 'presentation_turn_count',
-                    'a2_keywords', 'a2_keyword_progress', 'ai_already_replied', 'pending_presentation_message'
+                    'a2_keywords', 'a2_keyword_progress', 'pending_presentation_message'
                 ]:
                     st.session_state.pop(k, None)
                 st.experimental_rerun()
@@ -634,26 +649,27 @@ def presentation_chat_loop(generate_ai_reply):
                 for k in [
                     'presentation_step', 'presentation_level', 'presentation_topic',
                     'presentation_messages', 'presentation_turn_count',
-                    'a2_keywords', 'a2_keyword_progress', 'ai_already_replied', 'pending_presentation_message'
+                    'a2_keywords', 'a2_keyword_progress', 'pending_presentation_message'
                 ]:
                     st.session_state.pop(k, None)
                 st.session_state["presentation_step"] = 0
                 st.experimental_rerun()
 
-
 def generate_ai_reply_and_rerun():
     placeholder = st.empty()
     placeholder.info("🧑‍🏫 Herr Felix is typing...")
 
-    # --- A2 logic: cycle all keywords, English tip always! ---
+    # === A2 LOGIC ===
     if st.session_state.presentation_level == 'A2':
         kws = list(st.session_state.a2_keywords or [])
         max_turns = 12
         turn = st.session_state.presentation_turn_count
+
         if kws:
             turns_per_kw = max_turns // len(kws)
-            idx = min(turn // turns_per_kw, len(kws) - 1)
+            idx = min(turn // turns_per_kw, len(kws)-1)
             current_kw = kws[idx]
+
             detail_prompts = [
                 f"Let's talk more about '{current_kw}'. To make your answer more detailed, answer one or more of these: When do you do this? Where? Why? Who with? Can you ask me a question about it?",
                 f"Now, can you give an example about '{current_kw}'? Maybe tell a story or talk about a special experience.",
@@ -663,26 +679,27 @@ def generate_ai_reply_and_rerun():
             sub_idx = (turn % turns_per_kw) % len(detail_prompts)
             system = (
                 f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
-                f"Today's topic: '{st.session_state.presentation_topic}'. Focus on the keyword '{current_kw}'.\n"
+                f"Focus on the topic '{st.session_state.presentation_topic}' and the keyword '{current_kw}'.\n"
                 f"{detail_prompts[sub_idx]}\n"
-                "Correct the student's mistakes in English and always provide a tip in English for improvement. Use A2 vocabulary. Encourage full, detailed answers."
+                "Correct mistakes simply in English. Use A2 vocabulary. Always give a short tip or encouragement in English. Encourage full answers."
             )
         else:
             system = "What topic and keywords are we practicing today?"
-    # --- B1 logic, always give tip in English ---
+
+    # === B1 LOGIC ===
     else:
         topic = st.session_state.presentation_topic
         steps = [
-            f"Give your opinion on '{topic}' in German. Encourage longer answers. Always give feedback and a tip in English.",
-            f"Share your own opinion on '{topic}' and ask the student to react (German). Tip/feedback in English.",
-            f"Ask for advantages and disadvantages about '{topic}' (German). Tip/feedback in English.",
-            f"Compare how '{topic}' is in Germany and the student's country (German). Tip in English.",
-            f"Ask for a summary or final recommendation about '{topic}' (German). Tip in English.",
-            f"Ask the student for a personal experience related to '{topic}' (German). Tip in English.",
-            f"Ask the student for their advice to others about '{topic}' (German). Tip in English.",
-            f"Invite the student to ask you a question about '{topic}'. Answer in German and explain/tip in English.",
-            f"Ask the student to summarize their key points in German. Tip in English.",
-            f"Ask for any last thoughts or what they learned from discussing '{topic}'. Tip in English."
+            f"Give your opinion on '{topic}' in German. Encourage longer answers. Give feedback and a tip in English.",
+            f"Share your own opinion on '{topic}' and ask the student to react (German).",
+            f"Ask for advantages and disadvantages about '{topic}' (German). Feedback and a tip in English.",
+            f"Compare how '{topic}' is in Germany and the student's country (German).",
+            f"Ask for a summary or final recommendation about '{topic}' (German).",
+            f"Ask the student for a personal experience related to '{topic}' (German).",
+            f"Ask the student for their advice to others about '{topic}' (German).",
+            f"Invite the student to ask you a question about '{topic}'. Answer in German and explain and give a tip in English.",
+            f"Ask the student to summarize their key points in German.",
+            f"Ask for any last thoughts or what they learned from discussing '{topic}'."
         ]
         idx = min(st.session_state.presentation_turn_count, len(steps)-1)
         system = (
@@ -705,11 +722,9 @@ def generate_ai_reply_and_rerun():
 
     placeholder.empty()
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-    st.session_state['ai_already_replied'] = True
-    # NO rerun here!
-
 
 def stage_7():
+    # -- Init state
     defaults = {
         "presentation_step": 0,
         "presentation_level": None,
@@ -719,7 +734,6 @@ def stage_7():
         "presentation_messages": [],
         "presentation_turn_count": 0,
         "pending_presentation_message": None,
-        "ai_already_replied": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -727,7 +741,7 @@ def stage_7():
 
     st.header("🎤 Presentation Practice")
 
-    # Level select
+    # Level selection (A2/B1)
     if st.session_state.presentation_step == 0:
         lvl = st.radio("Select your level:", ["A2", "B1"], horizontal=True)
         if st.button("Start Presentation Practice"):
@@ -738,8 +752,6 @@ def stage_7():
             st.session_state.a2_keywords = None
             st.session_state.a2_keyword_progress = set()
             st.session_state.presentation_topic = ""
-            st.session_state['ai_already_replied'] = False
-            st.session_state['pending_presentation_message'] = None
             st.experimental_rerun()
         return
 
@@ -749,6 +761,8 @@ def stage_7():
         t = st.text_input("Topic:", key="topic_input")
         if st.button("Submit Topic") and t:
             st.session_state.presentation_topic = t
+            st.session_state.presentation_messages.clear()  # Reset chat for new topic
+            st.session_state.presentation_turn_count = 0
             st.session_state.presentation_messages.append({'role':'user','content':t})
             st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
             st.experimental_rerun()
@@ -756,14 +770,13 @@ def stage_7():
 
     # Keyword input (A2 only)
     if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
-        presentation_keywords_input(st.experimental_rerun)
+        presentation_keywords_input()
         return
 
     # Chat loop (A2/B1)
     if st.session_state.presentation_step == 3:
         presentation_chat_loop(generate_ai_reply_and_rerun)
         return
-
 
 # ---- Main navigation ----
 if "step" not in st.session_state:
