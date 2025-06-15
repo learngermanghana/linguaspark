@@ -555,22 +555,21 @@ def presentation_chat_loop(generate_ai_reply, safe_rerun):
     # --- PENDING MESSAGE TRICK ---
     pending = st.session_state.get("pending_presentation_message")
     if pending:
-        # Add user message to history
+        # Process user's pending message
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
         st.session_state.presentation_turn_count += 1
         if st.session_state.presentation_level == 'A2':
             for k in st.session_state.a2_keywords or []:
                 if k.lower() in pending.lower():
                     st.session_state.a2_keyword_progress.add(k)
-        st.session_state['pending_presentation_message'] = None  # Clear
+        st.session_state['pending_presentation_message'] = None  # Clear before AI reply!
         st.session_state['ai_already_replied'] = False
-        # Trigger AI reply and safe rerun
-        generate_ai_reply()
-        return  # Wait for rerun
+        generate_ai_reply()  # AI responds immediately—do NOT rerun again here
+        return
 
     msgs = st.session_state.presentation_messages
 
-    # --- AUTO-START: AI replies if needed ---
+    # --- AI auto-reply logic ---
     need_ai = (
         not msgs or
         (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
@@ -609,7 +608,7 @@ def presentation_chat_loop(generate_ai_reply, safe_rerun):
     inp = st.chat_input("Type your response...")
     if inp:
         st.session_state['pending_presentation_message'] = inp
-        safe_rerun()
+        safe_rerun()  # Only rerun after input!
         return
 
     # --- PROGRESS & CONTROLS ---
