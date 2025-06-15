@@ -529,18 +529,12 @@ def stage_4_5_6():
                 st.session_state["corrections"] = []
 
 
-# === STAGE 7: Presentation Practice ===
-
-def safe_rerun():
-    import streamlit as st
-    st.experimental_rerun()
-
+# --- STAGE 7: Presentation Practice (Fixed Input Lag) ---
 
 def presentation_keywords_input(safe_rerun):
-    """Prompt user for keywords in A2 presentation."""
     if st.session_state.presentation_step == 2:
         st.info(
-            "Enter 3–4 German keywords, comma-separated.\n\n"
+            "Enter 2–4 German keywords, comma-separated.\n\n"
             "Example: **Schule, Hausaufgaben, Lehrer, Prüfung**"
         )
         kw = st.text_input("Keywords:", key="kw_input")
@@ -554,22 +548,42 @@ def presentation_keywords_input(safe_rerun):
                 st.warning("Enter at least 3 keywords.")
         return
 
-def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
+def presentation_chat_loop(generate_ai_reply, safe_rerun):
     if st.session_state.presentation_step != 3:
         return
 
+    # --- PENDING MESSAGE TRICK ---
+    pending = st.session_state.get("pending_presentation_message")
+    if pending:
+        # Add user message to history
+        st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
+        st.session_state.presentation_turn_count += 1
+        if st.session_state.presentation_level == 'A2':
+            for k in st.session_state.a2_keywords or []:
+                if k.lower() in pending.lower():
+                    st.session_state.a2_keyword_progress.add(k)
+        st.session_state['pending_presentation_message'] = None  # Clear
+        st.session_state['ai_already_replied'] = False
+        # Trigger AI reply and safe rerun
+        generate_ai_reply()
+        return  # Wait for rerun
+
     msgs = st.session_state.presentation_messages
 
-    # --- AUTO-START: AI replies if chat is empty or last is user ---
+    # --- AUTO-START: AI replies if needed ---
     need_ai = (
         not msgs or
         (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
     )
-    if need_ai:
-        generate_ai_reply_and_rerun()
+    if need_ai and not st.session_state.get('ai_already_replied', False):
+        generate_ai_reply()
+        st.session_state['ai_already_replied'] = True
+        return
+    else:
+        st.session_state['ai_already_replied'] = False
 
-    # --- SPEECH BUBBLES: Show chat history ---
-    for m in st.session_state.presentation_messages:
+    # --- DISPLAY CHAT HISTORY ---
+    for m in msgs:
         if m['role'] == 'user':
             st.markdown(
                 f"""
@@ -591,21 +605,12 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
                 """, unsafe_allow_html=True
             )
 
-    # --- INPUT ---
+    # --- INPUT FIELD ---
     inp = st.chat_input("Type your response...")
     if inp:
-        today = str(date.today())
-        code = st.session_state.get("student_code", "(unknown)")
-        key = f"{code}_{today}"
-        if 'daily_usage' in st.session_state and key in st.session_state['daily_usage']:
-            st.session_state['daily_usage'][key] += 1
-        st.session_state.presentation_messages.append({'role': 'user', 'content': inp})
-        st.session_state.presentation_turn_count += 1
-        if st.session_state.presentation_level == 'A2':
-            for k in st.session_state.a2_keywords or []:
-                if k.lower() in inp.lower():
-                    st.session_state.a2_keyword_progress.add(k)
-        generate_ai_reply_and_rerun()
+        st.session_state['pending_presentation_message'] = inp
+        safe_rerun()
+        return
 
     # --- PROGRESS & CONTROLS ---
     max_turns = 12
@@ -652,6 +657,7 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
                 st.session_state["presentation_step"] = 0
                 safe_rerun()
 
+
 def generate_ai_reply_and_rerun():
     placeholder = st.empty()
     placeholder.info("🧑‍🏫 Herr Felix is typing...")
@@ -659,25 +665,20 @@ def generate_ai_reply_and_rerun():
     # === A2 LOGIC: Cycle through all keywords ===
     if st.session_state.presentation_level == 'A2':
         kws = list(st.session_state.a2_keywords or [])
-        progress = st.session_state.a2_keyword_progress
         max_turns = 12
         turn = st.session_state.presentation_turn_count
 
-        # Find the current keyword: first one not yet in progress
-        # Each keyword gets equal turns (e.g., 3 keywords → 4 turns each; 4 keywords → 3 turns each)
         if kws:
             turns_per_kw = max_turns // len(kws)
             idx = min(turn // turns_per_kw, len(kws)-1)
             current_kw = kws[idx]
 
-            # Encourage detail using various sub-prompts
             detail_prompts = [
                 f"Let's talk more about '{current_kw}'. To make your answer more detailed, answer one or more of these: When do you do this? Where? Why? Who with? Can you ask me a question about it?",
                 f"Now, can you give an example about '{current_kw}'? Maybe tell a story or talk about a special experience.",
                 f"Well done! What problem or challenge do you have with '{current_kw}'? How do you solve it?",
                 f"Finally, what is your advice or tip for someone about '{current_kw}'? Can you ask me a question about it?"
             ]
-            # Rotate prompts so it doesn't repeat the same one each time
             sub_idx = (turn % turns_per_kw) % len(detail_prompts)
             system = (
                 f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
@@ -687,7 +688,7 @@ def generate_ai_reply_and_rerun():
             )
         else:
             system = "What topic and keywords are we practicing today?"
-    # === B1 LOGIC: Use structured step-by-step progression ===
+    # === B1 LOGIC ===
     else:
         topic = st.session_state.presentation_topic
         steps = [
@@ -708,7 +709,6 @@ def generate_ai_reply_and_rerun():
             f"Today's topic: '{topic}'.\n{steps[idx]}"
         )
 
-    # ---- Continue as before: build messages, call OpenAI, store reply ----
     last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
     messages = [{'role':'system','content':system}]
     if last:
@@ -724,6 +724,8 @@ def generate_ai_reply_and_rerun():
 
     placeholder.empty()
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    st.session_state['ai_already_replied'] = True
+    safe_rerun()
 
 
 def stage_7():
@@ -735,7 +737,9 @@ def stage_7():
         "a2_keywords": None,
         "a2_keyword_progress": set(),
         "presentation_messages": [],
-        "presentation_turn_count": 0
+        "presentation_turn_count": 0,
+        "pending_presentation_message": None,
+        "ai_already_replied": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -777,6 +781,7 @@ def stage_7():
     if st.session_state.presentation_step == 3:
         presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
         return
+
 
 print(st.session_state)  # See what is set and what is missing
 
