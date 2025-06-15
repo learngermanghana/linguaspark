@@ -1,24 +1,21 @@
 # ===============================
-#         STAGE 1: IMPORTS, CONSTANTS, ALL TOPIC LISTS
+#         STAGE 1: IMPORTS, CONSTANTS, ALL TOPIC LISTS, PROMPT BANK
 # ===============================
 
 import os
-import io
-import re
 import random
-import tempfile
 from datetime import date
 
 import pandas as pd
 import streamlit as st
 from openai import OpenAI
 
-# --- General constants ---
+# --- App constants ---
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
 MAX_TURNS = 6
 
-# ========== A1 TEIL 1 ==========
+# ---------- A1 ----------
 A1_TEIL1_KEYWORDS = ["Name", "Alter", "Land", "Wohnort", "Sprachen", "Beruf", "Hobby"]
 A1_TEIL1_FOLLOWUP = [
     "Wie buchstabieren Sie Ihren Namen?",
@@ -28,7 +25,6 @@ A1_TEIL1_FOLLOWUP = [
     "Welche Sprachen sprechen Sie?",
     "Was machen Sie gern in Ihrer Freizeit?"
 ]
-# ========== A1 TEIL 2 ==========
 A1_VOCAB_TEIL2 = [
     ("Geschäft", "schließen"), ("Uhr", "Uhrzeit"), ("Arbeit", "Kollege"),
     ("Hausaufgabe", "machen"), ("Küche", "kochen"), ("Freizeit", "lesen"),
@@ -48,7 +44,6 @@ A1_VOCAB_TEIL2 = [
     ("Stadtplan", "finden"), ("Ticket", "bezahlen"), ("Zahnarzt", "Schmerzen"),
     ("Museum", "Öffnungszeiten"), ("Handy", "Akku leer"),
 ]
-# ========== A1 TEIL 3 ==========
 A1_BITTEN_PROMPTS = [
     "Radio anmachen", "Fenster zumachen", "Licht anschalten", "Tür aufmachen",
     "Tisch sauber machen", "Hausaufgaben schicken", "Buch bringen",
@@ -58,17 +53,80 @@ A1_BITTEN_PROMPTS = [
     "Termin machen", "Nachricht schreiben",
 ]
 
-# ======= B2 (28 TOPICS) =======
+# ---------- A2 ----------
+A2_TEIL1_THEMEN = [
+    "Wohnort", "Tagesablauf", "Freizeit", "Sprachen", "Essen & Trinken", "Haustiere",
+    "Lieblingsmonat", "Jahreszeit", "Sport", "Kleidung (Sommer)", "Familie", "Beruf",
+    "Hobbys", "Feiertage", "Reisen", "Lieblingsessen", "Schule", "Wetter", "Auto oder Fahrrad", "Perfekter Tag"
+]
+A2_TEIL2_PRESENTATION = [
+    "Was machen Sie mit Ihrem Geld?",
+    "Was machen Sie am Wochenende?",
+    "Wie verbringen Sie Ihren Urlaub?",
+    "Wie oft gehen Sie einkaufen und was kaufen Sie?",
+    "Was für Musik hören Sie gern?",
+    "Wie feiern Sie Ihren Geburtstag?",
+    "Welche Verkehrsmittel nutzen Sie?",
+    "Wie bleiben Sie gesund?",
+    "Was machen Sie gern mit Ihrer Familie?",
+    "Wie sieht Ihr Traumhaus aus?",
+    "Welche Filme oder Serien mögen Sie?",
+    "Wie oft gehen Sie ins Restaurant?",
+    "Was ist Ihr Lieblingsfeiertag?",
+    "Was machen Sie morgens als Erstes?",
+    "Wie lange schlafen Sie normalerweise?",
+    "Welche Hobbys hatten Sie als Kind?",
+    "Machen Sie lieber Urlaub am Meer oder in den Bergen?",
+    "Wie sieht Ihr Lieblingszimmer aus?",
+    "Was ist Ihr Lieblingsgeschäft?",
+    "Wie sieht ein perfekter Tag für Sie aus?"
+]
+A2_TEIL3_DISKUSSION = [
+    "Zusammen ins Kino gehen", "Ein Café besuchen", "Gemeinsam einkaufen gehen",
+    "Ein Picknick im Park organisieren", "Eine Fahrradtour planen",
+    "Zusammen in die Stadt gehen", "Einen Ausflug ins Schwimmbad machen",
+    "Eine Party organisieren", "Zusammen Abendessen gehen",
+    "Gemeinsam einen Freund/eine Freundin besuchen", "Zusammen ins Museum gehen",
+    "Einen Spaziergang im Park machen", "Ein Konzert besuchen",
+    "Zusammen eine Ausstellung besuchen", "Einen Wochenendausflug planen",
+    "Ein Theaterstück ansehen", "Ein neues Restaurant ausprobieren",
+    "Einen Kochabend organisieren", "Einen Sportevent besuchen", "Eine Wanderung machen"
+]
+
+# ---------- B1 ----------
+B1_TEIL1_THEMEN = [
+    "Mithilfe beim Sommerfest", "Eine Reise nach Köln planen",
+    "Überraschungsparty organisieren", "Kulturelles Ereignis (Konzert, Ausstellung) planen",
+    "Museumsbesuch organisieren"
+]
+B1_TEIL2_THEMEN = [
+    "Ausbildung", "Auslandsaufenthalt", "Behinderten-Sport", "Berufstätige Eltern",
+    "Berufswahl", "Bio-Essen", "Chatten", "Computer für jeden Kursraum",
+    "Das Internet", "Einkaufen in Einkaufszentren", "Einkaufen im Internet", "Extremsport", "Facebook",
+    "Fertigessen", "Freiwillige Arbeit", "Freundschaft", "Gebrauchte Kleidung",
+    "Getrennter Unterricht für Jungen und Mädchen", "Haushalt", "Haustiere", "Heiraten",
+    "Hotel Mama", "Ich bin reich genug", "Informationen im Internet", "Kinder und Fernsehen",
+    "Kinder und Handys", "Kinos sterben", "Kreditkarten", "Leben auf dem Land oder in der Stadt",
+    "Makeup für Kinder", "Marken-Kleidung", "Mode", "Musikinstrument lernen",
+    "Musik im Zeitalter des Internets", "Rauchen", "Reisen", "Schokolade macht glücklich",
+    "Sport treiben", "Sprachenlernen", "Sprachenlernen mit dem Internet",
+    "Stadtzentrum ohne Autos", "Studenten und Arbeit in den Ferien", "Studium", "Tattoos",
+    "Teilzeitarbeit", "Unsere Idole", "Umweltschutz", "Vegetarische Ernährung", "Zeitungslesen"
+]
+B1_TEIL3_THEMEN = [
+    "Fragen stellen zu einer Präsentation", "Positives Feedback geben",
+    "Etwas überraschend finden oder planen", "Weitere Details erfragen"
+]
+
+# ---------- B2 ----------
 B2_TEIL1_THEMEN = [
     "Mediennutzung", "Globalisierung", "Kulturelle Vielfalt", "Umweltschutz", "Technologischer Fortschritt",
     "Arbeitswelt", "Mobilität", "Gesundheitswesen", "Familienmodelle", "Bildungssysteme",
     "Ehrenamtliches Engagement", "Migration", "Integration", "Freizeitgestaltung", "Konsumgesellschaft",
     "Tourismus", "Digitalisierung", "Soziale Netzwerke", "Berufswahl", "Ernährungstrends",
     "Sport und Gesellschaft", "Kunst und Kultur", "Recht und Gerechtigkeit", "Wissenschaft und Forschung",
-    "Klimawandel", "Wohnen in der Stadt", "Traditionen und Feste", "Gleichberechtigung",
-    "Politische Partizipation"
+    "Klimawandel", "Wohnen in der Stadt", "Traditionen und Feste", "Gleichberechtigung"
 ]
-
 B2_TEIL2_PRESENTATION = [
     "Diskutiere Vor- und Nachteile der Digitalisierung.",
     "Beschreibe eine Erfahrung mit interkultureller Kommunikation.",
@@ -99,7 +157,6 @@ B2_TEIL2_PRESENTATION = [
     "Diskutiere aktuelle Entwicklungen in der Kunstwelt.",
     "Beschreibe die Bedeutung von Familie heute."
 ]
-
 B2_TEIL3_ARGUMENTATION = [
     "Argumentieren Sie für oder gegen das Homeoffice.",
     "Diskutieren Sie die Auswirkungen des Klimawandels auf die Gesellschaft.",
@@ -131,7 +188,7 @@ B2_TEIL3_ARGUMENTATION = [
     "Sollte Wissenschaft besser finanziert werden?"
 ]
 
-# ======= C1 (28 TOPICS) =======
+# ---------- C1 ----------
 C1_TEIL1_THEMEN = [
     "Arbeitswelt der Zukunft", "Künstliche Intelligenz", "Ethik in der Wissenschaft", "Migration",
     "Umwelt- und Klimapolitik", "Globalisierung", "Chancengleichheit", "Digitalisierung und Datenschutz",
@@ -143,7 +200,6 @@ C1_TEIL1_THEMEN = [
     "Werte in der modernen Gesellschaft", "Wirtschaftsethik", "Interkulturelle Kommunikation",
     "Forschungsethik", "Urbanisierung"
 ]
-
 C1_TEIL2_PRESENTATION = [
     "Halten Sie einen Vortrag über Chancen und Risiken von Social Media.",
     "Diskutieren Sie ethische Fragen der Genforschung.",
@@ -174,7 +230,6 @@ C1_TEIL2_PRESENTATION = [
     "Analysieren Sie gesellschaftliche Herausforderungen durch Digitalisierung.",
     "Präsentieren Sie einen aktuellen gesellschaftlichen Diskurs."
 ]
-
 C1_TEIL3_DISKUSSION = [
     "Reflektieren Sie über die Verantwortung von Wissenschaftlern.",
     "Diskutieren Sie über die Bedeutung lebenslangen Lernens.",
@@ -205,6 +260,43 @@ C1_TEIL3_DISKUSSION = [
     "Wie kann Demokratie im digitalen Zeitalter gesichert werden?",
     "Welche Bedeutung hat Forschung für die Zukunft?"
 ]
+
+# ------- Prompt bank -------
+PROMPT_BANK = {
+    "A1": {
+        "Teil 1": lambda: "Bitte beantworten Sie: " + ", ".join(A1_TEIL1_KEYWORDS) + ".\n" + random.choice(A1_TEIL1_FOLLOWUP),
+        "Teil 2": lambda: f"Stellen Sie eine Frage und antworten Sie zum Thema: {random.choice(A1_VOCAB_TEIL2)[0]} – {random.choice(A1_VOCAB_TEIL2)[1]}.",
+        "Teil 3": lambda: f"Formulieren Sie eine höfliche Bitte: {random.choice(A1_BITTEN_PROMPTS)}."
+    },
+    "A2": {
+        "Teil 1": lambda: f"Bitte sprechen Sie über: {random.choice(A2_TEIL1_THEMEN)}.",
+        "Teil 2": lambda: random.choice(A2_TEIL2_PRESENTATION),
+        "Teil 3": lambda: f"Planen Sie gemeinsam: {random.choice(A2_TEIL3_DISKUSSION)}."
+    },
+    "B1": {
+        "Teil 1": lambda: f"Planen Sie gemeinsam: {random.choice(B1_TEIL1_THEMEN)}.",
+        "Teil 2": lambda: f"Präsentieren oder diskutieren Sie das Thema: {random.choice(B1_TEIL2_THEMEN)}.",
+        "Teil 3": lambda: f"{random.choice(B1_TEIL3_THEMEN)}."
+    },
+    "B2": {
+        "Teil 1": lambda: f"Diskutieren Sie das Thema: {random.choice(B2_TEIL1_THEMEN)}.",
+        "Teil 2": lambda: random.choice(B2_TEIL2_PRESENTATION),
+        "Teil 3": lambda: random.choice(B2_TEIL3_ARGUMENTATION)
+    },
+    "C1": {
+        "Teil 1": lambda: f"Analysieren Sie das Thema: {random.choice(C1_TEIL1_THEMEN)}.",
+        "Teil 2": lambda: random.choice(C1_TEIL2_PRESENTATION),
+        "Teil 3": lambda: random.choice(C1_TEIL3_DISKUSSION)
+    }
+}
+
+LEVEL_TEIL_OPTIONS = {
+    "A1": ["Teil 1", "Teil 2", "Teil 3"],
+    "A2": ["Teil 1", "Teil 2", "Teil 3"],
+    "B1": ["Teil 1", "Teil 2", "Teil 3"],
+    "B2": ["Teil 1", "Teil 2", "Teil 3"],
+    "C1": ["Teil 1", "Teil 2", "Teil 3"]
+}
 
 # ===============================
 #         STAGE 2: Helper Functions and UI Setup
@@ -244,56 +336,43 @@ def setup_ui_and_state():
         """, unsafe_allow_html=True
     )
     for var, default in [
-        ("step", 1), ("student_code", ""), ("daily_usage", {}), ("messages", []),
-        ("corrections", []), ("turn_count", 0)
+        ("step", 1), ("student_code", ""), ("user_level", ""), ("daily_usage", {}),
+        ("messages", []), ("corrections", []), ("turn_count", 0)
     ]:
         if var not in st.session_state:
             st.session_state[var] = default
 # ===============================
-#         STAGE 3: Student Login, Welcome, and Mode Selection
+#         STAGE 3: Student Login, Level, Mode Selection
 # ===============================
 
 def stage_3_login_and_mode():
-    # ------ Stage 1: Student Login ------
+    # ------ Step 1: Student Login + Level ------
     if st.session_state["step"] == 1:
         st.title("Student Login")
         code = st.text_input("🔑 Enter your student code to begin:")
+        level = st.selectbox("Select your level:", ["A1", "A2", "B1", "B2", "C1"])
         if st.button("Next ➡️", key="stage1_next"):
             code_clean = code.strip().lower()
             df_codes = load_codes()
             if code_clean in df_codes["code"].dropna().tolist():
                 st.session_state["student_code"] = code_clean
+                st.session_state["user_level"] = level
                 st.session_state["step"] = 2
             else:
                 st.error("This code is not recognized. Please check with your tutor.")
 
-    # ------ Stage 2: Welcome ------
+    # ------ Step 2: Welcome ------
     elif st.session_state["step"] == 2:
-        fun_facts = [
-            "🇬🇭 Sir Felix was born in Ghana and mastered German up to C1 level!",
-            "🎓 Sir Felix studied International Management at IU International University in Germany.",
-            "🏫 He founded Learn Language Education Academy to help students pass Goethe exams.",
-            "💡 Sir Felix used to run a record label and produce music before becoming a language coach!",
-            "🥇 He loves making language learning fun, personal, and exam-focused.",
-            "📚 Sir Felix speaks English, German, and loves teaching in both.",
-            "🚀 Sometimes Sir Felix will throw in a real Goethe exam question—are you ready?",
-            "🤖 Sir Felix built this app himself—so every session is personalized!"
-        ]
-        st.success(f"**Did you know?** {random.choice(fun_facts)}")
+        st.success(f"**Welcome! Level: {st.session_state['user_level']}**")
         st.markdown(
-            "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your Friendly German Tutor, Sir Felix!</h2>",
+            "<h2 style='font-weight:bold;margin-bottom:0.5em'>🧑‍🏫 Welcome to Falowen – Your German Coach, Sir Felix!</h2>",
             unsafe_allow_html=True,
         )
-        st.markdown("> Practice your German speaking or writing. Get simple AI feedback and audio answers!")
         st.info(
             """
-            🎤 **This is not just chat—it's your personal exam preparation bootcamp!**
-            Every time you talk to Sir Felix, imagine you are **in the exam hall**.
-            Expect realistic A1, B2, C1 speaking questions, surprise prompts, and real exam tips—sometimes, you’ll even get questions from last year’s exam!
-            **Want to prepare for a class presentation or your next homework?**
-            👉 You can also enter your **own question or topic** at any time—perfect for practicing real classroom situations or special assignments!
-            Let’s make exam training engaging, surprising, and impactful.  
-            **Are you ready? Let’s go! 🚀**
+            🎤 **This is your German speaking and exam practice app.**
+            Every session, imagine you are in the exam hall—get real questions, feedback, and tips!
+            **Select your practice mode on the next page.**
             """, icon="💡"
         )
         col1, col2 = st.columns(2)
@@ -304,16 +383,22 @@ def stage_3_login_and_mode():
             if st.button("Next ➡️", key="stage2_next"):
                 st.session_state["step"] = 3
 
-    # ------ Stage 3: Mode Selection ------
+    # ------ Step 3: Mode Selection ------
     elif st.session_state["step"] == 3:
         st.header("Wie möchtest du üben? (How would you like to practice?)")
+        user_level = st.session_state.get("user_level", "A1")
+        # Only Exam Mode for A1, full options for higher
+        if user_level == "A1":
+            mode_options = ["Geführte Prüfungssimulation (Exam Mode)"]
+        else:
+            mode_options = [
+                "Geführte Prüfungssimulation (Exam Mode)",
+                "Eigenes Thema/Frage (Custom Chat)",
+                "Präsentationstraining (Presentation Practice)"
+            ]
         mode = st.radio(
             "Choose your practice mode:",
-            [
-                "Geführte Prüfungssimulation (Exam Mode)",
-                "Eigenes Thema/Frage (Custom Topic Chat)",
-                "Präsentationstraining (Presentation Practice)"
-            ],
+            mode_options,
             index=0,
             key="mode_selector"
         )
@@ -330,7 +415,7 @@ def stage_3_login_and_mode():
                 st.session_state["corrections"] = []
                 if mode == "Geführte Prüfungssimulation (Exam Mode)":
                     st.session_state["step"] = 4
-                elif mode == "Eigenes Thema/Frage (Custom Topic Chat)":
+                elif mode == "Eigenes Thema/Frage (Custom Chat)":
                     st.session_state["step"] = 5
                 elif mode == "Präsentationstraining (Presentation Practice)":
                     st.session_state["step"] = 7
@@ -342,41 +427,14 @@ def stage_4_exam_part():
     if st.session_state["step"] != 4:
         return
 
-    # Level detection from login step
     user_level = st.session_state.get("user_level", "A1")
     st.header("Prüfungsteil wählen / Choose exam part")
-    # Dynamic level options
-    levels = ["A1", "B2", "C1"]
-    # Don't allow A1 to change level here
-    exam_level = user_level
-
-    # Teil options by level
-    if exam_level == "A1":
-        teil_options = [
-            "Teil 1 – Persönliche Fragen",
-            "Teil 2 – Fragen und Antworten zu Alltagsthemen",
-            "Teil 3 – Bitten formulieren"
-        ]
-    elif exam_level == "B2":
-        teil_options = [
-            "Teil 1 – Diskussion eines Themas",
-            "Teil 2 – Präsentation",
-            "Teil 3 – Argumentation/Diskussion"
-        ]
-    else:  # C1
-        teil_options = [
-            "Teil 1 – Textanalyse",
-            "Teil 2 – Präsentation",
-            "Teil 3 – Diskussion/Reflexion"
-        ]
-
     teil = st.selectbox(
         "Welchen Teil möchtest du üben?",
-        teil_options,
+        LEVEL_TEIL_OPTIONS[user_level],
         key="exam_teil_select"
     )
     st.session_state["selected_teil"] = teil
-    st.session_state["selected_exam_level"] = exam_level
 
     col1, col2 = st.columns(2)
     with col1:
@@ -384,34 +442,8 @@ def stage_4_exam_part():
             st.session_state["step"] = 3
     with col2:
         if st.button("Start Chat ➡️", key="stage4_start"):
-            # Pick a random prompt for the chosen teil and level, and let AI start
-            if exam_level == "A1":
-                if teil.startswith("Teil 1"):
-                    prompt = (
-                        "Bitte beantworten Sie folgende Fragen zu sich: " +
-                        ", ".join(A1_TEIL1_KEYWORDS) +
-                        ".\n" + random.choice(A1_TEIL1_FOLLOWUP)
-                    )
-                elif teil.startswith("Teil 2"):
-                    vocab = random.choice(A1_VOCAB_TEIL2)
-                    prompt = f"Stellen Sie eine Frage und antworten Sie zum Thema: {vocab[0]} – {vocab[1]}."
-                else:
-                    prompt = f"Formulieren Sie eine höfliche Bitte: {random.choice(A1_BITTEN_PROMPTS)}."
-            elif exam_level == "B2":
-                if teil.startswith("Teil 1"):
-                    prompt = f"Diskutieren Sie das Thema: {random.choice(B2_TEIL1_THEMEN)}."
-                elif teil.startswith("Teil 2"):
-                    prompt = random.choice(B2_TEIL2_PRESENTATION)
-                else:
-                    prompt = random.choice(B2_TEIL3_ARGUMENTATION)
-            else:  # C1
-                if teil.startswith("Teil 1"):
-                    prompt = f"Analysieren Sie das Thema: {random.choice(C1_TEIL1_THEMEN)}."
-                elif teil.startswith("Teil 2"):
-                    prompt = random.choice(C1_TEIL2_PRESENTATION)
-                else:
-                    prompt = random.choice(C1_TEIL3_DISKUSSION)
-            # --- AI starts chat! ---
+            # Let AI start with the right prompt!
+            prompt = PROMPT_BANK[user_level][teil]()
             st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
@@ -430,6 +462,13 @@ def stage_5_chat():
     st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
+    # Always show the first AI prompt if messages got reset
+    if not st.session_state["messages"]:
+        user_level = st.session_state.get("user_level", "A1")
+        teil = st.session_state.get("selected_teil", "Teil 1")
+        prompt = PROMPT_BANK[user_level][teil]()
+        st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
+
     st.markdown(
         f"<div style='margin-bottom:0.5em'>"
         f"<span style='background:#bee3f8;border-radius:0.5em;padding:0.3em 0.8em;'>"
@@ -438,7 +477,7 @@ def stage_5_chat():
         unsafe_allow_html=True
     )
 
-    # Render chat bubbles
+    # --- Chat bubble rendering ---
     def show_formatted_ai_reply(ai_reply):
         lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
         answer, correction, explanation, followup = '', '', '', ''
@@ -495,7 +534,7 @@ def stage_5_chat():
 
     render_chat()
 
-    # Input form
+    # --- Input form ---
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_area("Type your reply or exam answer here...", height=70)
         submitted = st.form_submit_button("Send")
@@ -503,36 +542,21 @@ def stage_5_chat():
     session_ended = st.session_state["turn_count"] >= MAX_TURNS
     used_today = st.session_state["daily_usage"][usage_key]
 
-    # AI reply logic
     if submitted and user_input and not session_ended:
         st.session_state["messages"].append({"role": "user", "content": user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
         with st.spinner("Sir Felix is typing..."):
-            exam_level = st.session_state["selected_exam_level"]
-            # SYSTEM PROMPT
-            if exam_level == "A1":
-                system_prompt = (
-                    "You are Sir Felix, a strict but friendly A1 examiner. "
-                    "ALWAYS give corrections and grammar explanations in ENGLISH. "
-                    "Reply in very simple German (A1), maximum 2–3 sentences. "
-                    "Show the correction and a grammar tip in ENGLISH, then end with a next question or prompt in German."
-                )
-            elif exam_level == "B2":
-                system_prompt = (
-                    "You are Sir Felix, a strict but supportive Goethe B2 examiner. "
-                    "ALWAYS give corrections and grammar explanations in ENGLISH. "
-                    "Respond in fluent, advanced German (B2 level). "
-                    "Correct mistakes and explain them in ENGLISH. "
-                    "Guide the student to present arguments, analyze, and discuss as required for the B2 exam."
-                )
-            else:  # C1
-                system_prompt = (
-                    "You are Sir Felix, a C1-level examiner. "
-                    "Always respond in advanced, academic German (C1 level), but always correct and explain in ENGLISH. "
-                    "Encourage critical thinking, interpretation, and sophisticated language use as in the C1 exam."
-                )
+            level = st.session_state["user_level"]
+            teil = st.session_state["selected_teil"]
+            # One universal system prompt:
+            system_prompt = (
+                f"You are Sir Felix, a German teacher and exam coach. "
+                f"The student is level {level}, doing {teil}. "
+                "Adapt your reply to the level. Always correct and explain in ENGLISH. "
+                "Use A1/A2 language for beginners, more advanced German for B1/B2/C1."
+            )
             conversation = [
                 {"role": "system", "content": system_prompt},
                 st.session_state["messages"][-1]
@@ -553,8 +577,10 @@ def stage_5_chat():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
-            st.session_state["reset_stage5"] = True
             st.session_state["step"] = 4
+            st.session_state["messages"] = []
+            st.session_state["turn_count"] = 0
+            st.session_state["corrections"] = []
             st.experimental_rerun()
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
@@ -593,148 +619,178 @@ def stage_6_summary():
             st.session_state["corrections"] = []
 
 # ===============================
-#         STAGE 7: Presentation Practice Module (B2/C1)
+#         STAGE 7: Custom Chat Mode
 # ===============================
 
-def stage_7_presentation():
-    if st.session_state.get("step") != 7:
+def stage_7_custom_chat():
+    if st.session_state.get("step") != 5:
         return
 
-    user_level = st.session_state.get("user_level", "B2")
-    # Only B2 and C1 can use this stage
-    if user_level not in ["B2", "C1"]:
-        st.warning("Presentation Practice is only available for B2 and C1.")
-        if st.button("⬅️ Back", key="stage7_back"):
-            st.session_state["step"] = 3
-        return
+    user_level = st.session_state.get("user_level", "A2")
+    today_str = str(date.today())
+    student_code = st.session_state["student_code"]
+    usage_key = f"{student_code}_{today_str}"
+    st.session_state.setdefault("daily_usage", {})
+    st.session_state["daily_usage"].setdefault(usage_key, 0)
 
-    if "presentation_stage" not in st.session_state:
-        st.session_state["presentation_stage"] = 0
-        st.session_state["presentation_topic"] = ""
-        st.session_state["presentation_messages"] = []
-        st.session_state["presentation_turn_count"] = 0
+    st.markdown(
+        f"<div style='margin-bottom:0.5em'>"
+        f"<span style='background:#bee3f8;border-radius:0.5em;padding:0.3em 0.8em;'>"
+        f"Student code: <b>{student_code}</b> &nbsp; | &nbsp; Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
+        f"</span></div>",
+        unsafe_allow_html=True
+    )
 
-    # Stage 0: Choose Teil
-    if st.session_state["presentation_stage"] == 0:
-        if user_level == "B2":
-            teil_options = [
-                "Teil 1 – Diskussion eines Themas",
-                "Teil 2 – Präsentation",
-                "Teil 3 – Argumentation/Diskussion"
-            ]
-        else:
-            teil_options = [
-                "Teil 1 – Textanalyse",
-                "Teil 2 – Präsentation",
-                "Teil 3 – Diskussion/Reflexion"
-            ]
-        teil = st.selectbox("Wähle den Präsentationsteil", teil_options)
-        if st.button("Weiter zur Themenauswahl"):
-            st.session_state["presentation_teil"] = teil
-            st.session_state["presentation_stage"] = 1
-            st.session_state["presentation_messages"] = []
-            st.session_state["presentation_turn_count"] = 0
-            st.experimental_rerun()
-        return
+    # Start with a greeting if no chat yet
+    if not st.session_state["messages"]:
+        st.session_state["messages"] = [{
+            "role": "assistant",
+            "content": f"Hallo! 👋 Was möchtest du heute üben? Schreib ein Thema oder stelle eine Frage ({user_level}-Niveau)."
+        }]
 
-    # Stage 1: Choose/enter topic
-    if st.session_state["presentation_stage"] == 1:
-        if user_level == "B2":
-            if st.session_state["presentation_teil"].startswith("Teil 1"):
-                topics = B2_TEIL1_THEMEN
-            elif st.session_state["presentation_teil"].startswith("Teil 2"):
-                topics = B2_TEIL2_PRESENTATION
-            else:
-                topics = B2_TEIL3_ARGUMENTATION
-        else:  # C1
-            if st.session_state["presentation_teil"].startswith("Teil 1"):
-                topics = C1_TEIL1_THEMEN
-            elif st.session_state["presentation_teil"].startswith("Teil 2"):
-                topics = C1_TEIL2_PRESENTATION
-            else:
-                topics = C1_TEIL3_DISKUSSION
-
-        random_topic = random.choice(topics)
-        topic = st.text_input(
-            "Präsentationsthema auswählen oder eigenes Thema eingeben:",
-            value=random_topic
-        )
-        if st.button("Start Präsentations-Chat"):
-            st.session_state["presentation_topic"] = topic
-            # Let AI start!
-            st.session_state["presentation_messages"] = [
-                {"role": "assistant", "content": f"Bitte halte eine kurze Präsentation oder beginne mit dem Thema:\n\n<b>{topic}</b>"}
-            ]
-            st.session_state["presentation_stage"] = 2
-            st.experimental_rerun()
-        return
-
-    # Stage 2: Chat Loop
-    if st.session_state["presentation_stage"] == 2:
-        # Chat bubbles
-        for msg in st.session_state["presentation_messages"]:
+    def render_chat():
+        for msg in st.session_state["messages"]:
             if msg["role"] == "assistant":
                 with st.chat_message("assistant", avatar="🧑‍🏫"):
-                    st.markdown(f"<div style='background:linear-gradient(90deg,#bee3f8,#98f5e1);color:#174562;padding:1em 1.2em;border-radius:1.1em;max-width:65vw;min-width:110px;'><b>Sir Felix</b><br>{msg['content']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<b>Sir Felix</b><br>{msg['content']}", unsafe_allow_html=True)
             else:
                 with st.chat_message("user", avatar="🧑"):
-                    st.markdown(f"<div style='background:#f1f1f1;color:#181818;padding:1em 1.2em;border-radius:1.1em;max-width:65vw;min-width:110px;'><b>Student</b><br>{msg['content']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<b>Student</b><br>{msg['content']}", unsafe_allow_html=True)
 
-        # Input
-        user_input = st.chat_input("Schreibe deinen Präsentationsteil oder deine Antwort...")
-        if user_input:
-            st.session_state["presentation_messages"].append({"role": "user", "content": user_input})
-            st.session_state["presentation_turn_count"] += 1
+    render_chat()
 
-            # AI SYSTEM PROMPT
+    with st.form("custom_chat_form", clear_on_submit=True):
+        user_input = st.text_area("Deine Antwort oder Frage...", height=70)
+        submitted = st.form_submit_button("Senden")
+
+    if submitted and user_input:
+        st.session_state["messages"].append({"role": "user", "content": user_input})
+        st.session_state["turn_count"] += 1
+        st.session_state["daily_usage"][usage_key] += 1
+
+        with st.spinner("Sir Felix is typing..."):
             system_prompt = (
-                f"You are Sir Felix, a {'B2' if user_level == 'B2' else 'C1'} presentation examiner. "
-                f"ALWAYS correct and explain in ENGLISH. "
-                f"Respond in exam-appropriate German. "
-                f"Encourage argumentation, critical thinking, and structure, but always give corrections/explanations in ENGLISH."
+                f"You are Sir Felix, a German teacher. "
+                f"The student's level is {user_level}. "
+                "This is custom conversation/practice mode. "
+                "Give helpful, adaptive answers and always explain corrections in ENGLISH. "
+                "Encourage more speaking and keep questions interesting for the student's level."
             )
             conversation = [
                 {"role": "system", "content": system_prompt},
-                st.session_state["presentation_messages"][-1]
+                st.session_state["messages"][-1]
             ]
-            with st.spinner("Sir Felix is typing..."):
-                try:
-                    client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                    resp = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=conversation
-                    )
-                    ai_reply = resp.choices[0].message.content
-                except Exception as e:
-                    ai_reply = "Sorry, there was a problem generating a response."
-                    st.error(str(e))
-                st.session_state["presentation_messages"].append({"role": "assistant", "content": ai_reply})
-                st.experimental_rerun()
-
-        st.markdown(f"**Takes completed:** {st.session_state['presentation_turn_count']}/12")
-        if st.session_state["presentation_turn_count"] >= 12:
-            st.success("Presentation practice complete!")
-            if st.button("🔁 Neue Präsentation beginnen"):
-                for k in ["presentation_stage", "presentation_topic", "presentation_messages", "presentation_turn_count"]:
-                    if k in st.session_state:
-                        del st.session_state[k]
-                st.experimental_rerun()
-        if st.button("⬅️ Zurück zum Modus-Menü", key="stage7_back_to_menu"):
-            for k in ["presentation_stage", "presentation_topic", "presentation_messages", "presentation_turn_count"]:
-                if k in st.session_state:
-                    del st.session_state[k]
-            st.session_state["step"] = 3
+            try:
+                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation
+                )
+                ai_reply = resp.choices[0].message.content
+            except Exception as e:
+                ai_reply = "Sorry, there was a problem generating a response."
+                st.error(str(e))
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
             st.experimental_rerun()
+
+    if st.button("⬅️ Zurück zum Menü", key="stage7custom_back"):
+        st.session_state["step"] = 3
+        st.session_state["messages"] = []
+        st.session_state["turn_count"] = 0
+        st.session_state["corrections"] = []
+        st.experimental_rerun()
+
+# ===============================
+#         STAGE 8: Presentation Practice Mode
+# ===============================
+
+def stage_8_presentation():
+    if st.session_state.get("step") != 7:
+        return
+
+    user_level = st.session_state.get("user_level", "B1")
+    st.header("Präsentationstraining / Presentation Practice")
+
+    if "presentation_topic" not in st.session_state or not st.session_state["presentation_topic"]:
+        topic = st.text_input("Gib dein Präsentationsthema ein oder wähle eines (optional):")
+        if st.button("Start Practice"):
+            st.session_state["presentation_topic"] = topic if topic else f"Mein Alltag"
+            # AI starts
+            st.session_state["messages"] = [{
+                "role": "assistant",
+                "content": f"Bitte beginne deine Präsentation zum Thema: {st.session_state['presentation_topic']}"
+            }]
+            st.session_state["turn_count"] = 0
+            st.experimental_rerun()
+        if st.button("⬅️ Zurück zum Menü", key="stage8pres_back"):
+            st.session_state["step"] = 3
+            st.session_state["presentation_topic"] = ""
+            st.session_state["messages"] = []
+            st.experimental_rerun()
+        return
+
+    # Chat Loop
+    def render_chat():
+        for msg in st.session_state["messages"]:
+            if msg["role"] == "assistant":
+                with st.chat_message("assistant", avatar="🧑‍🏫"):
+                    st.markdown(f"<b>Sir Felix</b><br>{msg['content']}", unsafe_allow_html=True)
+            else:
+                with st.chat_message("user", avatar="🧑"):
+                    st.markdown(f"<b>Student</b><br>{msg['content']}", unsafe_allow_html=True)
+
+    render_chat()
+
+    with st.form("presentation_form", clear_on_submit=True):
+        user_input = st.text_area("Dein Präsentationsbeitrag...", height=70)
+        submitted = st.form_submit_button("Senden")
+
+    if submitted and user_input:
+        st.session_state["messages"].append({"role": "user", "content": user_input})
+        st.session_state["turn_count"] += 1
+
+        with st.spinner("Sir Felix is typing..."):
+            system_prompt = (
+                f"You are Sir Felix, a German teacher. "
+                f"The student's level is {user_level}. "
+                "This is presentation mode. "
+                "Give feedback, corrections (in ENGLISH), and encourage longer answers."
+            )
+            conversation = [
+                {"role": "system", "content": system_prompt},
+                st.session_state["messages"][-1]
+            ]
+            try:
+                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation
+                )
+                ai_reply = resp.choices[0].message.content
+            except Exception as e:
+                ai_reply = "Sorry, there was a problem generating a response."
+                st.error(str(e))
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+            st.experimental_rerun()
+
+    st.markdown(f"**Takes completed:** {st.session_state['turn_count']}/12")
+    if st.button("⬅️ Zurück zum Menü", key="stage8pres_back2"):
+        st.session_state["step"] = 3
+        st.session_state["presentation_topic"] = ""
+        st.session_state["messages"] = []
+        st.experimental_rerun()
+
 # ===============================
 #         MAIN APP RUNNER
 # ===============================
 
-# Setup page, state, and header
 setup_ui_and_state()
-
-# Show stages according to step
 stage_3_login_and_mode()
 stage_4_exam_part()
-stage_5_chat()
+if st.session_state.get("step") == 5 and st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Chat)":
+    stage_7_custom_chat()
+elif st.session_state.get("step") == 7:
+    stage_8_presentation()
+else:
+    stage_5_chat()
 stage_6_summary()
-stage_7_presentation()
