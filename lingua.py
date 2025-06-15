@@ -449,6 +449,10 @@ def stage_4_exam_part():
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
 
+# ===============================
+#         STAGE 5: Live Chat, Correction, and Styled UI
+# ===============================
+
 def stage_5_chat():
     if st.session_state.get("step") != 5:
         return
@@ -457,16 +461,16 @@ def stage_5_chat():
     user_level = st.session_state.get("user_level", "A1")
     teil = st.session_state.get("selected_teil", "Teil 1")
 
-    # Show instructions and allow switching part
+    # Show current selection and allow switching
     st.markdown(f"**Current Level:** {user_level}  |  **Current Part:** {teil}")
     new_teil = st.selectbox(
         "Change exam part (Teil):",
         LEVEL_TEIL_OPTIONS[user_level],
-        index=LEVEL_TEIL_OPTIONS[user_level].index(teil)
+        index=LEVEL_TEIL_OPTIONS[user_level].index(teil),
+        key="stage5_change_teil"
     )
     if new_teil != teil:
         st.session_state["selected_teil"] = new_teil
-        # Reset for new part
         prompt = PROMPT_BANK[user_level][new_teil]()
         st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
         st.session_state["turn_count"] = 0
@@ -501,10 +505,10 @@ def stage_5_chat():
             with st.chat_message("user", avatar="🧑"):
                 st.markdown(f"**Student:** {msg['content']}")
 
-    # English instruction
+    # Instruction in English
     st.markdown("Please answer the question above in German. You will receive corrections and tips in English.")
 
-    # User input via chat_input
+    # Get user input via chat_input
     user_input = st.chat_input("Type your reply here...")
     if user_input:
         # Append user message
@@ -525,15 +529,14 @@ def stage_5_chat():
             ]
             try:
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp = client.chat.completions.create(
-                    model="gpt-4o", messages=conversation
-                )
+                resp = client.chat.completions.create(model="gpt-4o", messages=conversation)
                 ai_reply = resp.choices[0].message.content
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
-        # Append AI response
+        # Append AI response and rerun to render
         st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+        st.experimental_rerun()
 
     # Navigation buttons
     col1, col2 = st.columns(2)
