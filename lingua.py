@@ -656,44 +656,59 @@ def generate_ai_reply_and_rerun():
     placeholder = st.empty()
     placeholder.info("🧑‍🏫 Herr Felix is typing...")
 
+    # === A2 LOGIC: Cycle through all keywords ===
     if st.session_state.presentation_level == 'A2':
         kws = list(st.session_state.a2_keywords or [])
-        topic = st.session_state.presentation_topic
-        next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0] if kws else "")
-        system = (
-            f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
-            f"You are helping a student practice for an upcoming German presentation. "
-            f"Always keep the conversation focused on the topic '{topic}' and the keywords: {', '.join(kws)}. "
-            f"Right now, focus especially on the keyword '{next_kw}'. "
-            "You must always use only A2-level vocabulary and grammar in your questions, examples, and corrections. "
-            "Avoid long, complex sentences or rare words. "
-            "Whenever possible, include the current keyword in your question or model answer. "
-            "Your goal is to guide the student to prepare, structure, and expand their presentation answers. "
-            "Ask questions that help them give better, fuller answers and practice what they'll say. "
-            "If they make mistakes, explain the correction in simple English so the student understands. "
-            "Always give examples and tips in English if needed, but your next question should always be in German. "
-            "Do not move to a new topic or keyword until the current one has been covered well. "
-            "Act as both a helpful coach and a chat partner—encourage, teach, and help them improve for their real presentation!"
-        )
+        progress = st.session_state.a2_keyword_progress
+        max_turns = 12
+        turn = st.session_state.presentation_turn_count
+
+        # Find the current keyword: first one not yet in progress
+        # Each keyword gets equal turns (e.g., 3 keywords → 4 turns each; 4 keywords → 3 turns each)
+        if kws:
+            turns_per_kw = max_turns // len(kws)
+            idx = min(turn // turns_per_kw, len(kws)-1)
+            current_kw = kws[idx]
+
+            # Encourage detail using various sub-prompts
+            detail_prompts = [
+                f"Let's talk more about '{current_kw}'. To make your answer more detailed, answer one or more of these: When do you do this? Where? Why? Who with? Can you ask me a question about it?",
+                f"Now, can you give an example about '{current_kw}'? Maybe tell a story or talk about a special experience.",
+                f"Well done! What problem or challenge do you have with '{current_kw}'? How do you solve it?",
+                f"Finally, what is your advice or tip for someone about '{current_kw}'? Can you ask me a question about it?"
+            ]
+            # Rotate prompts so it doesn't repeat the same one each time
+            sub_idx = (turn % turns_per_kw) % len(detail_prompts)
+            system = (
+                f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
+                f"Focus on the topic '{st.session_state.presentation_topic}' and the keyword '{current_kw}'.\n"
+                f"{detail_prompts[sub_idx]}\n"
+                "Correct mistakes simply in English. Use A2 vocabulary. Encourage full answers."
+            )
+        else:
+            system = "What topic and keywords are we practicing today?"
+    # === B1 LOGIC: Use structured step-by-step progression ===
     else:
         topic = st.session_state.presentation_topic
         steps = [
-            f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
-            f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
-            f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
-            f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
-            f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
-            f"Summarize student's points in German and highlight progress. Explanations/corrections in English.",
-            f"Ask the student to tell a personal story about '{topic}' in German. Feedback/corrections in English.",
-            f"Ask for a comparison: How is '{topic}' different in Germany vs. student's country? (German). Corrections/tips in English.",
-            f"Invite the student to ask you a question about '{topic}' in German. Respond and explain in English.",
-            f"Ask the student for a summary or key learning about '{topic}' in German. Encourage in English.",
-            f"Conclude with a final opinion on '{topic}' in German. Give closing positive feedback in English.",
-            f"Ask: What is your advice for someone interested in '{topic}'? (German). Cheer in English.",
+            f"Give your opinion on '{topic}' in German. Encourage longer answers. Give feedback in English.",
+            f"Share your own opinion on '{topic}' and ask the student to react (German).",
+            f"Ask for advantages and disadvantages about '{topic}' (German). Feedback in English.",
+            f"Compare how '{topic}' is in Germany and the student's country (German).",
+            f"Ask for a summary or final recommendation about '{topic}' (German).",
+            f"Ask the student for a personal experience related to '{topic}' (German).",
+            f"Ask the student for their advice to others about '{topic}' (German).",
+            f"Invite the student to ask you a question about '{topic}'. Answer in German and explain in English.",
+            f"Ask the student to summarize their key points in German.",
+            f"Ask for any last thoughts or what they learned from discussing '{topic}'."
         ]
         idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-        system = steps[idx]
+        system = (
+            f"You are Herr Felix, a motivating B1 German teacher. "
+            f"Today's topic: '{topic}'.\n{steps[idx]}"
+        )
 
+    # ---- Continue as before: build messages, call OpenAI, store reply ----
     last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
     messages = [{'role':'system','content':system}]
     if last:
@@ -710,6 +725,7 @@ def generate_ai_reply_and_rerun():
     placeholder.empty()
     st.session_state.presentation_messages.append({'role':'assistant','content':reply})
     safe_rerun()
+
 
 def stage_7():
     # Ensure all session keys exist
