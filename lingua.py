@@ -282,13 +282,13 @@ elif st.session_state["step"] == 4:
             if exam_level == "A2":
                 if teil.startswith("Teil 1"):
                     topic = random.choice(A2_TEIL1)
-                    prompt = f"**A2 Teil 1:** Das Schlüsselwort ist **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
+                    prompt = f"**A2 Teil 1:** The Keyword is **{topic}**. Stelle eine passende Frage und beantworte eine Frage dazu. Beispiel: 'Hast du Geschwister? – Ja, ich habe eine Schwester.'"
                 elif teil.startswith("Teil 2"):
                     topic = random.choice(A2_TEIL2)
-                    prompt = f"**A2 Teil 2:** Beschreibe oder diskutiere zum Thema: **{topic}**."
+                    prompt = f"**A2 Teil 2:** Talk about the topic: **{topic}**."
                 else:
                     topic = random.choice(A2_TEIL3)
-                    prompt = f"**A2 Teil 3:** Plant gemeinsam: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
+                    prompt = f"**A2 Teil 3:** Plan a meeting with Herr Felix: **{topic}**. Mache Vorschläge, reagiere, und trefft eine Entscheidung."
             else:
                 if teil.startswith("Teil 1"):
                     topic = random.choice(B1_TEIL1)
@@ -495,7 +495,9 @@ if st.session_state["step"] == 5:
                         "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                         "Reply at B1-level in German. "
                         "Always be sure to stay on students topic. "
-                        "Ask student creative question that will force student to be creative. "
+                        "Ask student about their opinion on the selected topic. "
+                        "Ask student to give one advantage and disadvantage on the selected topic. "
+                        "Ask student about the situation in their home country on the selected topic. "
                         "Correct and give a grammar tip for the student's last answer (always in English). "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
