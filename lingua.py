@@ -781,17 +781,26 @@ def stage_7():
         return
 
 
-# ---- Main navigation ----
-if "step" not in st.session_state:
-    st.session_state["step"] = 1
+# Main Navigation Dispatcher
 
+if "step" not in st.session_state:
+    st.session_state["step"] = 1  # Start at login or intro stage
+
+# Dispatch to stages based on the current step
 if st.session_state["step"] == 1:
-    stage_1()
+    stage_1()  # Your login stage
+
 elif st.session_state["step"] == 2:
-    stage_2()
+    stage_2()  # Welcome / intro stage
+
 elif st.session_state["step"] == 3:
-    stage_3()
+    stage_3()  # Mode selection
+
 elif st.session_state["step"] in (4, 5, 6):
-    stage_4_5_6()
+    stage_4_5_6()  # Exam mode, Custom chat, or summary
+
 elif st.session_state["step"] == 7:
-    stage_7()
+    stage_7()  # Presentation Practice
+
+else:
+    st.error(f"Unknown step: {st.session_state['step']}")
