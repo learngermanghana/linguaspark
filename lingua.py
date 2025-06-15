@@ -528,8 +528,6 @@ def stage_4_5_6():
                 st.session_state["turn_count"] = 0
                 st.session_state["corrections"] = []
 
-# --- STAGE 7: Presentation Practice (No Lag, English Tip, All Keywords Used) ---
-
 def presentation_keywords_input(safe_rerun):
     if st.session_state.presentation_step == 2:
         st.info(
@@ -547,11 +545,11 @@ def presentation_keywords_input(safe_rerun):
                 st.warning("Enter at least 2 keywords.")
         return
 
-def presentation_chat_loop(generate_ai_reply, safe_rerun):
+def presentation_chat_loop(generate_ai_reply):
     if st.session_state.presentation_step != 3:
         return
 
-    # 1. If pending user input exists, process and get AI reply in same run
+    # 1. Process pending user input
     pending = st.session_state.get("pending_presentation_message", None)
     if pending is not None:
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
@@ -561,12 +559,12 @@ def presentation_chat_loop(generate_ai_reply, safe_rerun):
                 if k.lower() in pending.lower():
                     st.session_state.a2_keyword_progress.add(k)
         st.session_state['pending_presentation_message'] = None
-        generate_ai_reply()
+        generate_ai_reply()  # AI reply directly, NO rerun here
         return
 
     msgs = st.session_state.presentation_messages
 
-    # 2. Auto AI reply if last message is user and no assistant reply yet
+    # 2. Auto AI reply if needed
     need_ai = (
         not msgs or
         (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
@@ -578,7 +576,7 @@ def presentation_chat_loop(generate_ai_reply, safe_rerun):
     else:
         st.session_state['ai_already_replied'] = False
 
-    # 3. Show chat
+    # 3. Show chat history
     for m in msgs:
         if m['role'] == 'user':
             st.markdown(
@@ -601,7 +599,7 @@ def presentation_chat_loop(generate_ai_reply, safe_rerun):
     inp = st.chat_input("Type your response...")
     if inp:
         st.session_state['pending_presentation_message'] = inp
-        safe_rerun()
+        st.experimental_rerun()
         return
 
     # 5. Progress bar, controls, summary
@@ -747,7 +745,7 @@ def stage_7():
             st.session_state.presentation_topic = ""
             st.session_state['ai_already_replied'] = False
             st.session_state['pending_presentation_message'] = None
-            safe_rerun()
+            st.experimental_rerun()
         return
 
     # Topic input
@@ -758,17 +756,17 @@ def stage_7():
             st.session_state.presentation_topic = t
             st.session_state.presentation_messages.append({'role':'user','content':t})
             st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
-            safe_rerun()
+            st.experimental_rerun()
         return
 
     # Keyword input (A2 only)
     if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
-        presentation_keywords_input(safe_rerun)
+        presentation_keywords_input(st.experimental_rerun)
         return
 
     # Chat loop (A2/B1)
     if st.session_state.presentation_step == 3:
-        presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
+        presentation_chat_loop(generate_ai_reply_and_rerun)
         return
 
 
