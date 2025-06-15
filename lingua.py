@@ -359,6 +359,211 @@ def show_formatted_ai_reply(ai_reply):
     if followup.strip():
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
+# ------ NEW: Custom Chat Mode – A2 & B1 Structured Flow ------
+
+def next_a2_keyword_question(current_keyword, turn):
+    # Add as many keywords as you like!
+    questions = {
+        "familie": [
+            "Hast du eine große oder kleine Familie?",
+            "Mit wem wohnst du zusammen?",
+            "Was machst du gern mit deiner Familie?",
+            "Feierst du oft mit deiner Familie?"
+        ],
+        "freizeit": [
+            "Was machst du in deiner Freizeit?",
+            "Treibst du Sport?",
+            "Siehst du oft fern oder liest du lieber?",
+            "Mit wem verbringst du deine Freizeit?"
+        ],
+        "essen": [
+            "Was isst du gern?",
+            "Kochst du oft zu Hause?",
+            "Gehst du gern ins Restaurant?",
+            "Was ist dein Lieblingsessen?"
+        ],
+        # Add more as you wish...
+    }
+    qlist = questions.get(current_keyword.lower(), [
+        f"Erzähl mir mehr über '{current_keyword}'. Was machst du gern?"
+    ])
+    return qlist[min(turn, len(qlist)-1)]
+
+def next_b1_presentation_step(turn, topic):
+    steps = [
+        f"Was ist deine Meinung zum Thema '{topic}'?",
+        f"Welche Vorteile gibt es bei '{topic}'?",
+        f"Welche Nachteile siehst du?",
+        "Wie ist die Situation in deinem Heimatland?",
+        "Hast du persönliche Erfahrungen oder Beispiele?",
+        "Wie würdest du zusammenfassen?"
+    ]
+    return steps[min(turn, len(steps)-1)]
+
+# ------ Custom Chat State Machine ------
+if st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)":
+    # Init state
+    if "custom_chat_state" not in st.session_state:
+        st.session_state["custom_chat_state"] = "get_topic"
+        st.session_state["custom_chat_topic"] = ""
+        st.session_state["custom_chat_keyword"] = ""
+        st.session_state["custom_chat_turn"] = 0
+        st.session_state["messages"] = [{
+            "role": "assistant",
+            "content": "Hallo! 👋 Worüber möchtest du heute sprechen oder üben? Schreib dein Präsentationsthema oder eine Frage."
+        }]
+        st.stop()
+    state = st.session_state["custom_chat_state"]
+    turn = st.session_state["custom_chat_turn"]
+    lvl = st.session_state.get("custom_chat_level", "A2")
+
+    # 1. GET TOPIC
+    if state == "get_topic":
+        typed = st.chat_input("Thema / Topic eingeben...", key="custom_topic_input")
+        if typed:
+            st.session_state["custom_chat_topic"] = typed
+            if lvl == "A2":
+                st.session_state["messages"].append({"role": "user", "content": typed})
+                st.session_state["messages"].append({
+                    "role": "assistant",
+                    "content": "Welches Schlüsselwort möchtest du verwenden? (z.B. Familie, Freizeit, Essen ...)"
+                })
+                st.session_state["custom_chat_state"] = "get_keyword"
+            else:
+                st.session_state["messages"].append({"role": "user", "content": typed})
+                st.session_state["messages"].append({
+                    "role": "assistant",
+                    "content": f"Lass uns eine Präsentation zu '{typed}' üben. {next_b1_presentation_step(0, typed)}"
+                })
+                st.session_state["custom_chat_state"] = "b1_presentation"
+            st.experimental_rerun()
+        for msg in st.session_state["messages"]:
+            if msg["role"] == "assistant":
+                with st.chat_message("assistant", avatar="🧑‍🏫"):
+                    st.markdown(msg["content"])
+            else:
+                with st.chat_message("user"):
+                    st.markdown(msg["content"])
+        st.stop()
+
+    # 2. A2: GET KEYWORD THEN ASK QUESTIONS
+    if lvl == "A2":
+        if state == "get_keyword":
+            typed = st.chat_input("Schlüsselwort eingeben...", key="custom_keyword_input")
+            if typed:
+                st.session_state["custom_chat_keyword"] = typed
+                question = next_a2_keyword_question(typed, 0)
+                st.session_state["messages"].append({"role": "user", "content": typed})
+                st.session_state["messages"].append({
+                    "role": "assistant",
+                    "content": question
+                })
+                st.session_state["custom_chat_state"] = "a2_questions"
+                st.session_state["custom_chat_turn"] = 0
+                st.experimental_rerun()
+            for msg in st.session_state["messages"]:
+                if msg["role"] == "assistant":
+                    with st.chat_message("assistant", avatar="🧑‍🏫"):
+                        st.markdown(msg["content"])
+                else:
+                    with st.chat_message("user"):
+                        st.markdown(msg["content"])
+            st.stop()
+        elif state == "a2_questions":
+            typed = st.chat_input("Antwort eingeben...", key=f"a2_q_{turn}")
+            if typed:
+                st.session_state["messages"].append({"role": "user", "content": typed})
+                # AI gives idea/example if answer is weak
+                idea = ""
+                if len(typed.strip().split()) < 3:
+                    example = {
+                        "familie": "Ich habe eine große Familie mit fünf Personen.",
+                        "freizeit": "In meiner Freizeit spiele ich Fußball.",
+                        "essen": "Mein Lieblingsessen ist Jollof Reis."
+                    }
+                    idea = "Hier ist eine Beispielantwort: " + example.get(
+                        st.session_state["custom_chat_keyword"].lower(), "Ich mag das Thema sehr!"
+                    )
+                next_q = next_a2_keyword_question(st.session_state["custom_chat_keyword"], turn+1)
+                msg = (idea + "\n" if idea else "") + next_q
+                st.session_state["messages"].append({
+                    "role": "assistant",
+                    "content": msg
+                })
+                st.session_state["custom_chat_turn"] += 1
+                st.experimental_rerun()
+            for msg in st.session_state["messages"]:
+                if msg["role"] == "assistant":
+                    with st.chat_message("assistant", avatar="🧑‍🏫"):
+                        st.markdown(msg["content"])
+                else:
+                    with st.chat_message("user"):
+                        st.markdown(msg["content"])
+            st.stop()
+
+    # 3. B1: PRESENTATION STEP-BY-STEP WITH IDEAS/EXAMPLES
+    else:
+        if state == "b1_presentation":
+            typed = st.chat_input("Antwort eingeben...", key=f"b1_p_{turn}")
+            if typed:
+                st.session_state["messages"].append({"role": "user", "content": typed})
+                # Give examples/ideas for each step
+                idea = ""
+                current_q = next_b1_presentation_step(turn, st.session_state["custom_chat_topic"])
+                if len(typed.strip().split()) < 4:
+                    if turn == 0:
+                        idea = "Tipp: Deine Meinung könnte sein: 'Ich finde das Thema sehr interessant, weil...'"
+                    elif turn == 1:
+                        idea = "Zum Beispiel: 'Ein Vorteil ist, dass...'"
+                    elif turn == 2:
+                        idea = "Ein Nachteil könnte sein: 'Ein Nachteil ist, dass...'"
+                    elif turn == 3:
+                        idea = "Beispiel: 'In meinem Heimatland ist es üblich, dass...'"
+                    elif turn == 4:
+                        idea = "Du könntest erzählen: 'Ich habe einmal erlebt, dass...'"
+                    elif turn == 5:
+                        idea = "Du kannst zusammenfassen: 'Zusammenfassend kann man sagen, dass...'"
+                if turn < 5:
+                    next_step = next_b1_presentation_step(turn+1, st.session_state["custom_chat_topic"])
+                    msg = (idea + "\n" if idea else "") + next_step
+                    st.session_state["messages"].append({
+                        "role": "assistant",
+                        "content": msg
+                    })
+                    st.session_state["custom_chat_turn"] += 1
+                else:
+                    st.session_state["messages"].append({
+                        "role": "assistant",
+                        "content": "Super, das war eine komplette Präsentation! 🎉 Wenn du willst, kannst du ein neues Thema eingeben oder Feedback bekommen."
+                    })
+                    st.session_state["custom_chat_state"] = "finished"
+                st.experimental_rerun()
+            for msg in st.session_state["messages"]:
+                if msg["role"] == "assistant":
+                    with st.chat_message("assistant", avatar="🧑‍🏫"):
+                        st.markdown(msg["content"])
+                else:
+                    with st.chat_message("user"):
+                        st.markdown(msg["content"])
+            st.stop()
+        elif state == "finished":
+            if st.button("Neue Präsentation starten"):
+                for k in [
+                    "custom_chat_state", "custom_chat_topic", "custom_chat_keyword",
+                    "custom_chat_turn", "messages"
+                ]:
+                    if k in st.session_state: del st.session_state[k]
+                st.experimental_rerun()
+            for msg in st.session_state["messages"]:
+                if msg["role"] == "assistant":
+                    with st.chat_message("assistant", avatar="🧑‍🏫"):
+                        st.markdown(msg["content"])
+                else:
+                    with st.chat_message("user"):
+                        st.markdown(msg["content"])
+            st.stop()
+
+
 if st.session_state["step"] == 5:
     today_str    = str(date.today())
     student_code = st.session_state["student_code"]
