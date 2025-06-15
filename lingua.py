@@ -360,12 +360,12 @@ def show_formatted_ai_reply(ai_reply):
         st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
 if st.session_state["step"] == 5:
-    today_str    = str(date.today())
+    today_str = str(date.today())
     student_code = st.session_state["student_code"]
-    usage_key    = f"{student_code}_{today_str}"
+    usage_key = f"{student_code}_{today_str}"
     st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
-    st.session_state.setdefault("custom_topic_intro_done", False)  # <-- Ensure this is set
+    st.session_state.setdefault("custom_topic_intro_done", False)
 
     st.info(
         f"Student code: `{student_code}` | "
@@ -450,7 +450,7 @@ if st.session_state["step"] == 5:
         user_input = typed
 
     session_ended = st.session_state.get('turn_count', 0) >= max_turns
-    used_today    = st.session_state['daily_usage'][usage_key]
+    used_today = st.session_state['daily_usage'][usage_key]
 
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
@@ -496,52 +496,54 @@ if st.session_state["step"] == 5:
                             "You are Herr Felix, a supportive B1 German teacher. "
                             "Reply in German, correct last answer, give a tip, and ask one question on the same topic."
                         )
-    else:
-        lvl = st.session_state["selected_exam_level"]
-        topic = st.session_state.get("initial_prompt", "")
-        if lvl == "A2":
-            ai_system_prompt = (
-                "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
-                "Reply ONLY as an examiner would in the real A2 Sprechen exam. "
-                "For Teil 3: If the task is to plan something together, you should act as the partner, respond to suggestions, make your own suggestions, and help make a decision together. "
-                "Do NOT ask for keywords. "
-                "Correct the student's most recent answer if needed and give a short grammar tip (in English). "
-                "Keep your reply to 2-3 sentences, simple A2 German. "
-                "Format: \n"
-                "- Your answer (German, as examiner partner)\n"
-                "- Correction: (only if needed)\n"
-                "- Grammar Tip: (in English, one short sentence)\n"
-                "- Next step (German, one prompt or suggestion, but NOT 'please give me keywords')"
-            )
-        else:
-            ai_system_prompt = (
-                "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                "Answer in B1 German, correct if needed, give a tip in English, then ask the next question."
-            )
-
+            elif st.session_state.get("selected_mode", "").startswith("Geführte"):
+                # --- A2 EXAM MODE (Teil 1, 2, 3) ---
+                teil = st.session_state.get("selected_teil", "Teil 1")
+                # If you want you can pass topic/keyword for Teil 2 etc.
+                if st.session_state["selected_exam_level"] == "A2":
+                    if teil == "Teil 1":
+                        ai_system_prompt = (
+                            "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                            "This is A2 Sprechen Teil 1. Ask a personal information question (name, age, job, hobby, family, etc.) in German. "
+                            "After the answer, ask a natural, personal follow-up. "
+                            "Do NOT ask for keywords. If there's a mistake, correct it in German and give a grammar tip in English."
+                        )
+                    elif teil == "Teil 2":
+                        keyword = st.session_state.get("teil2_keyword", "")
+                        ai_system_prompt = (
+                            "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                            "This is A2 Sprechen Teil 2. Ask the student to ask and answer questions using the given keyword. "
+                            f"Keyword: {keyword}. Never ask for keywords. "
+                            "If there's a mistake, correct it in German and give a grammar tip in English."
+                        )
+                    elif teil == "Teil 3":
+                        ai_system_prompt = (
+                            "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                            "Reply ONLY as an examiner would in the real A2 Sprechen exam. "
+                            "For Teil 3: If the task is to plan something together, you should act as the partner, respond to suggestions, make your own suggestions, and help make a decision together. "
+                            "Do NOT ask for keywords. "
+                            "Correct the student's most recent answer if needed and give a short grammar tip (in English). "
+                            "Keep your reply to 2-3 sentences, simple A2 German. "
+                            "Format:\n"
+                            "- Your answer (German, as examiner partner)\n"
+                            "- Correction: (only if needed)\n"
+                            "- Grammar Tip: (in English, one short sentence)\n"
+                            "- Next step (German, one prompt or suggestion, but NOT 'please give me keywords')"
+                        )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                        "Stay strictly on the student's selected topic in every message. "
-                        "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
-                        "1. Answer the student's message in B1-level German (max 2–3 sentences). "
-                        "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                        "3. Give a short grammar tip (in English, one short sentence). "
-                        "4. If the answer is perfect, say so and still give a tip in English. "
-                        "5. End with a next question or prompt in German, always about the same topic. "
-                        "Format your reply:\n"
-                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German, about the same topic)"
+                        "Answer in B1 German, correct if needed, give a tip in English, then ask the next question."
                     )
 
             conversation = [
-                {"role":"system","content":ai_system_prompt},
+                {"role": "system", "content": ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
-            # --- Herr Felix is typing... indicator ---
             with st.spinner("🧑‍🏫 Herr Felix is typing..."):
                 try:
                     client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                    resp   = client.chat.completions.create(
+                    resp = client.chat.completions.create(
                         model="gpt-4o", messages=conversation
                     )
                     ai_reply = resp.choices[0].message.content
@@ -549,7 +551,6 @@ if st.session_state["step"] == 5:
                     ai_reply = "Sorry, there was a problem generating a response."
                     st.error(str(e))
 
-            # ----- Flag for B1 custom topic intro -----
             if (
                 st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
                 and st.session_state.get("custom_chat_level") == "B1"
@@ -558,9 +559,8 @@ if st.session_state["step"] == 5:
                 st.session_state["custom_topic_intro_done"] = True
 
             st.session_state["messages"].append(
-                {"role":"assistant","content":ai_reply}
+                {"role": "assistant", "content": ai_reply}
             )
-            ai_just_replied = True
 
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
@@ -579,11 +579,11 @@ if st.session_state["step"] == 5:
         if st.button("⬅️ Back", key="stage5_back"):
             prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
             st.session_state.update({
-                "step":prev,
-                "messages":[],
-                "turn_count":0,
-                "custom_chat_level":None,
-                "custom_level_prompted":False,
+                "step": prev,
+                "messages": [],
+                "turn_count": 0,
+                "custom_chat_level": None,
+                "custom_level_prompted": False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
