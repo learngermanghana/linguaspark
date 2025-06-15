@@ -531,6 +531,11 @@ def stage_4_5_6():
 
 # === STAGE 7: Presentation Practice ===
 
+def safe_rerun():
+    import streamlit as st
+    st.experimental_rerun()
+
+
 def presentation_keywords_input(safe_rerun):
     """Prompt user for keywords in A2 presentation."""
     if st.session_state.presentation_step == 2:
