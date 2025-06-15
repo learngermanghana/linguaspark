@@ -496,6 +496,7 @@ if st.session_state["step"] == 5:
                         "Reply at B1-level in German. "
                          "Teach students how to get ideas on the selected topic. "
                         "Always be sure to stay on students topic. "
+                        "Ask only One question at a time. "
                         "Ask student about their opinion on the selected topic. "
                         "Ask student to give one advantage and disadvantage on the selected topic. "
                         "Ask student about the situation in their home country on the selected topic. "
