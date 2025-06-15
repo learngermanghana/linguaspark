@@ -482,8 +482,8 @@ if st.session_state["step"] == 5:
                     ai_system_prompt = (
                         "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
                         "Reply at A2-level, using simple German sentences. "
+                        "Teach students how to get go about the topic to build their points. "
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
-                        "Give them ideas when necessary. "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
                         "- Correction (if needed, in German)\n"
@@ -494,6 +494,7 @@ if st.session_state["step"] == 5:
                     ai_system_prompt = (
                         "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                         "Reply at B1-level in German. "
+                         "Teach students how to get ideas on the selected topic. "
                         "Always be sure to stay on students topic. "
                         "Ask student about their opinion on the selected topic. "
                         "Ask student to give one advantage and disadvantage on the selected topic. "
