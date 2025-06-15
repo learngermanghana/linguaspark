@@ -528,7 +528,7 @@ if st.session_state["step"] == 5:
                 topic = st.session_state.get("initial_prompt", "")
                 if lvl == "A2":
                     ai_system_prompt = (
-                        "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                        "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
                         "Stay strictly on the student's selected topic in every message. "
                         "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
                         "1. Ask students to give you some keywords to guide the conversation. Give them examples based on the topic. "
