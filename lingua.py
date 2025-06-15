@@ -634,6 +634,10 @@ if st.session_state["step"] == 6:
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = [] 
 
+from datetime import date
+import streamlit as st
+from openai import OpenAI
+
 def presentation_keywords_input(safe_rerun):
     if st.session_state.presentation_step == 2:
         st.info(
@@ -646,30 +650,83 @@ def presentation_keywords_input(safe_rerun):
             if len(arr) >= 3:
                 st.session_state.a2_keywords = arr[:4]
                 st.session_state.presentation_step = 3
-                # Initialize first message so chat is never blank
-                st.session_state.presentation_messages = [{
-                    'role': 'assistant',
-                    'content': "Super! Let's start your presentation. Please type your first answer below."
-                }]
+                # No starter assistant message—AI auto-starts
                 safe_rerun()
             else:
                 st.warning("Enter at least 3 keywords.")
         return
 
+def generate_ai_reply_and_rerun():
+    placeholder = st.empty()
+    placeholder.info("🧑‍🏫 Herr Felix is typing...")
+
+    if st.session_state.presentation_level == 'A2':
+        kws = list(st.session_state.a2_keywords or [])
+        topic = st.session_state.presentation_topic
+        next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
+        system = (
+            f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
+            f"You are helping a student practice for an upcoming German presentation. "
+            f"Always keep the conversation focused on the topic '{topic}' and the keywords: {', '.join(kws)}. "
+            f"Right now, focus especially on the keyword '{next_kw}'. "
+            "You must always use only A2-level vocabulary and grammar in your questions, examples, and corrections. "
+            "Avoid long, complex sentences or rare words. "
+            "Whenever possible, include the current keyword in your question or model answer. "
+            "Your goal is to guide the student to prepare, structure, and expand their presentation answers. "
+            "Ask questions that help them give better, fuller answers and practice what they'll say. "
+            "If they make mistakes, explain the correction in simple English so the student understands. "
+            "Always give examples and tips in English if needed, but your next question should always be in German. "
+            "Do not move to a new topic or keyword until the current one has been covered well. "
+            "Act as both a helpful coach and a chat partner—encourage, teach, and help them improve for their real presentation!"
+        )
+    else:  # B1 logic
+        topic = st.session_state.presentation_topic
+        steps = [
+            f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
+            f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
+            f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
+            f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
+            f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
+            f"Summarize student's points in German and highlight progress. Explanations/corrections in English.",
+            f"Ask the student to tell a personal story about '{topic}' in German. Feedback/corrections in English.",
+            f"Ask for a comparison: How is '{topic}' different in Germany vs. student's country? (German). Corrections/tips in English.",
+            f"Invite the student to ask you a question about '{topic}' in German. Respond and explain in English.",
+            f"Ask the student for a summary or key learning about '{topic}' in German. Encourage in English.",
+            f"Conclude with a final opinion on '{topic}' in German. Give closing positive feedback in English.",
+            f"Ask: What is your advice for someone interested in '{topic}'? (German). Cheer in English.",
+        ]
+        idx = min(st.session_state.presentation_turn_count, len(steps)-1)
+        system = steps[idx]
+
+    last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
+    messages = [{'role':'system','content':system}]
+    if last:
+        messages.append(last)
+
+    try:
+        resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
+            model='gpt-4o', messages=messages
+        )
+        reply = resp.choices[0].message.content
+    except Exception:
+        reply = "Sorry, something went wrong."
+
+    placeholder.empty()
+    st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
+    st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    # Auto-advance
+    safe_rerun()
+
 def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     if st.session_state.presentation_step != 3:
         return
 
-    if not st.session_state.presentation_messages:
-        st.session_state.presentation_messages.append({
-            'role': 'assistant',
-            'content': "Let's start your presentation! Please type your first answer below."
-        })
-
     msgs = st.session_state.presentation_messages
+
+    # AUTO-START: If chat is empty or last is user, AI replies
     need_ai = (
-        msgs and msgs[-1]['role'] == 'user' and
-        (len(msgs) < 2 or msgs[-2]['role'] != 'assistant')
+        not msgs or
+        (msgs and msgs[-1]['role'] == 'user' and (len(msgs) < 2 or msgs[-2]['role'] != 'assistant'))
     )
     if need_ai:
         generate_ai_reply_and_rerun()
@@ -698,6 +755,33 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
     st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
+    # --- Extra Controls: Restart, Change Topic, Change Level ---
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔁 Restart Practice"):
+            for k in [
+                'presentation_step', 'presentation_messages', 'presentation_turn_count',
+                'a2_keywords', 'a2_keyword_progress'
+            ]:
+                st.session_state.pop(k, None)
+            safe_rerun()
+    with col2:
+        if st.button("✏️ Change Topic"):
+            st.session_state["presentation_step"] = 1
+            st.session_state["presentation_topic"] = ""
+            st.session_state["presentation_messages"] = []
+            safe_rerun()
+    with col3:
+        if st.button("⬆️ Change Level"):
+            for k in [
+                'presentation_step', 'presentation_level', 'presentation_topic',
+                'presentation_messages', 'presentation_turn_count',
+                'a2_keywords', 'a2_keyword_progress'
+            ]:
+                st.session_state.pop(k, None)
+            st.session_state["presentation_step"] = 0
+            safe_rerun()
+
     a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
     b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
     if a2_done or b1_done:
@@ -708,19 +792,14 @@ def presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun):
         ]
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
-        if st.button("Restart Practice"):
-            for k in [
-                'presentation_step', 'presentation_messages', 'presentation_turn_count',
-                'a2_keywords', 'a2_keyword_progress'
-            ]:
-                st.session_state.pop(k, None)
-            safe_rerun()
+        # You can add the three controls again here if you want, or leave it clean.
 
 def stage_7():
     st.write(f"DEBUG: presentation_step = {st.session_state.get('presentation_step')}")
     if st.session_state.get("step") != 7:
         return
 
+    # Reset on weird/missing steps
     if "presentation_step" not in st.session_state or st.session_state["presentation_step"] not in [0,1,2,3]:
         st.session_state["presentation_step"] = 0
         st.session_state["presentation_level"] = None
@@ -748,63 +827,6 @@ def stage_7():
             st.experimental_rerun()
         except Exception:
             pass
-
-    def generate_ai_reply_and_rerun():
-        placeholder = st.empty()
-        placeholder.info("🧑‍🏫 Herr Felix is typing...")
-
-        if st.session_state.presentation_level == 'A2':
-            kws = list(st.session_state.a2_keywords or [])
-            topic = st.session_state.presentation_topic
-            next_kw = next((kw for kw in kws if kw not in st.session_state.a2_keyword_progress), kws[0])
-            system = (
-                f"You are Herr Felix, an intelligent and friendly German A2 teacher. "
-                f"You are helping a student practice for an upcoming German presentation. "
-                f"Always keep the conversation focused on the topic '{topic}' and the keywords: {', '.join(kws)}. "
-                f"Right now, focus especially on the keyword '{next_kw}'. "
-                "Your goal is to guide the student to prepare, structure, and expand their presentation answers. "
-                "Ask questions that help them give better, fuller answers and practice what they'll say. "
-                "If they make mistakes, explain the correction in simple English so the student understands. "
-                "Always give examples and tips in English if needed, but your next question should always be in German. "
-                "Do not move to a new topic or keyword until the current one has been covered well. "
-                "Act as both a helpful coach and a chat partner—encourage, teach, and help them improve for their real presentation!"
-            )
-        else:  # B1 logic
-            topic = st.session_state.presentation_topic
-            steps = [
-                f"You are Herr Felix, a motivating B1 teacher. Only discuss the student topic: '{topic}'. Ask for the student's opinion in German. Give positive feedback in English. If you correct a sentence, explain the correction in English.",
-                f"Still discussing '{topic}'. Now share your opinion in German and ask the student to respond. Feedback/corrections always in English.",
-                f"Keep to the topic '{topic}'. Ask the student to list advantages and disadvantages in German. Any explanations/corrections in English.",
-                f"Relate topic '{topic}' to student's home country in German. Feedback/corrections in English.",
-                f"Ask for a conclusion or recommendation in German about '{topic}'. Cheer in English.",
-                f"Summarize student's points in German and highlight progress. Explanations/corrections in English.",
-                f"Ask the student to tell a personal story about '{topic}' in German. Feedback/corrections in English.",
-                f"Ask for a comparison: How is '{topic}' different in Germany vs. student's country? (German). Corrections/tips in English.",
-                f"Invite the student to ask you a question about '{topic}' in German. Respond and explain in English.",
-                f"Ask the student for a summary or key learning about '{topic}' in German. Encourage in English.",
-                f"Conclude with a final opinion on '{topic}' in German. Give closing positive feedback in English.",
-                f"Ask: What is your advice for someone interested in '{topic}'? (German). Cheer in English.",
-            ]
-            idx = min(st.session_state.presentation_turn_count, len(steps)-1)
-            system = steps[idx]
-
-        last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
-        messages = [{'role':'system','content':system}]
-        if last:
-            messages.append(last)
-
-        try:
-            resp = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY']).chat.completions.create(
-                model='gpt-4o', messages=messages
-            )
-            reply = resp.choices[0].message.content
-        except Exception:
-            reply = "Sorry, something went wrong."
-
-        placeholder.empty()
-        st.chat_message("assistant", avatar="🧑‍🏫").markdown(reply)
-        st.session_state.presentation_messages.append({'role':'assistant','content':reply})
-        safe_rerun()
 
     # Stage 0: select level
     if st.session_state.presentation_step == 0:
@@ -841,6 +863,6 @@ def stage_7():
         presentation_chat_loop(generate_ai_reply_and_rerun, safe_rerun)
         return
 
-# ---- FINAL STEP: RUN STAGE 7 WHEN SELECTED ----
+# ---- To use in your app ----
 if st.session_state.get("step") == 7:
     stage_7()
