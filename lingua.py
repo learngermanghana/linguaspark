@@ -377,6 +377,7 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
+    # --- Mode initializations ---
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -464,11 +465,13 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
+            # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
                 ai_system_prompt = (
                     "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
-                    f"The topic of your presentation is: {b1_topic}. "
+                    f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
+                    "Never change the topic in your next question or feedback. "
                     "The student is supposed to ask you One question about your presentation. "
                     "1. Read the student's message. "
                     "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
@@ -481,37 +484,37 @@ if st.session_state["step"] == 5:
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
+                        "Always stay on the student's chosen topic for the session. "
                         "Reply at A2-level, using simple German sentences. "
-                        "Teach students how to get go about the topic to build their points. "
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
                         "- Correction (if needed, in German)\n"
                         "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German)\n"
+                        "- Next question (in German, about the same topic, and only ONE question)\n"
                     )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                         "Reply at B1-level in German. "
-                         "Teach students how to get ideas on the selected topic. "
-                        "Always be sure to stay on students topic. "
-                        "Ask only One question at a time. "
-                        "Ask student about their opinion on the selected topic. "
-                        "Ask student to give one advantage and disadvantage on the selected topic. "
-                        "Ask student about the situation in their home country on the selected topic. "
+                        "Always stay strictly on the student's current topic in every reply. "
+                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
+                        "Ask student about their opinion, or about one advantage, one disadvantage, or situation in their home country—but one at a time. "
                         "Correct and give a grammar tip for the student's last answer (always in English). "
                         "Your reply format:\n"
                         "- Your answer (German)\n"
                         "- Correction (if needed, in German)\n"
                         "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German)\n"
+                        "- Next question (in German, about the same topic, and only ONE question)\n"
                     )
             else:
                 lvl = st.session_state["selected_exam_level"]
+                topic = st.session_state.get("initial_prompt", "")
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                        "Stay strictly on the student's selected topic in every message. "
                         "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
                         "1. Ask students to give you some keywords to guide the conversation. Give them examples based on the topic. "
                         "1. Answer the student's message in very simple A2-level German (max 2–3 sentences). "
@@ -519,36 +522,39 @@ if st.session_state["step"] == 5:
                         "3. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
                         "4. Give a short grammar tip (in English, one short sentence). "
                         "5. If the answer is perfect, say so and still give a tip in English. "
-                        "6. End with a next question or prompt in German. "
+                        "6. End with a next question or prompt in German, always about the same topic. "
                         "Format your reply:\n"
-                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German, about the same topic)"
                     )
                 else:
                     ai_system_prompt = (
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
+                        "Stay strictly on the student's selected topic in every message. "
                         "Correct and give a grammar tip ONLY for the student's most recent answer, not for your own or earlier messages. "
                         "1. Answer the student's message in B1-level German (max 2–3 sentences). "
                         "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
                         "3. Give a short grammar tip (in English, one short sentence). "
                         "4. If the answer is perfect, say so and still give a tip in English. "
-                        "5. End with a next question or prompt in German. "
+                        "5. End with a next question or prompt in German, always about the same topic. "
                         "Format your reply:\n"
-                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German)"
+                        "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German, about the same topic)"
                     )
 
             conversation = [
                 {"role":"system","content":ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
-            try:
-                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp   = client.chat.completions.create(
-                    model="gpt-4o", messages=conversation
-                )
-                ai_reply = resp.choices[0].message.content
-            except Exception as e:
-                ai_reply = "Sorry, there was a problem generating a response."
-                st.error(str(e))
+            # --- Herr Felix is typing... indicator ---
+            with st.spinner("🧑‍🏫 Herr Felix is typing..."):
+                try:
+                    client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                    resp   = client.chat.completions.create(
+                        model="gpt-4o", messages=conversation
+                    )
+                    ai_reply = resp.choices[0].message.content
+                except Exception as e:
+                    ai_reply = "Sorry, there was a problem generating a response."
+                    st.error(str(e))
 
             st.session_state["messages"].append(
                 {"role":"assistant","content":ai_reply}
@@ -581,29 +587,3 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
-if st.session_state["step"] == 6:
-    st.title("🎉 Congratulations!")
-    st.markdown(
-        "<h3 style='color:#33691e;'>Session completed!</h3>",
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        f"**You completed {st.session_state['turn_count']} turns.**<br>"
-        "Start again or choose another mode?",
-        unsafe_allow_html=True
-    )
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔁 Start New Session", key="stage6_restart"):
-            st.session_state["step"] = 1
-            st.session_state["messages"] = []
-            st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
-            st.session_state["custom_topic"] = ""
-    with col2:
-        if st.button("⬅️ Back to Mode Selection", key="stage6_back"):
-            st.session_state["step"] = 3
-            st.session_state["messages"] = []
-            st.session_state["turn_count"] = 0
-            st.session_state["corrections"] = []
