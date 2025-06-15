@@ -527,6 +527,7 @@ def stage_4_5_6():
                 st.session_state["messages"] = []
                 st.session_state["turn_count"] = 0
                 st.session_state["corrections"] = []
+
 def presentation_chat_loop(generate_ai_reply):
     if st.session_state.presentation_step != 3:
         return
@@ -565,9 +566,7 @@ def presentation_chat_loop(generate_ai_reply):
 
     msgs = st.session_state.presentation_messages
 
-    msgs = st.session_state.presentation_messages
-
-    # --- 2. Show chat history and input field ---
+    # --- 2. Display chat history ---
     for m in msgs:
         if m['role'] == 'user':
             st.markdown(
@@ -593,12 +592,11 @@ def presentation_chat_loop(generate_ai_reply):
     # --- 3. Input field ---
     inp = st.chat_input("Type your response...")
     if inp:
+        # Set pending message ONLY, don't rerun
         st.session_state['pending_presentation_message'] = inp
-        st.experimental_rerun()
         return
 
-
-    # 5. Progress bar, controls, summary
+    # --- 4. Progress and controls (unchanged) ---
     max_turns = 12
     done = st.session_state.presentation_turn_count
     st.progress(min(done / max_turns, 1.0))
@@ -615,6 +613,7 @@ def presentation_chat_loop(generate_ai_reply):
         ]
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
+
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("🔁 Restart Practice"):
