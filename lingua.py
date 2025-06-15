@@ -528,6 +528,14 @@ def stage_4_5_6():
                 st.session_state["turn_count"] = 0
                 st.session_state["corrections"] = []
 
+def get_max_turns():
+    if st.session_state.presentation_level == 'A2':
+        return 12
+    elif st.session_state.presentation_level == 'B1':
+        return 10  # adjust if needed
+    else:
+        return 12
+
 def presentation_keywords_input():
     if st.session_state.presentation_step == 2:
         st.info(
@@ -549,15 +557,14 @@ def generate_ai_reply_presentation():
     placeholder = st.empty()
     placeholder.info("🧑‍🏫 Herr Felix is typing...")
 
-    # === A2 LOGIC: Cycle through all keywords ===
     if st.session_state.presentation_level == 'A2':
         kws = list(st.session_state.a2_keywords or [])
-        max_turns = 12
+        max_turns = get_max_turns()
         turn = st.session_state.presentation_turn_count
 
         if kws:
             turns_per_kw = max_turns // len(kws)
-            idx = min(turn // turns_per_kw, len(kws)-1)
+            idx = min(turn // turns_per_kw, len(kws) - 1)
             current_kw = kws[idx]
 
             detail_prompts = [
@@ -575,7 +582,6 @@ def generate_ai_reply_presentation():
             )
         else:
             system = "What topic and keywords are we practicing today?"
-    # === B1 LOGIC ===
     else:
         topic = st.session_state.presentation_topic
         steps = [
@@ -590,14 +596,14 @@ def generate_ai_reply_presentation():
             f"Ask the student to summarize their key points in German.",
             f"Ask for any last thoughts or what they learned from discussing '{topic}'."
         ]
-        idx = min(st.session_state.presentation_turn_count, len(steps)-1)
+        idx = min(st.session_state.presentation_turn_count, len(steps) - 1)
         system = (
             f"You are Herr Felix, a motivating B1 German teacher. "
             f"Today's topic: '{topic}'.\n{steps[idx]}"
         )
 
     last = st.session_state.presentation_messages[-1] if st.session_state.presentation_messages else None
-    messages = [{'role':'system','content':system}]
+    messages = [{'role': 'system', 'content': system}]
     if last:
         messages.append(last)
 
@@ -610,28 +616,29 @@ def generate_ai_reply_presentation():
         reply = "Sorry, something went wrong."
 
     placeholder.empty()
-    st.session_state.presentation_messages.append({'role':'assistant','content':reply})
+    st.session_state.presentation_messages.append({'role': 'assistant', 'content': reply})
     st.session_state['ai_already_replied'] = True
-
 
 def presentation_chat_loop():
     if st.session_state.presentation_step != 3:
         return
 
-    # 1. Process pending user input if exists
+    # Process pending user input if exists (do not rerun here!)
     pending = st.session_state.get("pending_presentation_message", None)
     if pending is not None:
         st.session_state.presentation_messages.append({'role': 'user', 'content': pending})
         st.session_state.presentation_turn_count += 1
+
         if st.session_state.presentation_level == 'A2':
             for k in st.session_state.a2_keywords or []:
-                if k.lower() in pending.lower():
-                    st.session_state.a2_keyword_progress.add(k)
+                if k.lower() in pending.lower() and k not in st.session_state.a2_keyword_progress:
+                    st.session_state.a2_keyword_progress.append(k)
+
         st.session_state['pending_presentation_message'] = None
-        generate_ai_reply_presentation()  # AI replies immediately here
+        generate_ai_reply_presentation()
         return
 
-    # 2. Display chat messages
+    # Show chat history
     for m in st.session_state.presentation_messages:
         if m['role'] == 'user':
             st.markdown(
@@ -654,22 +661,24 @@ def presentation_chat_loop():
                 """, unsafe_allow_html=True
             )
 
-    # 3. Input box
+    # Input field (set pending and rerun)
     inp = st.chat_input("Type your response...")
     if inp:
         st.session_state['pending_presentation_message'] = inp
         st.experimental_rerun()
         return
 
-    # 4. Progress bar and completion controls
-    max_turns = 12
+    # Show progress bar
     done = st.session_state.presentation_turn_count
+    max_turns = get_max_turns()
     st.progress(min(done / max_turns, 1.0))
     st.markdown(f"**Progress:** Turn {done}/{max_turns}")
     st.markdown("---")
 
+    # Completion message and controls
     a2_done = (st.session_state.presentation_level == 'A2' and done >= max_turns)
     b1_done = (st.session_state.presentation_level == 'B1' and done >= max_turns)
+
     if a2_done or b1_done:
         st.success("Practice complete! 🎉")
         lines = [
@@ -679,7 +688,6 @@ def presentation_chat_loop():
         st.subheader("Your Session Summary")
         st.markdown("\n\n".join(lines))
 
-        # Buttons for restart/change topic/level
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("🔁 Restart Practice"):
@@ -706,15 +714,13 @@ def presentation_chat_loop():
                 st.session_state["presentation_step"] = 0
                 st.experimental_rerun()
 
-
 def stage_7():
-    # Initialize session state keys if missing
     defaults = {
         "presentation_step": 0,
         "presentation_level": None,
         "presentation_topic": "",
         "a2_keywords": None,
-        "a2_keyword_progress": set(),
+        "a2_keyword_progress": [],
         "presentation_messages": [],
         "presentation_turn_count": 0,
         "pending_presentation_message": None,
@@ -722,7 +728,7 @@ def stage_7():
     }
     for k, v in defaults.items():
         if k not in st.session_state:
-            st.session_state[k] = v.copy() if isinstance(v, (list, set, dict)) else v
+            st.session_state[k] = v.copy() if isinstance(v, (list, dict)) else v
 
     st.header("🎤 Presentation Practice")
 
@@ -732,10 +738,10 @@ def stage_7():
         if st.button("Start Presentation Practice"):
             st.session_state.presentation_level = lvl
             st.session_state.presentation_step = 1
-            st.session_state.presentation_messages.clear()
+            st.session_state.presentation_messages = []
             st.session_state.presentation_turn_count = 0
             st.session_state.a2_keywords = None
-            st.session_state.a2_keyword_progress = set()
+            st.session_state.a2_keyword_progress = []
             st.session_state.presentation_topic = ""
             st.experimental_rerun()
         return
@@ -746,12 +752,12 @@ def stage_7():
         t = st.text_input("Topic:", key="topic_input")
         if st.button("Submit Topic") and t:
             st.session_state.presentation_topic = t
-            st.session_state.presentation_messages.append({'role':'user','content':t})
+            st.session_state.presentation_messages.append({'role': 'user', 'content': t})
             st.session_state.presentation_step = 2 if st.session_state.presentation_level == 'A2' else 3
             st.experimental_rerun()
         return
 
-    # Keywords input (A2 only)
+    # Keyword input (A2 only)
     if st.session_state.presentation_level == "A2" and st.session_state.presentation_step == 2:
         presentation_keywords_input()
         return
