@@ -470,6 +470,7 @@ def stage_5_chat():
         key="stage5_change_teil"
     )
     if new_teil != teil:
+        # Reset for new part
         st.session_state["selected_teil"] = new_teil
         prompt = PROMPT_BANK[user_level][new_teil]()
         st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
@@ -516,7 +517,7 @@ def stage_5_chat():
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
-        # AI reply
+        # Generate AI reply
         with st.spinner("Sir Felix is typing..."):
             system_prompt = (
                 f"You are Sir Felix, a German teacher and exam coach. "
@@ -534,9 +535,9 @@ def stage_5_chat():
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
-        # Append AI response and rerun to render
+        # Append AI response and return to rerun
         st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
-        st.experimental_rerun()
+        return
 
     # Navigation buttons
     col1, col2 = st.columns(2)
@@ -550,6 +551,7 @@ def stage_5_chat():
         if st.session_state["turn_count"] >= MAX_TURNS and st.button("Finish Session"):
             st.session_state["step"] = 6
             return
+
 
 
 # ===============================
