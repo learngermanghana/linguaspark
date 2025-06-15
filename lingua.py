@@ -448,6 +448,7 @@ def stage_4_exam_part():
             st.session_state["turn_count"] = 0
             st.session_state["corrections"] = []
             st.session_state["step"] = 5
+
 def stage_5_chat():
     if st.session_state.get("step") != 5:
         return
@@ -456,17 +457,16 @@ def stage_5_chat():
     user_level = st.session_state.get("user_level", "A1")
     teil = st.session_state.get("selected_teil", "Teil 1")
 
-    # Instructions and ability to switch exam part
-    st.markdown(f"**Current Level:** {user_level} | **Current Part:** {teil}")
+    # Show instructions and allow switching part
+    st.markdown(f"**Current Level:** {user_level}  |  **Current Part:** {teil}")
     new_teil = st.selectbox(
         "Change exam part (Teil):",
         LEVEL_TEIL_OPTIONS[user_level],
-        index=LEVEL_TEIL_OPTIONS[user_level].index(teil),
-        key="stage5_change_teil"
+        index=LEVEL_TEIL_OPTIONS[user_level].index(teil)
     )
     if new_teil != teil:
-        # Reset chat for new part
         st.session_state["selected_teil"] = new_teil
+        # Reset for new part
         prompt = PROMPT_BANK[user_level][new_teil]()
         st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
         st.session_state["turn_count"] = 0
@@ -480,7 +480,7 @@ def stage_5_chat():
     st.session_state["daily_usage"].setdefault(usage_key, 0)
 
     # Initialize first AI prompt if needed
-    if not st.session_state["messages"]:
+    if not st.session_state.get("messages"):
         prompt = PROMPT_BANK[user_level][teil]()
         st.session_state["messages"] = [{"role": "assistant", "content": prompt}]
 
@@ -488,74 +488,40 @@ def stage_5_chat():
     st.markdown(
         f"<div style='margin-bottom:0.5em'>"
         f"<span style='background:#bee3f8;border-radius:0.5em;padding:0.3em 0.8em;'>"
-        f"Student code: <b>{student_code}</b> &nbsp; | &nbsp; "
-        f"Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
-        f"</span></div>",
-        unsafe_allow_html=True
+        f"Student code: <b>{student_code}</b>  |  Today's practice: {st.session_state['daily_usage'][usage_key]}/{DAILY_LIMIT}"
+        f"</span></div>", unsafe_allow_html=True
     )
 
-    # --- Chat bubble rendering ---
-    def show_formatted_ai_reply(ai_reply):
-        lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
-        sections = {'answer': '', 'correction': '', 'explanation': '', 'followup': ''}
-        curr = 'answer'
-        for line in lines:
-            low = line.lower()
-            if 'correction:' in low:
-                curr = 'correction'; line = line.split(':', 1)[1].strip()
-            elif 'explanation:' in low or 'tip:' in low:
-                curr = 'explanation'; line = line.split(':', 1)[1].strip()
-            elif 'next question:' in low or 'follow-up' in low:
-                curr = 'followup'; line = line.split(':', 1)[1].strip()
-            sections[curr] += line + ' '
+    # Render chat history
+    for msg in st.session_state["messages"]:
+        if msg["role"] == "assistant":
+            with st.chat_message("assistant", avatar="🧑‍🏫"):
+                st.markdown(f"**Sir Felix:** {msg['content']}")
+        else:
+            with st.chat_message("user", avatar="🧑"):
+                st.markdown(f"**Student:** {msg['content']}")
 
-        if sections['answer'].strip():
-            st.markdown(f"**Answer:** {sections['answer'].strip()}")
-        if sections['correction'].strip():
-            st.markdown(f":red[**Correction (English):** {sections['correction'].strip()}]")
-        if sections['explanation'].strip():
-            st.markdown(f":blue[**Explanation (English):** {sections['explanation'].strip()}]")
-        if sections['followup'].strip():
-            st.markdown(f":green[**Next Question:** {sections['followup'].strip()}]")
+    # English instruction
+    st.markdown("Please answer the question above in German. You will receive corrections and tips in English.")
 
-    def render_chat():
-        for msg in st.session_state["messages"]:
-            if msg["role"] == "assistant":
-                with st.chat_message("assistant", avatar="🧑‍🏫"):
-                    st.markdown(f"**Sir Felix:**")
-                    show_formatted_ai_reply(msg["content"])
-            else:
-                with st.chat_message("user", avatar="🧑"):
-                    st.markdown(f"**Student:** {msg['content']}")
-
-    render_chat()
-
-    # English instruction for student
-    st.markdown("Please answer the question above in German. You will receive corrections in English.")
-
-    # --- Input form ---
-    with st.form("chat_form", clear_on_submit=True):
-        user_input = st.text_area("Your reply or exam answer:", height=80)
-        submitted = st.form_submit_button("Send")
-
-    session_ended = st.session_state["turn_count"] >= MAX_TURNS
-
-    if submitted and user_input and not session_ended:
+    # User input via chat_input
+    user_input = st.chat_input("Type your reply here...")
+    if user_input:
         # Append user message
         st.session_state["messages"].append({"role": "user", "content": user_input})
         st.session_state["turn_count"] += 1
         st.session_state["daily_usage"][usage_key] += 1
 
-        # Get AI reply
+        # AI reply
         with st.spinner("Sir Felix is typing..."):
             system_prompt = (
                 f"You are Sir Felix, a German teacher and exam coach. "
                 f"The student is level {user_level}, part {teil}. "
-                "Adapt your reply accordingly. Always correct and explain in English."
+                "Adapt your reply to the level. Always correct and explain in English."
             )
             conversation = [
                 {"role": "system", "content": system_prompt},
-                st.session_state["messages"][-1]
+                {"role": "user", "content": user_input}
             ]
             try:
                 client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
@@ -566,11 +532,10 @@ def stage_5_chat():
             except Exception as e:
                 ai_reply = "Sorry, there was a problem generating a response."
                 st.error(str(e))
-
-        # Append AI message
+        # Append AI response
         st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
 
-    # --- Navigation ---
+    # Navigation buttons
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back to Part Selection"):
@@ -579,9 +544,10 @@ def stage_5_chat():
             st.session_state["turn_count"] = 0
             return
     with col2:
-        if session_ended and st.button("Finish Session"):
+        if st.session_state["turn_count"] >= MAX_TURNS and st.button("Finish Session"):
             st.session_state["step"] = 6
             return
+
 
 # ===============================
 #         STAGE 6: Session Summary & Restart
