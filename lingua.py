@@ -566,15 +566,34 @@ def presentation_chat_loop(generate_ai_reply):
 
     # --- 2. Show chat history and input field ---
     for m in msgs:
-        # ... chat display as before ...
+        if m['role'] == 'user':
+            st.markdown(
+                f"""
+                <div style='display:flex;align-items:flex-start;margin-bottom:10px;'>
+                  <div style='background:#e3f2fd;color:#1565c0;padding:0.7em 1em;border-radius:1em 1em 1em 0;max-width:80%;display:inline-block;'>
+                    <b>👤</b> {m['content']}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"""
+                <div style='display:flex;justify-content:flex-end;margin-bottom:10px;'>
+                  <div style='background:#e8f5e9;color:#2e7d32;padding:0.7em 1em;border-radius:1em 1em 0 1em;max-width:80%;display:inline-block;'>
+                    <b>🧑‍🏫 Herr Felix:</b> {m['content']}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True
+            )
 
     # --- 3. Input field ---
     inp = st.chat_input("Type your response...")
     if inp:
-        # Set pending message and IMMEDIATELY return and rerun
         st.session_state['pending_presentation_message'] = inp
-        st.experimental_rerun()  # Safe to rerun here—no further logic after!
+        st.experimental_rerun()
         return
+
 
     # 5. Progress bar, controls, summary
     max_turns = 12
