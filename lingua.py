@@ -588,7 +588,8 @@ def presentation_chat_loop():
             for k in st.session_state.a2_keywords or []:
                 if k.lower() in inp.lower():
                     st.session_state.a2_keyword_progress.add(k)
-        generate_ai_reply_presentation()
+        # Add your AI reply function call here!
+        # Example: generate_ai_reply_presentation()
         st.experimental_rerun()
         return
 
@@ -631,6 +632,7 @@ def presentation_chat_loop():
                     st.session_state.pop(k, None)
                 st.session_state["presentation_step"] = 0
                 st.experimental_rerun()
+
 
 def stage_7():
     defaults = {
