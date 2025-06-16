@@ -568,7 +568,6 @@ if st.session_state["step"] == 5:
                                 "- Your answer (German)\n"
                                 "- Correction: ...\n"
                                 "- Grammar Tip: ...\n"
-                                "- Next question (German, about the same topic, and only ONE question)"
                             )
                         else:
                             ai_system_prompt = (
@@ -599,7 +598,6 @@ if st.session_state["step"] == 5:
                             "- Your answer (German)\n"
                             "- Correction (if needed, in German)\n"
                             "- Grammar Tip (in English, one short sentence)\n"
-                            "- Next question (in German, about the same topic, and only ONE question)\n"
                             "Never repeat the general topic ideas again."
                         )
             else:
