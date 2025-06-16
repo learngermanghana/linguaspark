@@ -474,6 +474,11 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
+                not st.session_state.get("custom_chat_intro_done", False)
+            ):
+                # After first AI reply (meta/keyword/phrases suggestion)
+                st.session_state["custom_chat_intro_done"] = True
+                
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
