@@ -32,7 +32,7 @@ st.markdown(
 # File/database constants
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
-max_turns = 15
+max_turns = 2
 TEACHER_PASSWORD = "Felix029"
 
 # Exam topic lists
@@ -466,37 +466,63 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-            # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
-            if is_b1_teil3:
-                b1_topic = st.session_state["current_b1_teil3_topic"]
-                ai_system_prompt = (
-                    "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
-                    f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
-                    "Never change the topic in your next question or feedback. "
-                    "The student is supposed to ask you One question about your presentation. "
-                    "1. Read the student's message. "
-                    "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
-                    "3. If the questions are good, answer them briefly (in simple German). "
-                    "4. Always end with clear exams tips in English. "
-                    "Be friendly, supportive, and exam-like. Never break character."
-                )
-            elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                lvl = st.session_state.get("custom_chat_level", "A2")
-                # ------ UPDATED LOGIC HERE ------
-                if lvl == "A2":
-                    ai_system_prompt = (
-                        "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
-                        "Teach students how to build their points on chosen topic. "
-                        "Always stay on the student's chosen topic for the session. "
-                        "Reply at A2-level, using simple German sentences. "
-                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
-                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
-                        "Your reply format:\n"
-                        "- Your answer (German)\n"
-                        "- Correction (if needed, in German)\n"
-                        "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German, about the same topic, and only ONE question)\n"
-                    )
+def get_a2_sentence_starters(topic: str):
+    """Return a list of simple A2-level sentence starters for the given topic."""
+    starters = [
+        f"Ich finde {topic} wichtig, weil ...",
+        f"Zum Beispiel: ...",
+        f"Ich habe Erfahrung mit {topic}.",
+        f"Für mich ist {topic} ...",
+        f"Ich mag {topic}, weil ...",
+        f"In meinem Land ist {topic} ...",
+        f"Ich möchte noch sagen, dass ...",
+        f"Ein Vorteil ist ...",
+        f"Ein Nachteil ist ...",
+    ]
+    return starters
+
+# ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
+if is_b1_teil3:
+    b1_topic = st.session_state["current_b1_teil3_topic"]
+    ai_system_prompt = (
+        "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
+        f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
+        "Never change the topic in your next question or feedback. "
+        "The student is supposed to ask you One question about your presentation. "
+        "1. Read the student's message. "
+        "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
+        "3. If the questions are good, answer them briefly (in simple German). "
+        "4. Always end with clear exams tips in English. "
+        "Be friendly, supportive, and exam-like. Never break character."
+    )
+elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
+    lvl = st.session_state.get("custom_chat_level", "A2")
+    topic = st.session_state.get("custom_topic", "das Thema")
+    # -------- SHOW PHRASE BANK ONCE AT THE START --------
+    if not st.session_state.get("phrase_bank_shown", False):
+        starters = get_a2_sentence_starters(topic)
+        st.info(
+            "Hier sind einige einfache Sätze, die du für deine Antworten benutzen kannst:\n\n" +
+            "\n".join([f"- {s}" for s in starters])
+        )
+        st.session_state["phrase_bank_shown"] = True
+
+    # ------ UPDATED LOGIC HERE ------
+    if lvl == "A2":
+        ai_system_prompt = (
+            "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
+            f"Teach students how to build their points on the topic '{topic}'. "
+            "Always stay on the student's chosen topic for the session. "
+            "Reply at A2-level, using simple German sentences. "
+            "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+            "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
+            "Your reply format:\n"
+            "- Your answer (German)\n"
+            "- Correction (if needed, in German)\n"
+            "- Grammar Tip (in English, one short sentence)\n"
+            "- Next question (in German, about the same topic, and only ONE question)\n"
+        )
+
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
