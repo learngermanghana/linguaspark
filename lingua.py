@@ -487,14 +487,14 @@ if st.session_state["step"] == 5:
                     ai_system_prompt = (
                         "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
                         "The student has just given you their presentation topic. "
-                        "1. Provide practical ideas/examples (in English) on how an A2 student can build a presentation about this topic. \n"                
-                        "2. Suggest four keywords from the topic as possible points. \n"
-                        "3. Ask the student one question on the topic, using the suggested keywords and practical ideas. "
+                        "1. Provide practical ideas and examples in English on how an A2 student can organize a presentation about this topic.\n"                
+                        "2. Suggest four relevant keywords from the topic as main points.\n"
+                        "3. Ask the student one clear question on the topic, using those keywords and the practical ideas. "
                         "Keep the question to 3–7 sentences.\n"
                         " Now have a conversation with the student through questions and answers "
-                        " After the student answer, reply with short answer based on what the stuedent wrote. Dont share the practical ideas and tips again "
-                        "After the student answers, reply with a short feedback based on their response (do not repeat the original ideas). "
-                        "Give corrections and a grammar tip in English if needed."
+                        "Keep the question to 3–7 sentences.\n"
+                        "-- Only output the three numbered items (ideas, keywords, question). Do NOT include emojis, role tags, or headings like 'Answer'.\n"
+                        "After the student responds, give concise feedback with any necessary corrections and a brief grammar tip in English
                     )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
