@@ -468,6 +468,17 @@ if st.session_state["step"] == 5:
 
 #def breaks
 
+            # --- USER INPUT HANDLER (place this immediately after receiving new user input!) ---
+            if (
+                st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
+                and st.session_state.get("custom_chat_level", "A2") == "A2"
+                and not st.session_state.get("a2_keywords_confirmed", False)
+            ):
+                user_msg = st.session_state.get("last_user_message", "").strip().lower()
+                if user_msg in ("yes", "ja", "ok", "okay"):
+                    st.session_state["a2_keywords_confirmed"] = True
+                # Optional: handle custom keywords logic here
+
             #  ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
@@ -484,16 +495,8 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # ---------- A2 Onboarding Logic ----------
                 if "a2_keywords_confirmed" not in st.session_state:
                     st.session_state["a2_keywords_confirmed"] = False
-
-                # Detect confirmation in your input handler (this is pseudocode):
-                user_msg = st.session_state.get("last_user_message", "").strip().lower()
-                if lvl == "A2" and not st.session_state["a2_keywords_confirmed"]:
-                    if user_msg in ("yes", "ja", "ok", "okay"):
-                        st.session_state["a2_keywords_confirmed"] = True
-                    # If you accept custom keywords, handle and set True here as well.
 
                 if lvl == "A2":
                     if not st.session_state["a2_keywords_confirmed"]:
@@ -525,9 +528,7 @@ if st.session_state["step"] == 5:
                 else:  # B1 Custom Chat
                     if "custom_topic_intro_done" not in st.session_state:
                         st.session_state["custom_topic_intro_done"] = False
-                    # Detect custom_topic_intro_done flag in your input handler:
                     if not st.session_state["custom_topic_intro_done"]:
-                        # You should set this flag to True after the B1 intro is complete in your input handler
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                             "The student has just given you their presentation topic. "
@@ -552,6 +553,7 @@ if st.session_state["step"] == 5:
                             "- Next question (in German, about the same topic, and only ONE question)\n"
                             "Never repeat the general topic ideas again."
                         )
+
 
             else:
                 lvl = st.session_state["selected_exam_level"]
