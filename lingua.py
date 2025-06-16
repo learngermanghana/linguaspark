@@ -490,6 +490,13 @@ if st.session_state["step"] == 5:
                         "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n""
                         "3. Ask the student in English if they are okay with these keywords. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n" "
                         "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed. "
+                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
+                        "Your reply format:\n"
+                        "- Your answer (German)\n"
+                        "- Correction (if needed, in German)\n"
+                        "- Grammar Tip (in English, one short sentence)\n"
+                        "- Next question (in German, about the same topic, and only ONE question)\n"
                     )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
