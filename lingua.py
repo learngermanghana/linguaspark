@@ -395,9 +395,9 @@ if st.session_state["step"] == 5:
                 "role": "assistant",
                 "content": "Hallo! 👋 What would you like to talk about? Give me details of what you want so I can understand."
             }]
-        st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
+        st.stop()
 
-    if is_b1_teil3 and not st.session_state["messages"]:
+    if is_b1_teil3 and not st.session_state.get("messages", []):
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
         init = (
@@ -411,7 +411,7 @@ if st.session_state["step"] == 5:
     elif (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and st.session_state.get("custom_chat_level")
-        and not st.session_state["messages"]
+        and not st.session_state.get("messages", [])
     ):
         st.session_state["messages"].append({
             "role": "assistant",
@@ -420,7 +420,7 @@ if st.session_state["step"] == 5:
 
     elif (
         st.session_state.get("selected_mode", "").startswith("Geführte")
-        and not st.session_state["messages"]
+        and not st.session_state.get("messages", [])
     ):
         prompt = st.session_state.get("initial_prompt")
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
@@ -440,20 +440,21 @@ if st.session_state["step"] == 5:
         try:
             suffix = "." + uploaded.name.split(".")[-1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(data); tmp.flush()
+                tmp.write(data)
+                tmp.flush()
             client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
             transcript = client.audio.transcriptions.create(
-                model="whisper-1", file=open(tmp.name,"rb")
+                model="whisper-1", file=open(tmp.name, "rb")
             )
             user_input = transcript.text
-        except:
+        except Exception:
             st.warning("Transcription failed; please type your message.")
     elif typed:
         user_input = typed
 
-    session_ended    = st.session_state["turn_count"] >= max_turns
-    used_today       = st.session_state["daily_usage"][usage_key]
-    ai_just_replied  = False
+    session_ended   = st.session_state["turn_count"] >= max_turns
+    used_today      = st.session_state["daily_usage"][usage_key]
+    ai_just_replied = False
 
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
@@ -462,22 +463,23 @@ if st.session_state["step"] == 5:
                 "Please come back tomorrow or contact your tutor!"
             )
         else:
-            st.session_state["messages"].append({"role":"user","content":user_input})
+            st.session_state["messages"].append({"role": "user", "content": user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
+
 
 def get_a2_sentence_starters(topic: str):
     """Return a list of simple A2-level sentence starters for the given topic."""
     starters = [
         f"Ich finde {topic} wichtig, weil ...",
-        f"Zum Beispiel: ...",
+        "Zum Beispiel: ...",
         f"Ich habe Erfahrung mit {topic}.",
         f"Für mich ist {topic} ...",
         f"Ich mag {topic}, weil ...",
         f"In meinem Land ist {topic} ...",
-        f"Ich möchte noch sagen, dass ...",
-        f"Ein Vorteil ist ...",
-        f"Ein Nachteil ist ...",
+        "Ich möchte noch sagen, dass ...",
+        "Ein Vorteil ist ...",
+        "Ein Nachteil ist ...",
     ]
     return starters
 
@@ -522,6 +524,7 @@ elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Cha
             "- Grammar Tip (in English, one short sentence)\n"
             "- Next question (in German, about the same topic, and only ONE question)\n"
         )
+
 
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
