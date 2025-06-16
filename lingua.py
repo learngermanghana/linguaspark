@@ -353,6 +353,7 @@ elif st.session_state["step"] == 5:
         )
         st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
         st.experimental_rerun()
+        return
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
