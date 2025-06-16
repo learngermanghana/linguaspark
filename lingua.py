@@ -345,7 +345,10 @@ elif st.session_state["step"] == 4:
             st.session_state["custom_topic_intro_done"] = False
             st.session_state["step"] = 5
 
+
 # -------------------- MAIN CHAT LOGIC ------------------------
+import time  # <-- Needed for the typing delay
+
 if st.session_state["step"] == 5:
     today_str = str(date.today())
     student_code = st.session_state["student_code"]
@@ -473,29 +476,68 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # ---- FIXED A2 custom chat intro/real chat split! ----
+                # --- GET THE STUDENT'S TOPIC ---
+                topic_msg = ""
+                for msg in st.session_state["messages"]:
+                    if msg["role"] == "user":
+                        topic_msg = msg["content"].strip()
+                        break
+                yes_set = {"ja", "yes"}
+                no_set = {"nein", "no"}
+
                 if lvl == "A2":
+                    # Intro message (meta/keywords/examples) not yet done
                     if not st.session_state.get("custom_chat_intro_done", False):
                         ai_system_prompt = (
-                            "You are Herr Felix, a strict but kind A2 German teacher. The student has just given you their topic."
-                            "1. In English, help them organize ideas and give 3-4 useful keywords for their topic."
-                            "2. Give a couple of simple German example sentences."
-                            "3. Ask in English if they agree with the keywords or want to suggest their own."
-                            "Wait for the student's confirmation or suggestions. After this, NEVER repeat the intro/keywords again."
+                            f"You are Herr Felix, a strict but kind A2 German teacher. The student wants to talk about: {topic_msg}."
+                            "1. In English, help them organize their ideas and give 3-4 useful keywords for their topic."
+                            "2. Give 2-3 simple German example sentences."
+                            "3. Ask if they agree with the keywords (say: 'Type ja/yes to accept, nein/no to suggest your own.')."
+                            "Wait for the student's confirmation. After this, NEVER repeat this intro message again."
                         )
                         st.session_state["custom_chat_intro_done"] = True
                     else:
-                        ai_system_prompt = (
-                            "You are Herr Felix, a strict but friendly A2 examiner. "
-                            "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time. "
-                            "Correct their last answer and give a short grammar tip (in English) if needed. "
-                            "Your reply format:\n"
-                            "- Your answer (German)\n"
-                            "- Correction: ...\n"
-                            "- Grammar Tip: ...\n"
-                            "- Next question (German, about the same topic, and only ONE question)"
-                        )
-                else:  # B1 Custom Chat
+                        # Last user reply (could be ja, yes, nein, no, or custom keywords)
+                        last_user_msg = ""
+                        for msg in reversed(st.session_state["messages"]):
+                            if msg["role"] == "user":
+                                last_user_msg = msg["content"].strip().lower()
+                                break
+                        if last_user_msg in yes_set:
+                            ai_system_prompt = (
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
+                                "Correct their last answer and give a short grammar tip (in English) if needed."
+                                "Your reply format:\n"
+                                "- Your answer (German)\n"
+                                "- Correction: ...\n"
+                                "- Grammar Tip: ...\n"
+                                "- Next question (German, about the same topic, and only ONE question)"
+                            )
+                        elif last_user_msg in no_set:
+                            ai_system_prompt = (
+                                f"Okay! Please suggest your own keywords for the topic '{topic_msg}' (in English or German). "
+                                "Once you've provided them, I'll use them for our conversation."
+                            )
+                        elif last_user_msg:
+                            ai_system_prompt = (
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "The student wants to use their own keywords. Use only those keywords to guide your questions."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
+                                "Correct their last answer and give a short grammar tip (in English) if needed."
+                                "Your reply format:\n"
+                                "- Your answer (German)\n"
+                                "- Correction: ...\n"
+                                "- Grammar Tip: ...\n"
+                                "- Next question (German, about the same topic, and only ONE question)"
+                            )
+                        else:
+                            ai_system_prompt = (
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
+                            )
+                else:
+                    # B1 custom chat logic as before
                     if not st.session_state.get("custom_topic_intro_done", False):
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
@@ -555,21 +597,29 @@ if st.session_state["step"] == 5:
                     )
 
             conversation = [
-                {"role": "system", "content": ai_system_prompt},
+                {"role":"system","content":ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
-            try:
-                client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                resp = client.chat.completions.create(
-                    model="gpt-4o", messages=conversation
-                )
-                ai_reply = resp.choices[0].message.content
-            except Exception as e:
-                ai_reply = "Sorry, there was a problem generating a response."
-                st.error(str(e))
+            with st.spinner("🧑‍🏫 Herr Felix is typing..."):
+                try:
+                    client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+                    resp   = client.chat.completions.create(
+                        model="gpt-4o", messages=conversation
+                    )
+                    ai_reply = resp.choices[0].message.content
+                except Exception as e:
+                    ai_reply = "Sorry, there was a problem generating a response."
+                    st.error(str(e))
+
+            if (
+                st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
+                and st.session_state.get("custom_chat_level") == "B1"
+                and not st.session_state["custom_topic_intro_done"]
+            ):
+                st.session_state["custom_topic_intro_done"] = True
 
             st.session_state["messages"].append(
-                {"role": "assistant", "content": ai_reply}
+                {"role":"assistant","content":ai_reply}
             )
 
     for msg in st.session_state["messages"]:
@@ -593,11 +643,8 @@ if st.session_state["step"] == 5:
                 "messages":[],
                 "turn_count":0,
                 "custom_chat_level":None,
-                "custom_chat_intro_done":False,
-                "custom_topic_intro_done":False
+                "custom_level_prompted":False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
-
-# --- End main file ---
