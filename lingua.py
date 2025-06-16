@@ -491,7 +491,10 @@ if st.session_state["step"] == 5:
                        "3. Ask the student in English if they are okay with these keywords.\n"
                        "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
                        "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
-                else:  # B1 Custom Chat
+                        
+                        }
+                        
+                        else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
@@ -502,6 +505,7 @@ if st.session_state["step"] == 5:
                             "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
                             "Give corrections and a grammar tip if needed. "
                             "Never repeat this ideas/tips message again in this chat session."
+                        
                         )
                     else:
                         ai_system_prompt = (
