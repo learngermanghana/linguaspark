@@ -401,17 +401,16 @@ if st.session_state["step"] == 5:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
         init = (
-            f"Imagine am done with my presentation on **{topic}** .\n\n"
+            f"Imagine you have just finished your presentation on **{topic}**.\n\n"
             "Your task now:\n"
-            "- Ask me **one question** about my presentation (In German).\n"
-            "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
+            "- Ask me exactly one question about my presentation (in German)."
         )
         st.session_state["messages"].append({"role": "assistant", "content": init})
 
     elif (
-        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
-        and st.session_state.get("custom_chat_level")
-        and not st.session_state["messages"]
+        st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)" and
+        st.session_state.get("custom_chat_level") and
+        not st.session_state["messages"]
     ):
         st.session_state["messages"].append({
             "role": "assistant",
@@ -419,8 +418,8 @@ if st.session_state["step"] == 5:
         })
 
     elif (
-        st.session_state.get("selected_mode", "").startswith("Geführte")
-        and not st.session_state["messages"]
+        st.session_state.get("selected_mode", "").startswith("Geführte") and
+        not st.session_state["messages"]
     ):
         prompt = st.session_state.get("initial_prompt")
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
@@ -472,30 +471,45 @@ if st.session_state["step"] == 5:
                 ai_system_prompt = (
                     "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
                     f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
-                    "Never change the topic in your next question or feedback. "
-                    "The student is supposed to ask you One question about your presentation. "
+                    "Never change the topic. The student is supposed to ask you one valid question about their presentation. "
                     "1. Read the student's message. "
-                    "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
-                    "3. If the questions are good, answer them briefly (in simple German). "
-                    "4. Always end with clear exams tips in English. "
-                    "Be friendly, supportive, and exam-like. Never break character."
+                    "2. Confirm if they wrote exactly one question—praise or politely correct. "
+                    "3. If valid, answer briefly in simple German. "
+                    "4. End with clear exam tips in English."
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
                 # ------ UPDATED LOGIC HERE ------
                 if lvl == "A2":
                     ai_system_prompt = (
-                        "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
-                        "The student has just given you their presentation topic. "
-                        "1. Provide practical ideas and examples in English on how an A2 student can organize a presentation about this topic.\n"                
+                        "You are Herr Felix, a creative but strict A2 German teacher and exam trainer.\n"
+                        "The student has just provided their presentation topic.\n"
+                        "1. Provide practical ideas/examples in English on how an A2 student can organize a presentation about this topic.\n"
                         "2. Suggest four relevant keywords from the topic as main points.\n"
-                        "3. Ask the student one clear question on the topic, using those keywords and the practical ideas. "
-                        "Keep the question to 3–7 sentences.\n"
-                        " Now have a conversation with the student through questions and answers "
-                        "Keep the question to 3–7 sentences.\n"
-                        "-- Only output the three numbered items (ideas, keywords, question). Do NOT include emojis, role tags, or headings like 'Answer'.\n"
-                        "After the student responds, give concise feedback with any necessary corrections and a brief grammar tip in English
+                        "3. Ask the student one clear question in German, using those keywords and practical ideas (3–7 sentences).\n"
+                        "Only output the three numbered items. Do NOT include emojis, role tags, or extra headings."
                     )
+                else:
+                    if not st.session_state["custom_topic_intro_done"]:
+                        ai_system_prompt = (
+                            "You are Herr Felix, a supportive B1 German teacher and exam trainer.\n"
+                            "The student has just provided their presentation topic.\n"
+                            "1. First, give practical ideas/examples in German on how a B1 student can build a presentation about this topic.\n"
+                            "2. Suggest points: Meinung, Vorteil, Nachteil, Situation im Heimatland.\n"
+                            "3. Ask one question about their opinion on the topic in German.\n"
+                            "Give corrections and a grammar tip if needed.\n"
+                            "Never repeat these ideas again."
+                        )
+                    else:
+                        ai_system_prompt = (
+                            "You are Herr Felix, a supportive B1 German teacher and exam trainer.\n"
+                            "Reply at B1-level in German, stay on topic.\n"
+                            "1. Provide your answer in German.\n"
+                            "2. Correction (if needed, in German).\n"
+                            "3. Grammar Tip (English).\n"
+                            "4. Next question in German (one question only).\n"
+                            "Do not repeat general topic ideas."
+                        )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
