@@ -522,6 +522,7 @@ elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Cha
             "- Next question (in German, about the same topic, and only ONE question)\n"
         )
 
+
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
