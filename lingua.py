@@ -495,6 +495,7 @@ if st.session_state["step"] == 5:
                         "6. After the keyword answer, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
                         "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
+                        "Never repeat number 1,2,3,4,5 again in this chat session after that stage is completed."
                         "Your reply format:\n"
                         "- Your answer (German)\n"
                         "- Correction (if needed, in German)\n"
