@@ -466,9 +466,6 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-#def
-"1"
-
             # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
