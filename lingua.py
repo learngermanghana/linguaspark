@@ -467,41 +467,61 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-            # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
-            if is_b1_teil3:
-                b1_topic = st.session_state["current_b1_teil3_topic"]
-                ai_system_prompt = (
-                    "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
-                    f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
-                    "Never change the topic in your next question or feedback. "
-                    "The student is supposed to ask you One question about your presentation. "
-                    "1. Read the student's message. "
-                    "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
-                    "3. If the questions are good, answer them briefly (in simple German). "
-                    "4. Always end with clear exams tips in English. "
-                    "Be friendly, supportive, and exam-like. Never break character."
-                )
+# ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
+if is_b1_teil3:
+    b1_topic = st.session_state["current_b1_teil3_topic"]
+    ai_system_prompt = (
+        "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
+        f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
+        "Never change the topic in your next question or feedback. "
+        "The student is supposed to ask you One question about your presentation. "
+        "1. Read the student's message. "
+        "2. Tell the student if they have written one valid question (praise them if so, otherwise say politely what is missing). "
+        "3. If the questions are good, answer them briefly (in simple German). "
+        "4. Always end with clear exams tips in English. "
+        "Be friendly, supportive, and exam-like. Never break character."
+    )
 
-            elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                lvl = st.session_state.get("custom_chat_level", "A2")
-                if lvl == "A2":
-                    ai_system_prompt = (
-                        "You are Herr Felix, a creative but strict A2 German teacher and exam trainer.\n"
-                        "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German that they can use.\n"
-                        "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n"
-                        "3. Ask the student in English if they are okay with these keywords.\n"
-                        "4.  If yes or ja, start with the first question in German.\n" 
-                        "5. If no or nein, let the student provide their own keywords, and then proceed with the first question in German.\n"
-                        "6. After the keyword answer, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
-                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
-                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
-                        "Never repeat number 1,2,3,4,5 again in this chat session after that stage is completed."
-                        "Your reply format:\n"
-                        "- Your answer (German)\n"
-                        "- Correction (if needed, in German)\n"
-                        "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German, about the same topic, and only ONE question)\n"    
-                    )
+elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
+    lvl = st.session_state.get("custom_chat_level", "A2")
+    intro_done = st.session_state.get("custom_topic_intro_done", False)
+    topic = st.session_state.get("custom_topic", "das Thema")
+
+    if lvl == "A2" and not intro_done:
+        ai_system_prompt = (
+            "You are Herr Felix, a creative but strict A2 German teacher and exam trainer.\n"
+            "Stage 1 (Intro):\n"
+            "  1. In English, teach the student how to build their points and ideas for their chosen topic. Give 2-3 example phrases in simple German they can use.\n"
+            "  2. Suggest 4 keywords (in English, with German translations in brackets) related to the topic.\n"
+            "  3. Ask the student in English if they are okay with these keywords. Wait for them to confirm or suggest their own.\n"
+            "  4. If the student answers 'yes', 'ja', or gives their own keywords, transition to Stage 2 and NEVER repeat Stage 1 again in this session.\n"
+            "  5. If the student says 'no' or 'nein', ask them to provide their own keywords, then proceed to Stage 2.\n"
+            "After Stage 1, only Stage 2 logic applies for the rest of this chat session.\n"
+            "Stage 2 (Main chat):\n"
+            "  - ONLY use simple German suitable for A2 level (except grammar tips, which must be in English).\n"
+            "  - Always stay on the student's chosen topic.\n"
+            "  - After each student message, reply with:\n"
+            "    - Your answer (in German)\n"
+            "    - Correction (if needed, in German)\n"
+            "    - Grammar Tip (in English, one short sentence)\n"
+            "    - Next question (in German, about the same topic, and only ONE question)\n"
+            "  - Ask NO MORE THAN ONE question at a time.\n"
+            "  - Never repeat Stage 1 instructions or keyword suggestions again after Stage 1 is completed.\n"
+        )
+    elif lvl == "A2" and intro_done:
+        ai_system_prompt = (
+            "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
+            "Always reply ONLY in simple German suitable for A2 level, except grammar tips which must be in English. "
+            f"Stay on the student's chosen topic '{topic}'. "
+            "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
+            "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
+            "Your reply format:\n"
+            "- Your answer (German)\n"
+            "- Correction (if needed, in German)\n"
+            "- Grammar Tip (in English, one short sentence)\n"
+            "- Next question (in German, about the same topic, and only ONE question)\n"
+        )
+
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
