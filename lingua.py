@@ -1,8 +1,8 @@
-import os
 import random
-from datetime import date
 import streamlit as st
-from openai import OpenAI
+
+# ---- (Optional) OpenAI import/setup ----
+# from openai import OpenAI
 
 def init_session():
     defaults = {
@@ -44,30 +44,24 @@ B1_TOPICS = {
 }
 
 def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
-    # Replace with your real prompt logic!
     return f"You are Herr Felix. Mode: {mode}, Level: {level}, Part: {teil}, Topic: {topic}"
 
 def get_recent_message_history(messages, N=6):
     return messages[-N:] if len(messages) > N else messages
 
-def chat_with_openai(system_prompt, message_history, api_key, model="gpt-4o", fallback_model="gpt-3.5-turbo"):
-    client = OpenAI(api_key=api_key)
-    messages = [{"role": "system", "content": system_prompt}] + message_history
-    try:
-        resp = client.chat.completions.create(
-            model=model, messages=messages
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        st.warning(f"GPT-4o failed: {e} - retrying with {fallback_model}")
-        try:
-            resp = client.chat.completions.create(
-                model=fallback_model, messages=messages
-            )
-            return resp.choices[0].message.content
-        except Exception as e2:
-            st.error(f"All models failed: {e2}")
-            return "Sorry, there was a problem generating a response."
+def chat_with_openai(system_prompt, message_history, api_key="sk-..."):
+    # Placeholder for OpenAI call. Uncomment and use your OpenAI key:
+    # client = OpenAI(api_key=api_key)
+    # messages = [{"role": "system", "content": system_prompt}] + message_history
+    # try:
+    #     resp = client.chat.completions.create(
+    #         model="gpt-4o", messages=messages
+    #     )
+    #     return resp.choices[0].message.content
+    # except Exception as e:
+    #     return "Sorry, there was a problem generating a response."
+    # DEMO: Fake AI reply
+    return "Dies ist eine Beispielantwort von Herr Felix."
 
 def step_1_login():
     st.title("Student Login")
@@ -137,7 +131,7 @@ def step_5_chat():
         custom_intro_done = st.session_state.get("custom_topic_intro_done", False)
         system_prompt = get_ai_system_prompt(mode, level, teil, topic, custom_intro_done)
         message_history = get_recent_message_history(st.session_state["messages"], N=6)
-        ai_reply = chat_with_openai(system_prompt, message_history, api_key=st.secrets["general"]["OPENAI_API_KEY"])
+        ai_reply = chat_with_openai(system_prompt, message_history)  # Add api_key as needed
         st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
         st.experimental_rerun()
         return
