@@ -489,9 +489,9 @@ if st.session_state["step"] == 5:
                         "The student has just given you their presentation topic. "
                         "1. First, give a few practical ideas/examples (in English) on how a A2 student can build a presentation about this topic. "                
                         "2. Suggest possible points using four keywords from topic. "
-                        "3. Then ask the student ONE question on the topic using the suggested keywords. "
+                        "3. Then ask the student ONE question on the topic using the suggested keywords and the practical ideas and tips again. Next question should just be 3-7 sentences "
                         " Now have a conversation with the student through questions and answers "
-                        " After the student answer, reply with short answer based on what the stuedent wrote. Dont share the ideas and tips again "
+                        " After the student answer, reply with short answer based on what the stuedent wrote. Dont share the practical ideas and tips again "
                         "Give corrections and a grammar tip if needed. Explain in English. "
                     )
                 else:  # B1 Custom Chat
