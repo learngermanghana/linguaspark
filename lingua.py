@@ -466,18 +466,18 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
-#def breaks
-
-            # --- USER INPUT HANDLER (place this immediately after receiving new user input!) ---
+            # --- USER INPUT HANDLER (place this immediately after you set last_user_message!) ---
             if (
                 st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
                 and st.session_state.get("custom_chat_level", "A2") == "A2"
                 and not st.session_state.get("a2_keywords_confirmed", False)
             ):
-                user_msg = st.session_state.get("last_user_message", "").strip().lower()
+                user_msg = st.session_state["last_user_message"].strip().lower()
                 if user_msg in ("yes", "ja", "ok", "okay"):
                     st.session_state["a2_keywords_confirmed"] = True
                 # Optional: handle custom keywords logic here
+
+#def breaks
 
             #  ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
