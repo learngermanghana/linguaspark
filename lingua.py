@@ -474,7 +474,7 @@ st.session_state.setdefault("custom_topic_intro_done", False)
 #def breaks
 
             # --- USER INPUT HANDLER (immediately after you set last_user_message!) ---
-            def handle_a2_keywords_confirmation():
+           
                 """
                 Checks if we’re in A2 custom chat and the student hasn't confirmed keywords yet.
                 If the user replies 'yes' (or equivalent), set the confirmation flag.
