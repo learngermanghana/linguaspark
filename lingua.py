@@ -347,6 +347,10 @@ elif st.session_state["step"] == 4:
 
 # -------------------- MAIN CHAT LOGIC (A2 now uses B1-like logic, tuned for A2) ------------------------
 
+# --- Constants ---
+DAILY_LIMIT = 25
+MAX_TURNS = 6
+
 # --- Session State Defaults ---
 st.session_state.setdefault("daily_usage", {})
 st.session_state.setdefault("custom_chat_intro_done", False)
