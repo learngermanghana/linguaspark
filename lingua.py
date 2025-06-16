@@ -487,11 +487,10 @@ st.session_state.setdefault("custom_topic_intro_done", False)
                     user_msg = st.session_state.get("last_user_message", "").strip().lower()
                     if user_msg in ("yes", "ja", "ok", "okay"):
                         st.session_state["a2_keywords_confirmed"] = True
-                    # Optional: handle custom-keywords logic here (e.g., parse and store them)
+                # Optional: handle custom-keywords logic here (e.g., parse and store them)
 
-            # Call the handler right after defining it
+            # Call the handler right away
             handle_a2_keywords_confirmation()
-
 
             #  ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
