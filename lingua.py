@@ -491,7 +491,7 @@ if st.session_state["step"] == 5:
                         "2. Suggest possible points using four keywords from topic. "
                         "3. Then ask the student ONE question on the topic using the suggested keywords. "
                         "4. Now have a conversation with the student through questions and answers "
-                        "Never repeat this ideas/tips message again in this chat session."
+                        "5. After the student answer, reply with short answer based on what the stuedent wrote. Dont share the ideas and tips again "
                         "Give corrections and a grammar tip if needed. Explain in English. "
                     )
                 else:  # B1 Custom Chat
