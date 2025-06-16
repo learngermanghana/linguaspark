@@ -345,17 +345,27 @@ elif st.session_state["step"] == 4:
             st.session_state["custom_topic_intro_done"] = False
             st.session_state["step"] = 5
 
-# -------------------- MAIN CHAT LOGIC ------------------------
-import time  # <-- Needed for the typing delay
+# -------------------- MAIN CHAT LOGIC (improved) ------------------------
+import time
+import tempfile
+from datetime import date
+
+# --- Constants ---
+DAILY_LIMIT = 25
+MAX_TURNS = 6  # Make sure you use this everywhere
+
+# --- State Initialization (safe) ---
+st.session_state.setdefault("daily_usage", {})
+st.session_state.setdefault("custom_chat_intro_done", False)
+st.session_state.setdefault("custom_topic_intro_done", False)
+st.session_state.setdefault("messages", [])
+st.session_state.setdefault("turn_count", 0)
 
 if st.session_state["step"] == 5:
     today_str = str(date.today())
     student_code = st.session_state["student_code"]
     usage_key = f"{student_code}_{today_str}"
-    st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
-    st.session_state.setdefault("custom_chat_intro_done", False)
-    st.session_state.setdefault("custom_topic_intro_done", False)
 
     st.info(
         f"Student code: `{student_code}` | "
@@ -415,6 +425,7 @@ if st.session_state["step"] == 5:
         prompt = st.session_state.get("initial_prompt")
         st.session_state["messages"].append({"role": "assistant", "content": prompt})
 
+    # --- User input (audio or text) ---
     uploaded = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
         type=["wav","mp3","ogg","m4a"],
@@ -436,14 +447,15 @@ if st.session_state["step"] == 5:
                 model="whisper-1", file=open(tmp.name,"rb")
             )
             user_input = transcript.text
-        except:
+        except Exception as e:
             st.warning("Transcription failed; please type your message.")
     elif typed:
         user_input = typed
 
-    session_ended    = st.session_state["turn_count"] >= max_turns
-    used_today       = st.session_state["daily_usage"][usage_key]
+    session_ended = st.session_state["turn_count"] >= MAX_TURNS
+    used_today = st.session_state["daily_usage"][usage_key]
 
+    # --- On user submission, run chat logic ---
     if user_input and not session_ended:
         if used_today >= DAILY_LIMIT:
             st.warning(
@@ -460,6 +472,7 @@ if st.session_state["step"] == 5:
             time.sleep(1.1)
 
             # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
+            # (For maintainability, you could move these into helper functions)
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
                 ai_system_prompt = (
@@ -475,7 +488,6 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # --- GET THE STUDENT'S TOPIC ---
                 topic_msg = ""
                 for msg in st.session_state["messages"]:
                     if msg["role"] == "user":
@@ -483,9 +495,7 @@ if st.session_state["step"] == 5:
                         break
                 yes_set = {"ja", "yes"}
                 no_set = {"nein", "no"}
-
                 if lvl == "A2":
-                    # Intro message (meta/keywords/examples) not yet done
                     if not st.session_state.get("custom_chat_intro_done", False):
                         ai_system_prompt = (
                             f"You are Herr Felix, a strict but kind A2 German teacher. The student wants to talk about: {topic_msg}."
@@ -496,7 +506,6 @@ if st.session_state["step"] == 5:
                         )
                         st.session_state["custom_chat_intro_done"] = True
                     else:
-                        # Last user reply (could be ja, yes, nein, no, or custom keywords)
                         last_user_msg = ""
                         for msg in reversed(st.session_state["messages"]):
                             if msg["role"] == "user":
@@ -536,7 +545,6 @@ if st.session_state["step"] == 5:
                                 "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
                             )
                 else:
-                    # B1 custom chat logic as before
                     if not st.session_state.get("custom_topic_intro_done", False):
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
@@ -602,7 +610,7 @@ if st.session_state["step"] == 5:
             with st.spinner("🧑‍🏫 Herr Felix is typing..."):
                 try:
                     client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                    resp   = client.chat.completions.create(
+                    resp = client.chat.completions.create(
                         model="gpt-4o", messages=conversation
                     )
                     ai_reply = resp.choices[0].message.content
@@ -610,17 +618,11 @@ if st.session_state["step"] == 5:
                     ai_reply = "Sorry, there was a problem generating a response."
                     st.error(str(e))
 
-            if (
-                st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
-                and st.session_state.get("custom_chat_level") == "B1"
-                and not st.session_state["custom_topic_intro_done"]
-            ):
-                st.session_state["custom_topic_intro_done"] = True
-
             st.session_state["messages"].append(
-                {"role":"assistant","content":ai_reply}
+                {"role": "assistant", "content": ai_reply}
             )
 
+    # --- Chat display loop ---
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -633,17 +635,21 @@ if st.session_state["step"] == 5:
             with st.chat_message("user"):
                 st.markdown(f"🗣️ {msg['content']}")
 
+    # --- Navigation buttons ---
+    def reset_to_prev():
+        prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
+        st.session_state.update({
+            "step": prev,
+            "messages": [],
+            "turn_count": 0,
+            "custom_chat_level": None,
+            "custom_level_prompted": False,
+        })
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("⬅️ Back", key="stage5_back"):
-            prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
-            st.session_state.update({
-                "step":prev,
-                "messages":[],
-                "turn_count":0,
-                "custom_chat_level":None,
-                "custom_level_prompted":False,
-            })
+            reset_to_prev()
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
