@@ -504,8 +504,9 @@ if st.session_state["step"] == 5:
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                             "The student has just given you their presentation topic. "
                             "1. First, give a few practical ideas/examples (in German) on how a B1 student can build a presentation about this topic. "
-                            "2. Suggest possible points: Meinung (opinion), Vorteil (advantage), Nachteil (disadvantage), Situation im Heimatland (situation in home country), etc. "
+                            "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n"
                             "3. Then ask the student ONE question about their opinion (Meinung) on the topic (in German). "
+                            "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
                             "Give corrections and a grammar tip if needed. "
                             "Never repeat this ideas/tips message again in this chat session."
                         )
