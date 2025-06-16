@@ -345,9 +345,8 @@ elif st.session_state["step"] == 4:
             st.session_state["custom_topic_intro_done"] = False
             st.session_state["step"] = 5
 
-
 # -------------------- MAIN CHAT LOGIC ------------------------
-import time
+import time  # <-- Needed for the typing delay
 
 if st.session_state["step"] == 5:
     today_str = str(date.today())
@@ -357,8 +356,6 @@ if st.session_state["step"] == 5:
     st.session_state["daily_usage"].setdefault(usage_key, 0)
     st.session_state.setdefault("custom_chat_intro_done", False)
     st.session_state.setdefault("custom_topic_intro_done", False)
-    st.session_state.setdefault("a2_current_topic", "")
-    st.session_state.setdefault("a2_keywords_confirmed", False)
 
     st.info(
         f"Student code: `{student_code}` | "
@@ -478,42 +475,38 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # ---- IMPROVED A2 custom chat logic ----
+                # --- GET THE STUDENT'S TOPIC ---
+                topic_msg = ""
+                for msg in st.session_state["messages"]:
+                    if msg["role"] == "user":
+                        topic_msg = msg["content"].strip()
+                        break
+                yes_set = {"ja", "yes"}
+                no_set = {"nein", "no"}
+
                 if lvl == "A2":
-                    # Find the current chat topic (first user message after intro)
-                    if not st.session_state.get("a2_current_topic"):
-                        # Find the first user message after system intro
-                        for msg in st.session_state["messages"]:
-                            if msg["role"] == "user" and msg["content"].strip():
-                                st.session_state["a2_current_topic"] = msg["content"].strip()
-                                break
-
-                    topic_msg = st.session_state.get("a2_current_topic", "").strip()
-                    yes_set = {"ja", "yes"}
-                    no_set = {"nein", "no"}
-
-                    # If we haven't yet confirmed/handled keywords for this topic
-                    if topic_msg and not st.session_state.get("a2_keywords_confirmed", False):
+                    # Intro message (meta/keywords/examples) not yet done
+                    if not st.session_state.get("custom_chat_intro_done", False):
+                        ai_system_prompt = (
+                            f"You are Herr Felix, a strict but kind A2 German teacher. The student wants to talk about: {topic_msg}."
+                            "1. In English, help them organize their ideas and give 3-4 useful keywords for their topic."
+                            "2. Give 2-3 simple German example sentences."
+                            "3. Ask if they agree with the keywords (say: 'Type ja/yes to accept, nein/no to suggest your own.')."
+                            "Wait for the student's confirmation. After this, NEVER repeat this intro message again."
+                        )
+                        st.session_state["custom_chat_intro_done"] = True
+                    else:
+                        # Last user reply (could be ja, yes, nein, no, or custom keywords)
                         last_user_msg = ""
                         for msg in reversed(st.session_state["messages"]):
                             if msg["role"] == "user":
                                 last_user_msg = msg["content"].strip().lower()
                                 break
-                        # 1. No reply yet? Do the meta/keywords step
-                        if last_user_msg == topic_msg.lower():
+                        if last_user_msg in yes_set:
                             ai_system_prompt = (
-                                f"You are Herr Felix, a strict but kind A2 German teacher. The student wants to talk about: {topic_msg}. "
-                                "1. In English, help them organize their ideas and give 3-4 useful keywords for their topic. "
-                                "2. Give 2-3 simple German example sentences. "
-                                "3. Ask if they agree with the keywords (say: 'Type ja/yes to accept, nein/no to suggest your own.'). "
-                                "Wait for the student's confirmation or suggestions. After this, NEVER repeat this intro message again."
-                            )
-                        elif last_user_msg in yes_set:
-                            st.session_state["a2_keywords_confirmed"] = True
-                            ai_system_prompt = (
-                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}. "
-                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time. "
-                                "Correct their last answer and give a short grammar tip (in English) if needed. "
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
+                                "Correct their last answer and give a short grammar tip (in English) if needed."
                                 "Your reply format:\n"
                                 "- Your answer (German)\n"
                                 "- Correction: ...\n"
@@ -525,14 +518,12 @@ if st.session_state["step"] == 5:
                                 f"Okay! Please suggest your own keywords for the topic '{topic_msg}' (in English or German). "
                                 "Once you've provided them, I'll use them for our conversation."
                             )
-                        elif last_user_msg and last_user_msg != topic_msg.lower():
-                            # Student just wrote their own keywords
-                            st.session_state["a2_keywords_confirmed"] = True
+                        elif last_user_msg:
                             ai_system_prompt = (
-                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}. "
-                                "The student wants to use their own keywords. Use only those keywords to guide your questions. "
-                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time. "
-                                "Correct their last answer and give a short grammar tip (in English) if needed. "
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "The student wants to use their own keywords. Use only those keywords to guide your questions."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
+                                "Correct their last answer and give a short grammar tip (in English) if needed."
                                 "Your reply format:\n"
                                 "- Your answer (German)\n"
                                 "- Correction: ...\n"
@@ -540,28 +531,13 @@ if st.session_state["step"] == 5:
                                 "- Next question (German, about the same topic, and only ONE question)"
                             )
                         else:
-                            # fallback
                             ai_system_prompt = (
-                                f"You are Herr Felix, a strict but kind A2 German teacher. The student wants to talk about: {topic_msg}. "
-                                "1. In English, help them organize their ideas and give 3-4 useful keywords for their topic. "
-                                "2. Give 2-3 simple German example sentences. "
-                                "3. Ask if they agree with the keywords (say: 'Type ja/yes to accept, nein/no to suggest your own.'). "
-                                "Wait for the student's confirmation or suggestions. After this, NEVER repeat this intro message again."
+                                f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}."
+                                "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time."
                             )
-                    else:
-                        # Normal A2 question/answer mode
-                        ai_system_prompt = (
-                            f"You are Herr Felix, a strict but friendly A2 examiner. The topic is: {topic_msg}. "
-                            "NOW, only use simple German, stay on the student's topic, and ask ONE question at a time. "
-                            "Correct their last answer and give a short grammar tip (in English) if needed. "
-                            "Your reply format:\n"
-                            "- Your answer (German)\n"
-                            "- Correction: ...\n"
-                            "- Grammar Tip: ...\n"
-                            "- Next question (German, about the same topic, and only ONE question)"
-                        )
-                else:  # B1 custom chat
-                    if not st.session_state["custom_topic_intro_done"]:
+                else:
+                    # B1 custom chat logic as before
+                    if not st.session_state.get("custom_topic_intro_done", False):
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                             "The student has just given you their presentation topic. "
@@ -571,6 +547,7 @@ if st.session_state["step"] == 5:
                             "Give corrections and a grammar tip if needed. "
                             "Never repeat this ideas/tips message again in this chat session."
                         )
+                        st.session_state["custom_topic_intro_done"] = True
                     else:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
@@ -581,9 +558,9 @@ if st.session_state["step"] == 5:
                             "Correct and give a grammar tip for the student's last answer (always in English). "
                             "Your reply format:\n"
                             "- Your answer (German)\n"
-                            "- Correction: ...\n"
-                            "- Grammar Tip: ...\n"
-                            "- Next question (German, about the same topic, and only ONE question)\n"
+                            "- Correction (if needed, in German)\n"
+                            "- Grammar Tip (in English, one short sentence)\n"
+                            "- Next question (in German, about the same topic, and only ONE question)\n"
                             "Never repeat the general topic ideas again."
                         )
             else:
@@ -619,13 +596,13 @@ if st.session_state["step"] == 5:
                     )
 
             conversation = [
-                {"role": "system", "content": ai_system_prompt},
+                {"role":"system","content":ai_system_prompt},
                 st.session_state["messages"][-1]
             ]
             with st.spinner("🧑‍🏫 Herr Felix is typing..."):
                 try:
                     client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
-                    resp = client.chat.completions.create(
+                    resp   = client.chat.completions.create(
                         model="gpt-4o", messages=conversation
                     )
                     ai_reply = resp.choices[0].message.content
@@ -633,7 +610,6 @@ if st.session_state["step"] == 5:
                     ai_reply = "Sorry, there was a problem generating a response."
                     st.error(str(e))
 
-            # ----- Flag for B1 custom topic intro -----
             if (
                 st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
                 and st.session_state.get("custom_chat_level") == "B1"
@@ -642,10 +618,9 @@ if st.session_state["step"] == 5:
                 st.session_state["custom_topic_intro_done"] = True
 
             st.session_state["messages"].append(
-                {"role": "assistant", "content": ai_reply}
+                {"role":"assistant","content":ai_reply}
             )
 
-    # ---- UI: Display Chat History ----
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -663,16 +638,13 @@ if st.session_state["step"] == 5:
         if st.button("⬅️ Back", key="stage5_back"):
             prev = 4 if st.session_state["selected_mode"].startswith("Geführte") else 3
             st.session_state.update({
-                "step": prev,
-                "messages": [],
-                "turn_count": 0,
-                "custom_chat_level": None,
-                "custom_level_prompted": False,
-                "a2_current_topic": "",
-                "a2_keywords_confirmed": False,
-                "custom_chat_intro_done": False,
-                "custom_topic_intro_done": False
+                "step":prev,
+                "messages":[],
+                "turn_count":0,
+                "custom_chat_level":None,
+                "custom_level_prompted":False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
