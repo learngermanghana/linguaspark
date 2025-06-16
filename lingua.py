@@ -25,7 +25,6 @@ B1_TOPICS = {
     B1_PARTS[2]: ["Fragen stellen zu einer Präsentation"]
 }
 
-# ---- Session state init ----
 def init_session():
     defaults = {
         "step": 1,
@@ -44,48 +43,30 @@ def init_session():
             st.session_state[k] = v
 init_session()
 
-# ---- Prompt Engineering ----
 def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
-    # ---- Exam Mode Prompts ----
     if mode == "Geführte Prüfungssimulation (Exam Mode)":
         if level == "A2":
             return (
                 f"You are Herr Felix, a strict but friendly Goethe A2 examiner. "
                 f"Stay strictly on the topic: {topic}. "
                 "Correct and give a grammar tip ONLY for the student's most recent answer. "
-                "1. Answer in very simple A2-level German (max 2–3 sentences). "
-                "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                "3. Give a short grammar tip (in English, one short sentence). "
-                "4. If the answer is perfect, say so and still give a tip in English. "
-                "5. End with a next question in German, always about the same topic. "
-                "Format your reply:\n"
-                "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German, about the same topic)"
+                "Format your reply as follows:\n"
+                "- Your answer (German)\n"
+                "- Correction: ...\n"
+                "- Grammar Tip: ...\n"
+                "- Next question (German, about the same topic)"
             )
         elif level == "B1":
-            if teil and "Teil 3" in teil:
-                return (
-                    f"You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
-                    f"Stay strictly on the topic: {topic}. "
-                    "The student is supposed to ask you one valid question about their presentation. "
-                    "1. Read the student's message. "
-                    "2. Confirm if they wrote exactly one question—praise or politely correct. "
-                    "3. If valid, answer briefly in simple German. "
-                    "4. End with clear exam tips in English."
-                )
-            else:
-                return (
-                    f"You are Herr Felix, a strict but supportive Goethe B1 examiner. "
-                    f"Stay strictly on the topic: {topic}. "
-                    "Correct and give a grammar tip ONLY for the student's most recent answer. "
-                    "1. Answer in B1-level German (max 2–3 sentences). "
-                    "2. If there are mistakes, show the corrected sentence(s) under 'Correction:'. "
-                    "3. Give a short grammar tip (in English, one short sentence). "
-                    "4. If the answer is perfect, say so and still give a tip in English. "
-                    "5. End with a next question or prompt in German, always about the same topic. "
-                    "Format your reply:\n"
-                    "- Your answer (German)\n- Correction: ...\n- Grammar Tip: ...\n- Next question (German, about the same topic)"
-                )
-    # ---- Custom Topic Prompts ----
+            return (
+                f"You are Herr Felix, a strict but supportive Goethe B1 examiner. "
+                f"Stay strictly on the topic: {topic}. "
+                "Correct and give a grammar tip ONLY for the student's most recent answer. "
+                "Format your reply as follows:\n"
+                "- Your answer (German)\n"
+                "- Correction: ...\n"
+                "- Grammar Tip: ...\n"
+                "- Next question (German, about the same topic)"
+            )
     elif mode == "Eigenes Thema/Frage (Custom Topic Chat)":
         if level == "A2":
             return (
@@ -94,18 +75,25 @@ def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
                 "1. Provide practical ideas/examples in English on how an A2 student can organize a presentation about this topic. "
                 "2. Suggest four relevant keywords from the topic as main points. "
                 "3. Ask the student one clear question in German, using those keywords and practical ideas (3–7 sentences). "
-                "Only output the three numbered items. Do NOT include emojis, role tags, or extra headings."
+                "Format your reply as follows:\n"
+                "- Your answer (German)\n"
+                "- Correction: ...\n"
+                "- Grammar Tip: ...\n"
+                "- Next question (German, about the same topic)"
             )
         elif level == "B1":
             if not custom_intro_done:
                 return (
                     f"You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                     f"The student has just given you their presentation topic: {topic}. "
-                    "1. First, give a few practical ideas/examples (in German) on how a B1 student can build a presentation about this topic. "
-                    "2. Suggest possible points: Meinung (opinion), Vorteil (advantage), Nachteil (disadvantage), Situation im Heimatland (situation in home country), etc. "
-                    "3. Then ask the student ONE question about their opinion (Meinung) on the topic (in German). "
-                    "Give corrections and a grammar tip if needed. "
-                    "Never repeat this ideas/tips message again in this chat session."
+                    "1. Give practical ideas/examples in German for a B1 presentation about this topic. "
+                    "2. Suggest points: Meinung, Vorteil, Nachteil, Situation im Heimatland. "
+                    "3. Ask one question about their opinion on the topic in German. "
+                    "Format your reply as follows:\n"
+                    "- Your answer (German)\n"
+                    "- Correction: ...\n"
+                    "- Grammar Tip: ...\n"
+                    "- Next question (German, about the same topic)"
                 )
             else:
                 return (
@@ -113,22 +101,17 @@ def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
                     f"Stay strictly on the topic: {topic}. "
                     "Reply at B1-level in German. "
                     "Always stay strictly on the student's current topic in every reply. "
-                    "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
-                    "Ask the student about their opinion, or about one advantage, one disadvantage, or situation in their home country—but one at a time, rotating each turn. "
                     "Correct and give a grammar tip for the student's last answer (always in English). "
-                    "Your reply format:\n"
+                    "Format your reply as follows:\n"
                     "- Your answer (German)\n"
-                    "- Correction (if needed, in German)\n"
-                    "- Grammar Tip (in English, one short sentence)\n"
-                    "- Next question (in German, about the same topic, and only ONE question)\n"
-                    "Never repeat the general topic ideas again."
+                    "- Correction: ...\n"
+                    "- Grammar Tip: ...\n"
+                    "- Next question (German, about the same topic, and only ONE question)"
                 )
-    # Default fallback
     return f"You are Herr Felix, answer as a German teacher/examiner for {level}."
 
-# ---- AI Chat Utility ----
 def chat_with_openai(system_prompt, message_history):
-    # Uncomment and adapt for production
+    # Uncomment & replace for real API use
     # client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
     # messages = [{"role": "system", "content": system_prompt}] + message_history
     # try:
@@ -138,13 +121,63 @@ def chat_with_openai(system_prompt, message_history):
     #     return resp.choices[0].message.content
     # except Exception as e:
     #     return "Sorry, there was a problem generating a response."
-    # DEMO: Fake AI reply
-    return "Dies ist eine Beispielantwort von Herr Felix."
+    # Demo reply:
+    # The format here should match your AI output format for real use.
+    return (
+        "Guten Morgen! Ich stehe jeden Tag um 7 Uhr auf. Dann frühstücke ich.\n"
+        "Correction: Ich stehe jeden Tag um 7 Uhr **auf** (verb at the end).\n"
+        "Grammar Tip: In separable verbs, the prefix goes to the end.\n"
+        "Next question: Was machst du nach dem Frühstück?"
+    )
 
 def get_recent_message_history(messages, N=6):
     return messages[-N:] if len(messages) > N else messages
 
-# ---- Step Functions ----
+def show_formatted_ai_reply(ai_reply):
+    """
+    Splits the AI reply into sections and displays each part with a different style.
+    Expected sections: Correction, Grammar Tip, Next Question.
+    """
+    # Parse out the sections
+    lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
+    main, correction, grammatik, followup = '', '', '', ''
+    curr_section = 'main'
+
+    for line in lines:
+        header = line.lower()
+        if header.startswith('correction:') or header.startswith('- correction:'):
+            curr_section = 'correction'
+            line = line.split(':',1)[-1].strip()
+            if line: correction += line + ' '
+            continue
+        elif header.startswith('grammar tip:') or header.startswith('- grammar tip:') \
+             or header.startswith('grammatik-tipp:') or header.startswith('- grammatik-tipp:'):
+            curr_section = 'grammatik'
+            line = line.split(':',1)[-1].strip()
+            if line: grammatik += line + ' '
+            continue
+        elif header.startswith('next question:') or header.startswith('- next question:') \
+             or header.startswith('follow-up question') or header.startswith('folgefrage'):
+            curr_section = 'followup'
+            line = line.split(':',1)[-1].strip()
+            if line: followup += line + ' '
+            continue
+        if curr_section == 'main':
+            main += line + ' '
+        elif curr_section == 'correction':
+            correction += line + ' '
+        elif curr_section == 'grammatik':
+            grammatik += line + ' '
+        elif curr_section == 'followup':
+            followup += line + ' '
+
+    st.markdown(f"**📝 Answer:**  \n{main.strip()}", unsafe_allow_html=True)
+    if correction.strip():
+        st.markdown(f"<div style='color:#c62828'><b>✏️ Correction:</b>  \n{correction.strip()}</div>", unsafe_allow_html=True)
+    if grammatik.strip():
+        st.markdown(f"<div style='color:#1565c0'><b>📚 Grammar Tip:</b>  \n{grammatik.strip()}</div>", unsafe_allow_html=True)
+    if followup.strip():
+        st.markdown(f"<div style='color:#388e3c'><b>➡️ Next question:</b>  \n{followup.strip()}</div>", unsafe_allow_html=True)
 
 def step_1_login():
     st.title("Student Login")
@@ -181,29 +214,26 @@ def step_4_exam_part():
     selected_topic = st.selectbox("Choose a topic:", current_topics, key="topic_select")
 
     if st.button("Start Chat ➡️", key="stage4_start"):
-        prompt = f"Practice: {selected_topic}"
-        st.session_state["initial_prompt"] = prompt
+        st.session_state["initial_prompt"] = selected_topic
         st.session_state["messages"] = []
         st.session_state["turn_count"] = 0
         st.session_state["step"] = 5
 
 def step_5_chat():
-    st.markdown("### 💬 Chat with Herr Felix")
+    st.header("💬 Chat mit Herr Felix")
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
-                st.markdown(msg['content'])
+                show_formatted_ai_reply(msg["content"])
         else:
             with st.chat_message("user"):
-                st.markdown(msg['content'])
+                st.markdown(msg["content"])
     typed = st.chat_input("💬 Type your answer here...", key="stage5_typed_input")
     if typed:
         st.session_state["messages"].append({"role": "user", "content": typed})
-        # --- AI logic with real prompt ---
         mode = st.session_state.get("selected_mode", "")
         level = st.session_state.get("selected_exam_level") or st.session_state.get("custom_chat_level")
         teil = st.session_state.get("selected_teil")
-        # For custom mode, you could allow user to type their own topic
         topic = st.session_state.get("initial_prompt", "")
         custom_intro_done = st.session_state.get("custom_topic_intro_done", False)
         system_prompt = get_ai_system_prompt(mode, level, teil, topic, custom_intro_done)
