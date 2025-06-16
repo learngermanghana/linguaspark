@@ -481,7 +481,7 @@ if st.session_state["step"] == 5:
                     "Be friendly, supportive, and exam-like. Never break character."
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                lvl = st.session_state.get("custom_chat_level", "A2")
+                lvl = st.session_state.get("custom_chat_intro_done", "A2")
                 # ------ UPDATED LOGIC HERE ------
                 if lvl == "A2":
                     ai_system_prompt = (
