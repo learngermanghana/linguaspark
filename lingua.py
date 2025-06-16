@@ -491,7 +491,7 @@ if st.session_state["step"] == 5:
                         "2. Suggest possible points using four keywords from topic. "
                         "3. Then ask the student ONE question on the topic using the suggested keywords. Ask 3 questions for each keyword and remaining as random questions (in German). "
                         "Never repeat this ideas/tips message again in this chat session."
-                        "Give corrections and a grammar tip if needed. Explain in English
+                        "Give corrections and a grammar tip if needed. Explain in English. "
                     )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
