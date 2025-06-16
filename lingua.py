@@ -492,7 +492,7 @@ if st.session_state["step"] == 5:
                         "3. Ask the student in English if they are okay with these keywords.\n"
                         "4.  If yes or ja, start with the first question in German.\n" 
                         "5. If no or nein, let the student provide their own keywords, and then proceed with the first question in German.\n"
-                        "After the keyword answer, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
+                        "6. After the keyword answer, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
                         "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
                         "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
                         "Your reply format:\n"
