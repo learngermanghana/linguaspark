@@ -418,7 +418,7 @@ if st.session_state["step"] == 5:
         st.markdown(get_intro_text(mode, level), unsafe_allow_html=True)
         if st.button("Los geht's!"):
             st.session_state["intro_key"] = intro_key
-            st.experimental_rerun()
+            st.rerun()
         st.stop()
 
     # ========== MAIN CHAT LOGIC ==========
