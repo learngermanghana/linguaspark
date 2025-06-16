@@ -466,6 +466,9 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
+#def
+"1"
+
             # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
                 b1_topic = st.session_state["current_b1_teil3_topic"]
@@ -481,18 +484,20 @@ if st.session_state["step"] == 5:
                     "Be friendly, supportive, and exam-like. Never break character."
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
-                lvl = st.session_state.get("custom_chat_intro_done", "A2")
+                lvl = st.session_state.get("custom_chat_level", "A2")
                 # ------ UPDATED LOGIC HERE ------
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
                         "The student has just given you their presentation topic. "
-                        "1. First, give a few practical ideas/examples (in English) on how a A2 student can build a presentation about this topic. "                
-                        "2. Suggest possible points using four keywords from topic. "
-                        "3. Then ask the student ONE question on the topic using the suggested keywords and the practical ideas and tips again. Next question should just be 3-7 sentences "
+                        "1. Provide practical ideas/examples (in English) on how an A2 student can build a presentation about this topic. \n"                
+                        "2. Suggest four keywords from the topic as possible points. \n"
+                        "3. Ask the student one question on the topic, using the suggested keywords and practical ideas. "
+                        "Keep the question to 3–7 sentences.\n"
                         " Now have a conversation with the student through questions and answers "
                         " After the student answer, reply with short answer based on what the stuedent wrote. Dont share the practical ideas and tips again "
-                        "Give corrections and a grammar tip if needed. Explain in English. "
+                        "After the student answers, reply with a short feedback based on their response (do not repeat the original ideas). "
+                        "Give corrections and a grammar tip in English if needed."
                     )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
