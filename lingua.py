@@ -523,7 +523,11 @@ if st.session_state["step"] == 5:
                             "Do NOT ask for keywords or repeat the introduction again."
                         )
                 else:  # B1 Custom Chat
+                    if "custom_topic_intro_done" not in st.session_state:
+                        st.session_state["custom_topic_intro_done"] = False
+                    # Detect custom_topic_intro_done flag in your input handler:
                     if not st.session_state["custom_topic_intro_done"]:
+                        # You should set this flag to True after the B1 intro is complete in your input handler
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
                             "The student has just given you their presentation topic. "
