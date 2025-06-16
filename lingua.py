@@ -486,17 +486,10 @@ if st.session_state["step"] == 5:
                 if lvl == "A2":
                     ai_system_prompt = (
                         "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
-                        "1. Teach students how to build their points and ideas on how the conversation will proceed on chosen topic. In Englsih and needed phrases in German "
-                        "2. Always stay on the student's chosen topic and suggest 4 keywords that relate to the topic for the session. Ask them in English so they understand"
-                        "3. Ask student in English if they are okay with keywords and if they confirm use your keywords else let them provide their own and proceed. "
-                        "Reply at A2-level, using simple German sentences. "
-                        "Correct and give a short grammar tip ONLY for the student's most recent answer (always in English). "
-                        "Ask NO MORE THAN ONE question at a time—never ask two or more questions in one reply. "
-                        "Your reply format:\n"
-                        "- Your answer (German)\n"
-                        "- Correction (if needed, in German)\n"
-                        "- Grammar Tip (in English, one short sentence)\n"
-                        "- Next question (in German, about the same topic, and only ONE question)\n"
+                        "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German that they can use.\n "
+                        "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n""
+                        "3. Ask the student in English if they are okay with these keywords. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n" "
+                        "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed. "
                     )
                 else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
