@@ -365,7 +365,7 @@ if st.session_state["step"] == 5:
     usage_key    = f"{student_code}_{today_str}"
     st.session_state.setdefault("daily_usage", {})
     st.session_state["daily_usage"].setdefault(usage_key, 0)
-    st.session_state.setdefault("custom_topic_intro_done", False)  # <-- Ensure this is set
+    st.session_state.setdefault("custom_topic_intro_done", False)
 
     st.info(
         f"Student code: `{student_code}` | "
@@ -378,7 +378,7 @@ if st.session_state["step"] == 5:
         st.session_state.get("selected_teil", "").startswith("Teil 3")
     )
 
-    # --- Mode initializations ---
+    # ---- Mode initializations ----
     if (
         st.session_state.get("selected_mode", "") == "Eigenes Thema/Frage (Custom Topic Chat)"
         and not st.session_state.get("custom_chat_level")
@@ -395,13 +395,13 @@ if st.session_state["step"] == 5:
                 "role": "assistant",
                 "content": "Hallo! 👋 What would you like to talk about? Give me details of what you want so I can understand."
             }]
-        st.stop()  # Only runs until level is picked; after button, rerun shows chat UI
+        st.stop()  # Only runs until level is picked
 
     if is_b1_teil3 and not st.session_state["messages"]:
         topic = random.choice(B1_TEIL2)
         st.session_state["current_b1_teil3_topic"] = topic
         init = (
-            f"Imagine am done with my presentation on **{topic}** .\n\n"
+            f"Imagine am done with my presentation on **{topic}**.\n\n"
             "Your task now:\n"
             "- Ask me **one question** about my presentation (In German).\n"
             "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
@@ -427,7 +427,7 @@ if st.session_state["step"] == 5:
 
     uploaded = st.file_uploader(
         "Upload an audio file (WAV, MP3, OGG, M4A)",
-        type=["wav","mp3","ogg","m4a"],
+        type=["wav", "mp3", "ogg", "m4a"],
         key="stage5_audio_upload"
     )
     typed = st.chat_input("💬 Oder tippe deine Antwort hier...", key="stage5_typed_input")
@@ -440,10 +440,11 @@ if st.session_state["step"] == 5:
         try:
             suffix = "." + uploaded.name.split(".")[-1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(data); tmp.flush()
+                tmp.write(data)
+                tmp.flush()
             client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
             transcript = client.audio.transcriptions.create(
-                model="whisper-1", file=open(tmp.name,"rb")
+                model="whisper-1", file=open(tmp.name, "rb")
             )
             user_input = transcript.text
         except:
@@ -462,7 +463,7 @@ if st.session_state["step"] == 5:
                 "Please come back tomorrow or contact your tutor!"
             )
         else:
-            st.session_state["messages"].append({"role":"user","content":user_input})
+            st.session_state["messages"].append({"role": "user", "content": user_input})
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
@@ -480,21 +481,19 @@ if st.session_state["step"] == 5:
                     "4. Always end with clear exams tips in English. "
                     "Be friendly, supportive, and exam-like. Never break character."
                 )
+
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # ------ UPDATED LOGIC HERE ------
                 if lvl == "A2":
                     ai_system_prompt = (
-                       "You are Herr Felix, a creative but strict A2 German teacher and exam trainer.\n"
-                       "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German that they can use.\n"
-                       "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n"
-                       "3. Ask the student in English if they are okay with these keywords.\n"
-                       "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
-                       "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
-                        
-                        )
-                        
-                        else:  # B1 Custom Chat
+                        "You are Herr Felix, a creative but strict A2 German teacher and exam trainer.\n"
+                        "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German that they can use.\n"
+                        "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n"
+                        "3. Ask the student in English if they are okay with these keywords.\n"
+                        "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
+                        "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed."
+                    )
+                else:  # B1 Custom Chat
                     if not st.session_state["custom_topic_intro_done"]:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
@@ -505,8 +504,8 @@ if st.session_state["step"] == 5:
                             "4. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
                             "Give corrections and a grammar tip if needed. "
                             "Never repeat this ideas/tips message again in this chat session."
-                        
                         )
+
                     else:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher and exam trainer. "
