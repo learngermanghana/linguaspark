@@ -489,7 +489,7 @@ if st.session_state["step"] == 5:
                         "The student has just given you their presentation topic. "
                         "1. First, give a few practical ideas/examples (in English) on how a A2 student can build a presentation about this topic. "                
                         "2. Suggest possible points using four keywords from topic. "
-                        "3. Then ask the student ONE question on the topic using the suggested keywords. Ask 3 questions for each keyword and remaining as random questions (in German). "
+                        "3. Then ask the student ONE question on the topic using the suggested keywords. 
                         "Never repeat this ideas/tips message again in this chat session."
                         "Give corrections and a grammar tip if needed. Explain in English. "
                     )
