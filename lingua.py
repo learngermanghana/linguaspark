@@ -474,15 +474,24 @@ st.session_state.setdefault("custom_topic_intro_done", False)
 #def breaks
 
             # --- USER INPUT HANDLER (immediately after you set last_user_message!) ---
-            if (
-                st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
-                and st.session_state.get("custom_chat_level", "A2") == "A2"
-                and not st.session_state["a2_keywords_confirmed"]
-            ):
-                user_msg = st.session_state.get("last_user_message", "").strip().lower()
-                if user_msg in ("yes", "ja", "ok", "okay"):
-                    st.session_state["a2_keywords_confirmed"] = True
-                # Optional: handle custom‐keywords logic here (e.g., parse and store them)
+            def handle_a2_keywords_confirmation():
+                """
+                Checks if we’re in A2 custom chat and the student hasn't confirmed keywords yet.
+                If the user replies 'yes' (or equivalent), set the confirmation flag.
+                """
+                if (
+                    st.session_state.get("selected_mode") == "Eigenes Thema/Frage (Custom Topic Chat)"
+                    and st.session_state.get("custom_chat_level", "A2") == "A2"
+                    and not st.session_state["a2_keywords_confirmed"]
+                ):
+                    user_msg = st.session_state.get("last_user_message", "").strip().lower()
+                    if user_msg in ("yes", "ja", "ok", "okay"):
+                        st.session_state["a2_keywords_confirmed"] = True
+                    # Optional: handle custom-keywords logic here (e.g., parse and store them)
+
+            # Call the handler right after defining it
+            handle_a2_keywords_confirmation()
+
 
             #  ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
