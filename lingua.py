@@ -1,7 +1,17 @@
 import streamlit as st
 import random
 from datetime import date
+import pandas as pd
+import os
+import tempfile
 # from openai import OpenAI
+
+# --- App config ---
+st.set_page_config(
+    page_title="Falowen – Your AI Conversation Partner",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
 # ---- Exam Data ----
 A2_PARTS = [
@@ -25,6 +35,11 @@ B1_TOPICS = {
     B1_PARTS[2]: ["Fragen stellen zu einer Präsentation"]
 }
 
+CODES_FILE = "student_codes.csv"
+TEACHER_PASSWORD = "Felix029"
+DAILY_LIMIT = 25
+MAX_TURNS = 10
+
 def init_session():
     defaults = {
         "step": 1,
@@ -37,11 +52,66 @@ def init_session():
         "initial_prompt": None,
         "custom_chat_level": None,
         "custom_topic_intro_done": False,
+        "teacher_authenticated": False,
+        "daily_usage": {},
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 init_session()
+
+def load_codes():
+    if os.path.exists(CODES_FILE):
+        df = pd.read_csv(CODES_FILE)
+        if "code" not in df.columns:
+            df = pd.DataFrame(columns=["code"])
+        df["code"] = df["code"].astype(str).str.strip().str.lower()
+    else:
+        df = pd.DataFrame(columns=["code"])
+    return df
+
+# ---- Teacher Admin Sidebar ----
+with st.sidebar.expander("👩‍🏫 Teacher Area (Login/Settings)", expanded=False):
+    if not st.session_state["teacher_authenticated"]:
+        st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)
+        pwd = st.text_input("Teacher Login (for admin only)", type="password")
+        login_btn = st.button("Login (Teacher)")
+        if login_btn:
+            if pwd == TEACHER_PASSWORD:
+                st.session_state["teacher_authenticated"] = True
+                st.success("Access granted!")
+            elif pwd != "":
+                st.error("Incorrect password. Please try again.")
+
+    else:
+        st.header("👩‍🏫 Teacher Dashboard")
+        df_codes = load_codes()
+        st.subheader("Current Codes")
+        st.dataframe(df_codes, use_container_width=True)
+
+        new_code = st.text_input("Add a new student code")
+        if st.button("Add Code"):
+            new_code_clean = new_code.strip().lower()
+            if new_code_clean and new_code_clean not in df_codes["code"].values:
+                df_codes = pd.concat([df_codes, pd.DataFrame({"code": [new_code_clean]})], ignore_index=True)
+                df_codes.to_csv(CODES_FILE, index=False)
+                st.success(f"Code '{new_code_clean}' added!")
+            elif not new_code_clean:
+                st.warning("Enter a code to add.")
+            else:
+                st.warning("Code already exists.")
+
+        remove_code = st.selectbox("Select code to remove", [""] + df_codes["code"].tolist())
+        if st.button("Remove Selected Code"):
+            if remove_code:
+                df_codes = df_codes[df_codes["code"] != remove_code]
+                df_codes.to_csv(CODES_FILE, index=False)
+                st.success(f"Code '{remove_code}' removed!")
+            else:
+                st.warning("Choose a code to remove.")
+
+        if st.button("Log out (Teacher)"):
+            st.session_state["teacher_authenticated"] = False
 
 def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
     if mode == "Geführte Prüfungssimulation (Exam Mode)":
@@ -111,7 +181,7 @@ def get_ai_system_prompt(mode, level, teil, topic, custom_intro_done):
     return f"You are Herr Felix, answer as a German teacher/examiner for {level}."
 
 def chat_with_openai(system_prompt, message_history):
-    # Uncomment & replace for real API use
+    # Uncomment & replace for real API use!
     # client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
     # messages = [{"role": "system", "content": system_prompt}] + message_history
     # try:
@@ -122,7 +192,6 @@ def chat_with_openai(system_prompt, message_history):
     # except Exception as e:
     #     return "Sorry, there was a problem generating a response."
     # Demo reply:
-    # The format here should match your AI output format for real use.
     return (
         "Guten Morgen! Ich stehe jeden Tag um 7 Uhr auf. Dann frühstücke ich.\n"
         "Correction: Ich stehe jeden Tag um 7 Uhr **auf** (verb at the end).\n"
@@ -130,15 +199,18 @@ def chat_with_openai(system_prompt, message_history):
         "Next question: Was machst du nach dem Frühstück?"
     )
 
+def transcribe_audio_with_whisper(audio_bytes, file_type):
+    # Replace this function with actual OpenAI Whisper API call if needed!
+    # client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
+    # ...
+    # return transcript.text
+    # For demo, just return a fake transcript:
+    return "Demo transcript: Ich stehe jeden Tag um 7 Uhr auf."
+
 def get_recent_message_history(messages, N=6):
     return messages[-N:] if len(messages) > N else messages
 
 def show_formatted_ai_reply(ai_reply):
-    """
-    Splits the AI reply into sections and displays each part with a different style.
-    Expected sections: Correction, Grammar Tip, Next Question.
-    """
-    # Parse out the sections
     lines = [l.strip() for l in ai_reply.split('\n') if l.strip()]
     main, correction, grammatik, followup = '', '', '', ''
     curr_section = 'main'
@@ -183,8 +255,13 @@ def step_1_login():
     st.title("Student Login")
     code = st.text_input("🔑 Enter your student code to begin:")
     if st.button("Next ➡️", key="stage1_next"):
-        st.session_state["student_code"] = code.strip().lower()
-        st.session_state["step"] = 2
+        code_clean = code.strip().lower()
+        df_codes = load_codes()
+        if code_clean in df_codes["code"].dropna().tolist():
+            st.session_state["student_code"] = code_clean
+            st.session_state["step"] = 2
+        else:
+            st.error("This code is not recognized. Please check with your tutor.")
 
 def step_2_welcome():
     st.success("Welcome to Falowen!")
@@ -221,6 +298,17 @@ def step_4_exam_part():
 
 def step_5_chat():
     st.header("💬 Chat mit Herr Felix")
+    today_str = str(date.today())
+    student_code = st.session_state["student_code"]
+    usage_key = f"{student_code}_{today_str}"
+    st.session_state.setdefault("daily_usage", {})
+    st.session_state["daily_usage"].setdefault(usage_key, 0)
+    used_today = st.session_state["daily_usage"][usage_key]
+    st.info(
+        f"Student code: `{student_code}` | "
+        f"Today's practice: {used_today}/{DAILY_LIMIT}"
+    )
+
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar="🧑‍🏫"):
@@ -228,18 +316,51 @@ def step_5_chat():
         else:
             with st.chat_message("user"):
                 st.markdown(msg["content"])
+
+    # ---- Audio upload ----
+    uploaded = st.file_uploader(
+        "Upload an audio file (WAV, MP3, OGG, M4A) or type below:",
+        type=["wav","mp3","ogg","m4a"],
+        key="stage5_audio_upload"
+    )
     typed = st.chat_input("💬 Type your answer here...", key="stage5_typed_input")
-    if typed:
-        st.session_state["messages"].append({"role": "user", "content": typed})
-        mode = st.session_state.get("selected_mode", "")
-        level = st.session_state.get("selected_exam_level") or st.session_state.get("custom_chat_level")
-        teil = st.session_state.get("selected_teil")
-        topic = st.session_state.get("initial_prompt", "")
-        custom_intro_done = st.session_state.get("custom_topic_intro_done", False)
-        system_prompt = get_ai_system_prompt(mode, level, teil, topic, custom_intro_done)
-        message_history = get_recent_message_history(st.session_state["messages"], N=6)
-        ai_reply = chat_with_openai(system_prompt, message_history)
-        st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+    user_input = None
+
+    if uploaded:
+        uploaded.seek(0)
+        data = uploaded.read()
+        st.audio(data, format=uploaded.type)
+        try:
+            transcript = transcribe_audio_with_whisper(data, uploaded.type)
+            user_input = transcript
+        except:
+            st.warning("Transcription failed; please type your message.")
+    elif typed:
+        user_input = typed
+
+    session_ended = st.session_state["turn_count"] >= MAX_TURNS
+
+    if user_input and not session_ended:
+        if used_today >= DAILY_LIMIT:
+            st.warning(
+                "You’ve reached today’s free practice limit. "
+                "Please come back tomorrow or contact your tutor!"
+            )
+        else:
+            st.session_state["messages"].append({"role": "user", "content": user_input})
+            st.session_state["turn_count"] += 1
+            st.session_state["daily_usage"][usage_key] += 1
+
+            mode = st.session_state.get("selected_mode", "")
+            level = st.session_state.get("selected_exam_level") or st.session_state.get("custom_chat_level")
+            teil = st.session_state.get("selected_teil")
+            topic = st.session_state.get("initial_prompt", "")
+            custom_intro_done = st.session_state.get("custom_topic_intro_done", False)
+            system_prompt = get_ai_system_prompt(mode, level, teil, topic, custom_intro_done)
+            message_history = get_recent_message_history(st.session_state["messages"], N=6)
+            ai_reply = chat_with_openai(system_prompt, message_history)
+            st.session_state["messages"].append({"role": "assistant", "content": ai_reply})
+
     if st.button("Summary / Restart"):
         st.session_state["step"] = 6
 
