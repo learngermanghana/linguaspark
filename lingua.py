@@ -466,6 +466,7 @@ if st.session_state["step"] == 5:
             st.session_state["turn_count"] += 1
             st.session_state["daily_usage"][usage_key] += 1
 
+#def breaks
 
             #  ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             if is_b1_teil3:
@@ -483,15 +484,22 @@ if st.session_state["step"] == 5:
                 )
             elif st.session_state["selected_mode"] == "Eigenes Thema/Frage (Custom Topic Chat)":
                 lvl = st.session_state.get("custom_chat_level", "A2")
-                # --- Ensure the confirmation flag exists ---
+                # ---------- A2 Onboarding Logic ----------
                 if "a2_keywords_confirmed" not in st.session_state:
                     st.session_state["a2_keywords_confirmed"] = False
+
+                # Detect confirmation in your input handler (this is pseudocode):
+                user_msg = st.session_state.get("last_user_message", "").strip().lower()
+                if lvl == "A2" and not st.session_state["a2_keywords_confirmed"]:
+                    if user_msg in ("yes", "ja", "ok", "okay"):
+                        st.session_state["a2_keywords_confirmed"] = True
+                    # If you accept custom keywords, handle and set True here as well.
 
                 if lvl == "A2":
                     if not st.session_state["a2_keywords_confirmed"]:
                         ai_system_prompt = (
                             "You are Herr Felix, a creative but strict A2 German teacher and exam trainer. "
-                            "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German that they can use.\n "
+                            "1. First, in English, teach the student how to build their points and ideas on how the conversation will proceed for their chosen topic. Give them simple example phrases in German they can use.\n"
                             "2. Next, always stay on the student's chosen topic. Suggest 4 keywords that relate to this topic for the session, and present these keywords in English so the student understands.\n"
                             "3. Ask the student in English if they are okay with these keywords. If the student confirms, use your suggested keywords. If not, let the student provide their own keywords, and then proceed with the conversation using those.\n"
                             "After this introduction, continue the conversation only in simple German, following the A2 level. In each turn, ask only one question, always about the chosen topic, and provide corrections and grammar tips as needed. "
