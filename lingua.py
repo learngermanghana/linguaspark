@@ -32,7 +32,10 @@ st.markdown(
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
 MAX_TURNS = 10
-TEACHER_PASSWORD = "Felix029"
+# Teacher password can be provided via environment variable or Streamlit secrets
+TEACHER_PASSWORD = os.environ.get("TEACHER_PASSWORD")
+if not TEACHER_PASSWORD:
+    TEACHER_PASSWORD = st.secrets.get("teacher_password", "")
 
 A2_TEIL2 = [
     "Was machen Sie mit Ihrem Geld?",
