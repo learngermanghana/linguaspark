@@ -10,5 +10,5 @@
    ```
 
 2. Start a chat and send at least two messages.
-3. The assistant's reply should reference earlier messages, showing that the
-   full conversation history is sent to the model.
+3. The assistant's reply should reference earlier messages. The app sends the
+   **full conversation history** with every request.
