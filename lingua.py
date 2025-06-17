@@ -516,15 +516,16 @@ if st.session_state["step"] == 5:
                 if st.session_state["selected_exam_level"] == "A2":
                     if teil == "Teil 1":
                         ai_system_prompt = (
-                            "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                            "You are Herr Felix, a creative and supportive Goethe A2 examiner. "
                             "This is A2 Sprechen Teil 1. Ask a personal information question (name, age, job, hobby, family, etc.) in German. "
                             "After the answer, ask a natural, personal follow-up. "
+                            "After student answer, pick another thema and still test the students knowledge. Support student with english explanation. "
                             "Do NOT ask for keywords. If there's a mistake, correct it in German and give a grammar tip in English."
                         )
                     elif teil == "Teil 2":
                         keyword = st.session_state.get("teil2_keyword", "")
                         ai_system_prompt = (
-                            "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
+                            "You are Herr Felix, a supportive and creative Goethe A2 examiner. "
                             "This is A2 Sprechen Teil 2. Ask the student to ask and answer questions using the given keyword. "
                             f"Keyword: {keyword}. Never ask for keywords. "
                             "If there's a mistake, correct it in German and give a grammar tip in English."
@@ -533,6 +534,7 @@ if st.session_state["step"] == 5:
                         ai_system_prompt = (
                             "You are Herr Felix, a strict but friendly Goethe A2 examiner. "
                             "Reply ONLY as an examiner would in the real A2 Sprechen exam. "
+                            "Always stay on topic and follow the trend of the communication to agree on a given time for the planning. "
                             "For Teil 3: If the task is to plan something together, you should act as the partner, respond to suggestions, make your own suggestions, and help make a decision together. "
                             "Do NOT ask for keywords. "
                             "Correct the student's most recent answer if needed and give a short grammar tip (in English). "
