@@ -536,10 +536,10 @@ if st.session_state["step"] == 5:
                         "Answer in B1 German, correct if needed, give a tip in English, then ask the next question."
                     )
 
-            conversation = [
-                {"role": "system", "content": ai_system_prompt},
-                st.session_state["messages"][-1]
-            ]
+            conversation = (
+                [{"role": "system", "content": ai_system_prompt}]
+                + st.session_state["messages"]
+            )
             with st.spinner("🧑‍🏫 Herr Felix is typing..."):
                 try:
                     client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
