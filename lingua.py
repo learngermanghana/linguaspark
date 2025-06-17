@@ -404,7 +404,7 @@ if st.session_state["step"] == 5:
             f"Imagine am done with my presentation on **{topic}**.\n\n"
             "Your task now:\n"
             "- Ask me **one question** about my presentation (In German).\n"
-            "👉 Schreib deine zwei Fragen und ein Feedback jetzt unten auf!"
+            "👉 Schreib dein Frage!"
         )
         st.session_state['messages'].append({'role': 'assistant', 'content': init})
 
@@ -468,7 +468,7 @@ if st.session_state["step"] == 5:
             # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
             # Always set a fallback for ai_system_prompt in case no branch is chosen
             ai_system_prompt = (
-                "You are Herr Felix, a supportive German examiner. "
+                "You are Herr Felix, a supportive and creative German examiner. "
                 "Continue the conversation, give simple corrections, and ask the next question."
             )
 
@@ -483,7 +483,7 @@ if st.session_state["step"] == 5:
                     "2. Praise if it's valid or politely indicate what's missing. "
                     "3. If valid, answer briefly in simple German. "
                     "4. End with clear exam tips in English. "
-                    "Stay friendly and exam-like."
+                    "Stay friendly,creative and exam-like."
                 )
             elif st.session_state.get('selected_mode') == 'Eigenes Thema/Frage (Custom Topic Chat)':
                 lvl = st.session_state.get('custom_chat_level', 'A2')
