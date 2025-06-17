@@ -585,7 +585,6 @@ if st.session_state["step"] == 5:
                 "messages": [],
                 "turn_count": 0,
                 "custom_chat_level": None,
-                "custom_level_prompted": False,
             })
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
