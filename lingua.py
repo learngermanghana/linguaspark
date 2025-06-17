@@ -466,6 +466,12 @@ if st.session_state["step"] == 5:
             st.session_state['daily_usage'][usage_key] += 1
 
             # ---- PROMPT SELECTION, ENFORCING TOPIC & SINGLE QUESTION ----
+            # Always set a fallback for ai_system_prompt in case no branch is chosen
+            ai_system_prompt = (
+                "You are Herr Felix, a supportive German examiner. "
+                "Continue the conversation, give simple corrections, and ask the next question."
+            )
+
             if is_b1_teil3:
                 b1_topic = st.session_state['current_b1_teil3_topic']
                 ai_system_prompt = (
@@ -506,9 +512,7 @@ if st.session_state["step"] == 5:
                             "Reply in German and English, correct last answer, give a tip in English, and ask one question on the same topic."
                         )
             elif st.session_state.get("selected_mode", "").startswith("Geführte"):
-                # --- A2 EXAM MODE (Teil 1, 2, 3) ---
                 teil = st.session_state.get("selected_teil", "Teil 1")
-                # If you want you can pass topic/keyword for Teil 2 etc.
                 if st.session_state["selected_exam_level"] == "A2":
                     if teil == "Teil 1":
                         ai_system_prompt = (
