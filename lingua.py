@@ -440,9 +440,11 @@ if st.session_state["step"] == 5:
                 tmp.write(data)
                 tmp.flush()
             client = OpenAI(api_key=st.secrets['general']['OPENAI_API_KEY'])
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1", file=open(tmp.name, 'rb')
-            )
+            with open(tmp.name, "rb") as f:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1", file=f
+                )
+            os.remove(tmp.name)
             user_input = transcript.text
         except:
             st.warning("Transcription failed; please type your message.")
