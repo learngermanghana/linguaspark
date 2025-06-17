@@ -473,4 +473,37 @@ if st.session_state["step"] == 5:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
 
+elif st.session_state["step"] == 6:
+    st.header("Session Summary")
+    st.markdown(
+        "Vielen Dank fürs Üben mit **Herrn Felix**! Hier ist eine kurze Übersicht Ihrer Session:")
+
+    keywords = ", ".join(sorted(st.session_state.get("used_keywords", []))) or "–"
+    topics = ", ".join(sorted(st.session_state.get("used_topics", []))) or "–"
+    turns = st.session_state.get("turn_count", 0)
+
+    st.write(f"**Gesprochene Runden:** {turns}")
+    st.write(f"**Benutzte Schlüsselwörter:** {keywords}")
+    st.write(f"**Bearbeitete Themen:** {topics}")
+
+    st.success("Bis zum nächsten Mal und viel Erfolg beim Lernen!")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Back to Start", key="stage6_restart"):
+            st.session_state.update({
+                "step": 1,
+                "messages": [],
+                "turn_count": 0,
+                "used_keywords": set(),
+                "used_topics": set(),
+                "custom_chat_level": None,
+                "intro_key": "",
+                "current_topic": None,
+            })
+    with col2:
+        if st.button("Exit", key="stage6_exit"):
+            st.write("👋 Bis bald! Du kannst das Fenster nun schließen.")
+            st.stop()
+
 # --- END ---
