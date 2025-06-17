@@ -544,7 +544,6 @@ if st.session_state["step"] == 5:
                         "You are Herr Felix, a strict but supportive Goethe B1 examiner. "
                         "Answer in B1 German, correct if needed, give a tip in English, then ask the next question."
                     )
-                        "ai_system_prompt = "You are Herr Felix, a supportive German teacher. Continue the conversation and provide corrections and tips."
             conversation = (
                 [{"role": "system", "content": ai_system_prompt}]
                 + st.session_state["messages"]
