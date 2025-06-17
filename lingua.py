@@ -485,7 +485,7 @@ if st.session_state["step"] == 5:
                     ai_system_prompt = (
                         "You are Herr Felix, a friendly but creative A2 German teacher and exam trainer. "
                         "Greet and give students ideas and examples about how to talk about the topic in English and ask only question. No correction in the statemnt but only tip and possible phrases to use. This stage only when the student input their first question and not anyother input. "
-                        "The first input from the student is their topic and not their reply. Only the second and further repliers it their response to your question "
+                        "The first input from the student is their topic and not their reply or sentence. It is always their presentation topic. Only the second and further repliers it their response to your question "
                         "Use simple German and correct the student's last answer. "
                         "Ask one question only. Format your reply with answer, correction explanation in english, tip in english, and next question."
                     )
@@ -494,6 +494,7 @@ if st.session_state["step"] == 5:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher. "
                             "Provide practical ideas/examples for the topic in German, then ask one opinion question."
+                            "Always put the opinion question on a separate line so the student can notice the question from the ideas and examples"
                         )
                     else:
                         ai_system_prompt = (
