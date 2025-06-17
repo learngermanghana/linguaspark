@@ -588,3 +588,20 @@ if st.session_state["step"] == 5:
     with col2:
         if session_ended and st.button("Next ➡️ (Summary)", key="stage5_summary"):
             st.session_state["step"] = 6
+
+elif st.session_state["step"] == 6:
+    st.header("Session Summary")
+    st.success("Great work today! 🎉")
+    st.write(f"Total turns: {st.session_state.get('turn_count', 0)}")
+    for msg in st.session_state.get("messages", []):
+        role = "Herr Felix" if msg["role"] == "assistant" else "You"
+        st.markdown(f"**{role}:** {msg['content']}")
+    if st.button("Start New Session"):
+        st.session_state.update({
+            "step": 1,
+            "messages": [],
+            "turn_count": 0,
+            "custom_chat_level": None,
+            "custom_level_prompted": False,
+        })
+
