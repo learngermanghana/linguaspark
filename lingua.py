@@ -477,7 +477,7 @@ if st.session_state["step"] == 5:
                 ai_system_prompt = (
                     "You are Herr Felix, the examiner in a German B1 oral exam (Teil 3: Feedback & Questions). "
                     f"**IMPORTANT: Stay strictly on the topic:** {b1_topic}. "
-                    "Never change the topic in your next question or feedback. "
+                    "After student ask the question and you have given the student compliment, give another topic for the student ask the question. "
                     "The student is supposed to ask you one valid question about their presentation. "
                     "1. Read the student's message. "
                     "2. Praise if it's valid or politely indicate what's missing. "
