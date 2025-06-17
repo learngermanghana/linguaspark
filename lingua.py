@@ -493,14 +493,15 @@ if st.session_state["step"] == 5:
                 else:
                     if not st.session_state['custom_topic_intro_done']:
                         ai_system_prompt = (
-                            "You are Herr Felix, a supportive B1 German teacher. "
-                            "Provide practical ideas/examples for the topic in German, then ask one opinion question."
+                            "You are Herr Felix, a supportive and creative B1 German teacher. "
+                            "Provide practical ideas/examples for the topic in German, then ask one opinion question. No correction or answer in the statement but only tip and possible phrases to use. This stage only when the student input their first question and not anyother input. "
+                            "Support ideas and opinions explanation in english as these students are new B1 students. "
                             "Always put the opinion question on a separate line so the student can notice the question from the ideas and examples"
                         )
                     else:
                         ai_system_prompt = (
                             "You are Herr Felix, a supportive B1 German teacher. "
-                            "Reply in German, correct last answer, give a tip, and ask one question on the same topic."
+                            "Reply in German and English, correct last answer, give a tip in English, and ask one question on the same topic."
                         )
             elif st.session_state.get("selected_mode", "").startswith("Geführte"):
                 # --- A2 EXAM MODE (Teil 1, 2, 3) ---
