@@ -8,6 +8,20 @@ from datetime import date
 import time
 import re
 
+# --- Helper ---
+def _trim_history(history, max_chars=12000):
+    """Return the most recent messages that fit within max_chars."""
+    total = 0
+    trimmed = []
+    for msg in reversed(history):
+        content = msg.get("content", "")
+        msg_len = len(content)
+        if total + msg_len > max_chars:
+            break
+        trimmed.append(msg)
+        total += msg_len
+    return list(reversed(trimmed))
+
 # --- CONFIG ---
 st.set_page_config(
     page_title="Falowen – Your AI Conversation Partner",
@@ -421,10 +435,8 @@ if st.session_state["step"] == 5:
                 ai_system_prompt += f"\nNext topic: {next_topic}"
 
             # --- OpenAI Chat Completion ---
-            conversation = [
-                {"role": "system", "content": ai_system_prompt},
-                st.session_state["messages"][-1]
-            ]
+            trimmed = _trim_history(st.session_state["messages"])
+            conversation = [{"role": "system", "content": ai_system_prompt}] + trimmed
             with st.spinner("🧑‍🏫 Herr Felix is typing..."):
                 try:
                     client = OpenAI(api_key=st.secrets["general"]["OPENAI_API_KEY"])
