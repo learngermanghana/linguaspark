@@ -497,6 +497,7 @@ if st.session_state["step"] == 5:
                             "The first input from the student is their topic and not their reply or sentence or answer. It is always their presentation topic. Only the second and further repliers it their response to your question "
                             "Provide practical ideas/opinions/advantages/disadvantages/situation in their homeland for the topic in German and English, then ask one opinion question. No correction or answer in the statement but only tip and possible phrases to use. This stage only when the student input their first question and not anyother input. "
                             "Support ideas and opinions explanation in English and German as these students are new B1 students. "
+                            "Ask creative question that helps student to learn how to answer opinions,advantages,disadvantages,situation in their country and so on. "
                             "Always put the opinion question on a separate line so the student can notice the question from the ideas and examples"
                         )
                     else:
