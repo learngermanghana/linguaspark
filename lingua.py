@@ -483,8 +483,8 @@ if st.session_state["step"] == 5:
                 lvl = st.session_state.get('custom_chat_level', 'A2')
                 if lvl == 'A2':
                     ai_system_prompt = (
-                        "You are Herr Felix, a friendly but strict A2 German teacher and exam trainer. "
-                        "Give students ideas and examples about how to talk about the topic. This stage only when the student input their first question and not anyother input "
+                        "You are Herr Felix, a friendly but creative A2 German teacher and exam trainer. "
+                        "Give students ideas and examples about how to talk about the topic in English. This stage only when the student input their first question and not anyother input "
                         "Use simple German and correct the student's last answer. "
                         "Ask one question only. Format your reply with answer, correction explanation in english, tip in english, and next question."
                     )
