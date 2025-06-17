@@ -31,7 +31,7 @@ st.markdown(
 # --- CONSTANTS ---
 CODES_FILE = "student_codes.csv"
 DAILY_LIMIT = 25
-MAX_TURNS = 6
+MAX_TURNS = 25
 TEACHER_PASSWORD = "Felix029"
 
 A2_TEIL1 = [
