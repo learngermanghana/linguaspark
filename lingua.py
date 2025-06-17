@@ -11,7 +11,7 @@ import re
 
 # Streamlit page config
 st.set_page_config(
-    page_title="Falowen – Your AI Conversation Partner",
+    page_title="Falowen – Your German Conversation Partner",
     layout="centered",
     initial_sidebar_state="expanded"
 )
