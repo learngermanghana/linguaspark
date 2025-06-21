@@ -9,6 +9,20 @@ import os
 from datetime import date
 import re
 
+st.markdown("""
+<div style='display:flex;align-items:center;gap:18px;
+    background:linear-gradient(90deg,#e3f6fc,#d5f0e6);padding:14px 22px 14px 22px;
+    border-bottom:2px solid #4fb8de;box-shadow:0 4px 18px #e3f6fc;'>
+    <img src='https://cdn-icons-png.flaticon.com/512/6815/6815043.png' width='54'
+        style='border-radius:50%;border:2.5px solid #51a8d2;box-shadow:0 2px 8px #cbe7fb;'/>
+    <div>
+        <span style='font-size:2.1rem;font-weight:bold;color:#17617a;letter-spacing:2px;'>Falowen</span><br>
+        <span style='font-size:1.1rem;color:#268049;font-weight:600;'>Learn Language Education Academy</span><br>
+        <span style='font-size:0.98rem;color:#1e5777;'>by Felix Asadu</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 # Streamlit page config
 st.set_page_config(
     page_title="Falowen – Your German Conversation Partner",
