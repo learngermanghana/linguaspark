@@ -328,8 +328,6 @@ def inc_sprechen_usage(student_code):
 def has_sprechen_quota(student_code, limit=FALOWEN_DAILY_LIMIT):
     return get_sprechen_usage(student_code) < limit
 
-def has_sprechen_quota(student_code, limit=FALOWEN_DAILY_LIMIT):
-    return get_sprechen_usage(student_code) < limit
 
 # ==== YOUTUBE PLAYLIST HELPERS ====
 YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY", "AIzaSyBA3nJi6dh6-rmOLkA4Bb0d7h0tLAp7xE4")
@@ -642,8 +640,8 @@ def login_page():
     # Inject PWA/meta link tags AFTER the hero (zero-height iframe)
     _inject_meta_tags()
 
-    # Inject SEO head tags AFTER the hero (zero-height iframe)
-    html("""
+    # Inject SEO head tags AFTER the hero (using components.html)
+    components.html("""
     <script>
       document.title = "Falowen – Learn German with Learn Language Education Academy";
       const desc = "Falowen is the German learning companion from Learn Language Education Academy. Join live classes or self-study with A1–C1 courses, recorded lectures, and real progress tracking.";
@@ -667,7 +665,8 @@ def login_page():
     </script>
     """, height=0)
 
-      <!-- ===== Compact stats strip ===== -->
+    # ===== Compact stats strip =====
+    st.markdown("""
       <style>
         .stats-strip { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:10px auto 4px auto; max-width:820px; }
         .stat { background:#0ea5e9; color:#ffffff; border-radius:12px; padding:12px 14px; min-width:150px; text-align:center;
@@ -695,7 +694,6 @@ def login_page():
           <div class="label">Avg. feedback</div>
         </div>
       </div>
-    </div>
     """, unsafe_allow_html=True)
 
     # Short explainer: which option to use
@@ -711,7 +709,6 @@ def login_page():
     """, unsafe_allow_html=True)
 
     # --- Rotating multi-country reviews (with flags) ---
-    import json, streamlit.components.v1 as components
     REVIEWS = [
         {"quote": "Falowen helped me pass A2 in 8 weeks. The assignments and feedback were spot on.",
          "author": "Ama — Accra, Ghana 🇬🇭", "level": "A2"},
@@ -733,7 +730,7 @@ def login_page():
 <div class="page-wrap" role="region" aria-label="Student reviews" style="margin-top:10px;">
   <div id="rev-quote" style="
       background:#f8fafc;border-left:4px solid #6366f1;padding:12px 14px;border-radius:10px;
-      color:#475569;min-height:82px;display:flex;align-items:center;justify-content:center;text-align:center;">
+      color:#475569;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.45;">
     Loading…
   </div>
   <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;">
@@ -749,6 +746,7 @@ def login_page():
   const dotsEl  = document.getElementById('rev-dots');
   const prevBtn = document.getElementById('rev-prev');
   const nextBtn = document.getElementById('rev-next');
+
   function renderDots(){
     dotsEl.innerHTML = '';
     data.forEach((_, idx) => {
@@ -761,35 +759,32 @@ def login_page():
       dotsEl.appendChild(d);
     });
   }
+
   function render(){
     const r = data[i];
+    // Use <span> wrappers to keep style consistent and allow wrapping.
     quoteEl.innerHTML = '“' + r.quote + '” — <i>' + r.author + ' · ' + r.level + '</i>';
     renderDots();
   }
+
   function next(){ i = (i + 1) % data.length; render(); }
   function prev(){ i = (i - 1 + data.length) % data.length; render(); }
+
   prevBtn.addEventListener('click', prev);
   nextBtn.addEventListener('click', next);
+
+  // Auto-rotate unless user prefers reduced motion
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) { setInterval(next, 6000); }
+
+  // Initial render
   render();
 </script>
 """
-    components.html(_reviews_html.replace("__DATA__", _reviews_json), height=240)
+    # Increased height + allow scroll if content ever exceeds (safest + simplest in Streamlit)
+    components.html(_reviews_html.replace("__DATA__", _reviews_json), height=320, scrolling=True)
 
-    # Support / Help section
-    st.markdown("""
-    <div class="page-wrap">
-      <div class="help-contact-box" aria-label="Help and contact options">
-        <b>❓ Need help or access?</b><br>
-        <a href="https://api.whatsapp.com/send?phone=233205706589" target="_blank" rel="noopener">📱 WhatsApp us</a>
-        &nbsp;|&nbsp;
-        <a href="mailto:learngermanghana@gmail.com" target="_blank" rel="noopener">✉️ Email</a>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
 
-#
     # --- Google OAuth (Optional) ---
     GOOGLE_CLIENT_ID     = st.secrets.get("GOOGLE_CLIENT_ID", "180240695202-3v682khdfarmq9io9mp0169skl79hr8c.apps.googleusercontent.com")
     GOOGLE_CLIENT_SECRET = st.secrets.get("GOOGLE_CLIENT_SECRET", "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")
@@ -9777,6 +9772,7 @@ if tab == "Schreiben Trainer":
                     [],
                 )
                 st.rerun()
+
 
 
 
