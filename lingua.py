@@ -1888,6 +1888,36 @@ def months_between(start_dt: datetime, end_dt: datetime) -> int:
     if end_dt.day < start_dt.day: months -= 1
     return months
 
+from urllib.parse import unquote_plus
+
+# 1) Define your top-level tabs EXACTLY as your code uses them
+TABS = ["Home", "My Course", "Vocab Trainer", "Dictionary"]  # <-- adjust to your real list/order
+
+# 2) Read the deep link (?tab=...) and normalize it
+def _get_deeplink_tab(default="Home"):
+    try:
+        params = st.experimental_get_query_params()  # works on all current Streamlit versions
+        raw = params.get("tab", [default])[0]
+        return unquote_plus(str(raw)).strip()
+    except Exception:
+        return default
+
+# 3) Initialize and/or override the selected tab from the URL if valid
+if "main_tab" not in st.session_state:
+    st.session_state["main_tab"] = TABS[0]
+
+_dl = _get_deeplink_tab(st.session_state["main_tab"])
+if _dl in TABS and st.session_state["main_tab"] != _dl:
+    st.session_state["main_tab"] = _dl
+
+# 4) Keep the URL in sync when users change tabs
+def _sync_tab_to_url():
+    st.experimental_set_query_params(tab=st.session_state["main_tab"])
+
+# 5) Render your top-level tab control (radio or selectbox)
+tab = st.radio("Navigate", TABS, key="main_tab", horizontal=True, on_change=_sync_tab_to_url)
+
+
 # =========================================================
 # ===================== Tabs UI ===========================
 # =========================================================
@@ -4236,6 +4266,16 @@ def get_c1_schedule():
     ]
 
 
+# --- Imports used by helpers (safe to re-import) ---
+import os, re, requests
+from datetime import datetime
+try:
+    # For atomic lock via .create()
+    from google.api_core.exceptions import AlreadyExists
+except Exception:
+    class AlreadyExists(Exception):
+        pass
+
 # --- FORCE A MOCK LOGIN FOR TESTING ---
 if "student_row" not in st.session_state:
     st.session_state["student_row"] = {
@@ -4259,7 +4299,9 @@ def load_level_schedules():
         "C1": get_c1_schedule(),
     }
 
-# --- Helpers ---
+# -------------------------
+# UI helpers
+# -------------------------
 def render_assignment_reminder():
     st.markdown(
         '''
@@ -4303,40 +4345,16 @@ def build_wa_message(name, code, level, day, chapter, answer):
         f"Answer: {answer if answer.strip() else '[See attached file/photo]'}"
     )
 
-SLACK_DEBUG = (os.getenv("SLACK_DEBUG", "0") == "1")
-
-def _slack_url() -> str:
-    # 1) Render env var  2) optional fallback to st.secrets.slack.webhook_url
-    url = (os.getenv("SLACK_WEBHOOK_URL") or "").strip()
-    if not url:
-        try:
-            url = (st.secrets.get("slack", {}).get("webhook_url", "") if hasattr(st, "secrets") else "").strip()
-        except Exception:
-            url = ""
-    return url
-
-def notify_slack(text: str):
-    """
-    Returns (ok: bool, info: str). Uses one webhook for all events.
-    Set SLACK_DEBUG=1 in Render to see failure details in-app (admins only).
-    """
-    url = _slack_url()
-    if not url:
-        return False, "missing_webhook"
-    try:
-        resp = requests.post(url, json={"text": text}, timeout=6)
-        ok = 200 <= resp.status_code < 300
-        return ok, f"status={resp.status_code}"
-    except Exception as e:
-        return False, str(e)
-        
 def highlight_terms(text, terms):
-    if not text: return ""
+    if not text:
+        return ""
     for term in terms:
         if not term.strip():
             continue
         pattern = re.compile(re.escape(term), re.IGNORECASE)
-        text = pattern.sub(f"<span style='background:yellow;border-radius:0.23em;'>{term}</span>", text)
+        text = pattern.sub(
+            f"<span style='background:yellow;border-radius:0.23em;'>{term}</span>", text
+        )
     return text
 
 def filter_matches(lesson, terms):
@@ -4349,7 +4367,7 @@ def filter_matches(lesson, terms):
         str(lesson.get('day', '')).lower()
     )
     return any(term in searchable for term in terms)
-    
+
 def render_section(day_info, key, title, icon):
     content = day_info.get(key)
     if not content:
@@ -4375,7 +4393,158 @@ def render_section(day_info, key, title, icon):
             for ex in (extras if isinstance(extras, list) else [extras]):
                 render_link("🔗 Extra", ex)
 
+# -------------------------
+# Slack helpers (optional)
+# -------------------------
+SLACK_DEBUG = (os.getenv("SLACK_DEBUG", "0") == "1")
 
+def _slack_url() -> str:
+    # 1) Render env var  2) optional fallback to st.secrets.slack.webhook_url
+    url = (os.getenv("SLACK_WEBHOOK_URL") or "").strip()
+    if not url:
+        try:
+            url = (st.secrets.get("slack", {}).get("webhook_url", "") if hasattr(st, "secrets") else "").strip()
+        except Exception:
+            url = ""
+    return url
+
+def get_slack_webhook() -> str:  # back-compat alias
+    return _slack_url()
+
+def notify_slack(text: str):
+    """
+    Returns (ok: bool, info: str). Uses one webhook for all events.
+    Set SLACK_DEBUG=1 in Render to see failure details in-app (admins only).
+    """
+    url = _slack_url()
+    if not url:
+        return False, "missing_webhook"
+    try:
+        resp = requests.post(url, json={"text": text}, timeout=6)
+        ok = 200 <= resp.status_code < 300
+        return ok, f"status={resp.status_code}"
+    except Exception as e:
+        return False, str(e)
+
+def notify_slack_submission(webhook_url: str, *, student_name: str, student_code: str,
+                            level: str, day: int, chapter: str, receipt: str, preview: str):
+    if not webhook_url:
+        return
+    text = (
+        f"*New submission* • {student_name} ({student_code})\n"
+        f"*Level:* {level}  •  *Day:* {day}\n"
+        f"*Chapter:* {chapter}\n"
+        f"*Ref:* `{receipt}`\n"
+        f"*Preview:* {preview[:180]}{'…' if len(preview) > 180 else ''}"
+    )
+    try:
+        requests.post(webhook_url, json={"text": text}, timeout=6)
+    except Exception:
+        pass  # never block the student
+
+# -------------------------
+# Firestore helpers (Firebase)
+# -------------------------
+def lesson_key_build(level: str, day: int, chapter: str) -> str:
+    """Unique key for this lesson (safe for reuse in docs)."""
+    safe_ch = re.sub(r'[^A-Za-z0-9_\-]+', '_', str(chapter))
+    return f"{level}_day{day}_ch{safe_ch}"
+
+def lock_id(level: str, code: str, lesson_key: str) -> str:
+    safe_code = re.sub(r'[^A-Za-z0-9_\-]+', '_', str(code))
+    return f"{level}__{safe_code}__{lesson_key}"
+
+def has_existing_submission(level: str, code: str, lesson_key: str) -> bool:
+    posts_ref = db.collection("submissions").document(level).collection("posts")
+    try:
+        q = posts_ref.where("student_code", "==", code)\
+                     .where("lesson_key", "==", lesson_key)\
+                     .limit(1).stream()
+        return any(True for _ in q)
+    except Exception:
+        try:
+            for _ in posts_ref.where("student_code", "==", code)\
+                              .where("lesson_key", "==", lesson_key).stream():
+                return True
+        except Exception:
+            pass
+        return False
+
+def acquire_lock(level: str, code: str, lesson_key: str) -> bool:
+    """Atomic lock using Firestore .create(). Returns True if acquired, False if already locked."""
+    ref = db.collection("submission_locks").document(lock_id(level, code, lesson_key))
+    try:
+        ref.create({
+            "level": level,
+            "student_code": code,
+            "lesson_key": lesson_key,
+            "created_at": datetime.utcnow(),
+        })
+        return True
+    except AlreadyExists:
+        return False
+    except Exception:
+        # Fallback path if .create() isn’t available: check-then-set (not fully atomic, but acceptable)
+        if ref.get().exists:
+            return False
+        ref.set({
+            "level": level,
+            "student_code": code,
+            "lesson_key": lesson_key,
+            "created_at": datetime.utcnow(),
+        }, merge=False)
+        return True
+
+def is_locked(level: str, code: str, lesson_key: str) -> bool:
+    """Treat either an existing submission OR a lock doc as 'locked'."""
+    if has_existing_submission(level, code, lesson_key):
+        return True
+    try:
+        ref = db.collection("submission_locks").document(lock_id(level, code, lesson_key))
+        return ref.get().exists
+    except Exception:
+        return False
+
+def save_draft_to_db(code, lesson_key, text):
+    doc_ref = db.collection('draft_answers').document(code)
+    doc_ref.set(
+        {lesson_key: text, f"{lesson_key}__updated_at": datetime.utcnow()},
+        merge=True
+    )
+
+def load_draft_from_db(code, lesson_key) -> str:
+    try:
+        doc = db.collection('draft_answers').document(code).get()
+        if doc.exists:
+            data = doc.to_dict() or {}
+            return data.get(lesson_key, "")
+    except Exception:
+        pass
+    return ""
+
+def fetch_latest(level: str, code: str, lesson_key: str):
+    posts_ref = db.collection("submissions").document(level).collection("posts")
+    try:
+        docs = posts_ref.where("student_code","==",code)\
+                        .where("lesson_key","==",lesson_key)\
+                        .order_by("updated_at", direction=firestore.Query.DESCENDING)\
+                        .limit(1).stream()
+        for d in docs:
+            return d.to_dict()
+    except Exception:
+        try:
+            docs = posts_ref.where("student_code","==",code)\
+                            .where("lesson_key","==",lesson_key).stream()
+            items = [d.to_dict() for d in docs]
+            items.sort(key=lambda x: x.get("updated_at"), reverse=True)
+            return items[0] if items else None
+        except Exception:
+            return None
+    return None
+
+# -------------------------
+# Misc existing helper preserved
+# -------------------------
 def post_message(level, code, name, text, reply_to=None):
     posts_ref = db.collection("class_board").document(level).collection("posts")
     posts_ref.add({
@@ -4392,6 +4561,7 @@ RESOURCE_LABELS = {
     'workbook_link': '📒 Workbook',
     'extra_resources': '🔗 Extra'
 }
+
 
 # ---- Firestore Helpers ----
 def load_notes_from_db(student_code):
@@ -4453,7 +4623,6 @@ if tab == "My Course":
         horizontal=True,
         key="coursebook_subtab"
     )
-
 
     # === COURSE BOOK SUBTAB ===
     if cb_subtab == "📘 Course Book":
@@ -4548,8 +4717,7 @@ if tab == "My Course":
                     continue
 
             if start_date:
-                total = total  # assuming this variable is already defined earlier in your code
-                # calculate weeks for different paces
+                total = total
                 weeks_three = (total + 2) // 3
                 weeks_two   = (total + 1) // 2
                 weeks_one   = total
@@ -4558,7 +4726,6 @@ if tab == "My Course":
                 end_two   = start_date + timedelta(weeks=weeks_two)
                 end_one   = start_date + timedelta(weeks=weeks_one)
 
-                # spacer layout
                 spacer, content = st.columns([3, 7])
                 with content:
                     st.success(f"If you complete **three sessions per week**, you will finish by **{end_three.strftime('%A, %d %B %Y')}**.")
@@ -4568,7 +4735,7 @@ if tab == "My Course":
                 spacer, content = st.columns([3, 7])
                 with content:
                     st.warning("❓ Start date missing or invalid. Please update your contract start date.")
-#
+
         info = schedule[idx]
         # ---- Fix for highlight and header ----
         lesson_title = f"Day {info['day']}: {info['topic']}"
@@ -4605,7 +4772,6 @@ if tab == "My Course":
                 if part.get('video'):
                     st.video(part['video'])
                     st.markdown(f"[▶️ Watch on YouTube]({part['video']})")
-                # --- Also support explicit youtube_link (if different from 'video') ---
                 elif part.get('youtube_link'):
                     st.markdown(f"[▶️ Watch on YouTube]({part['youtube_link']})")
                 if part.get('grammarbook_link'):
@@ -4671,7 +4837,7 @@ if tab == "My Course":
 
         st.divider()
 
-        # === SUBMIT ASSIGNMENT (Render env secret + context banner + submit + lock; NO AUTO-REFRESH) ===
+        # === SUBMIT ASSIGNMENT (DB-locked) ===
         st.markdown("### ✅ Submit Your Assignment")
 
         # Clear context banner so students see exactly where they are
@@ -4690,62 +4856,45 @@ if tab == "My Course":
             unsafe_allow_html=True
         )
 
-        # Render env (Slack) — set on Render dashboard: SLACK_WEBHOOK_URL=...
-        import os, requests
-        from datetime import datetime
-
-        def get_slack_webhook() -> str:
-            return (os.getenv("SLACK_WEBHOOK_URL") or "").strip()
-
-        # --- Draft persistence (save + load from Firestore) ---
-        def save_draft_to_db(code, lesson_key, text):
-            doc_ref = db.collection('draft_answers').document(code)
-            doc_ref.set(
-                {lesson_key: text, f"{lesson_key}__updated_at": datetime.utcnow()},
-                merge=True
-            )
-
-        def load_draft_from_db(code, lesson_key) -> str:
-            try:
-                doc = db.collection('draft_answers').document(code).get()
-                if doc.exists:
-                    data = doc.to_dict() or {}
-                    return data.get(lesson_key, "")
-            except Exception:
-                pass
-            return ""
-
+        # --- Core context
         code = student_row.get('StudentCode', 'demo001')
-        lesson_key = f"draft_{info['chapter']}"     # unique per chapter
+        lesson_key = lesson_key_build(student_level, info['day'], info['chapter'])  # unique, DB-safe
         chapter_name = f"{info['chapter']} – {info.get('topic', '')}"
         name = st.text_input("Name", value=student_row.get('Name', ''))
 
-        # Persisted lock per lesson
+        # --- Draft persistence (use a separate draft key)
+        draft_key = f"draft_{lesson_key}"
+
+        # DB-backed lock (persists across refresh/devices)
+        db_locked = is_locked(student_level, code, lesson_key)
         locked_key = f"{lesson_key}_locked"
-        locked = st.session_state.get(locked_key, False)
+        if db_locked:
+            st.session_state[locked_key] = True
+        locked = db_locked or st.session_state.get(locked_key, False)
 
         # One-time hydration from Firestore so text survives refresh/restart
-        if not st.session_state.get(f"{lesson_key}__hydrated", False):
-            existing = load_draft_from_db(code, lesson_key)
-            if existing and not st.session_state.get(lesson_key):
-                st.session_state[lesson_key] = existing
+        if not st.session_state.get(f"{draft_key}__hydrated", False):
+            existing = load_draft_from_db(code, draft_key)
+            if existing and not st.session_state.get(draft_key):
+                st.session_state[draft_key] = existing
                 st.info("💾 Loaded your saved draft.")
-            st.session_state[f"{lesson_key}__hydrated"] = True
+            st.session_state[f"{draft_key}__hydrated"] = True
 
         # Answer Box (autosaves on change ONLY)
         st.subheader("✍️ Your Answer (Autosaves)")
+
         def autosave_draft():
-            text = st.session_state.get(lesson_key, "")
-            save_draft_to_db(code, lesson_key, text)
-            st.session_state[f"{lesson_key}_saved"] = True
-            st.session_state[f"{lesson_key}_saved_at"] = datetime.utcnow()
+            text = st.session_state.get(draft_key, "")
+            save_draft_to_db(code, draft_key, text)
+            st.session_state[f"{draft_key}_saved"] = True
+            st.session_state[f"{draft_key}_saved_at"] = datetime.utcnow()
 
         st.text_area(
             "Type all your answers here",
-            value=st.session_state.get(lesson_key, ""),
+            value=st.session_state.get(draft_key, ""),
             height=500,
-            key=lesson_key,
-            on_change=autosave_draft,  # saves when the field loses focus or the widget updates
+            key=draft_key,
+            on_change=autosave_draft,
             disabled=locked,
             help="Draft autosaves when you click outside the box or change focus."
         )
@@ -4756,7 +4905,7 @@ if tab == "My Course":
                 autosave_draft()
                 st.success("Draft saved.")
         with cols_save[1]:
-            ts = st.session_state.get(f"{lesson_key}_saved_at")
+            ts = st.session_state.get(f"{draft_key}_saved_at")
             if ts:
                 st.caption("Last saved: " + ts.strftime("%Y-%m-%d %H:%M") + " UTC")
 
@@ -4769,48 +4918,6 @@ if tab == "My Course":
                 4) Your box will lock (read-only).  
                 _You’ll get an **email** when it’s marked. See **Results & Resources** for scores & feedback._
             """)
-
-        # Slack notify helper (uses Render env only)
-        def notify_slack_submission(webhook_url: str, *, student_name: str, student_code: str,
-                                    level: str, day: int, chapter: str, receipt: str, preview: str):
-            if not webhook_url:
-                return
-            text = (
-                f"*New submission* • {student_name} ({student_code})\n"
-                f"*Level:* {level}  •  *Day:* {day}\n"
-                f"*Chapter:* {chapter}\n"
-                f"*Ref:* `{receipt}`\n"
-                f"*Preview:* {preview[:180]}{'…' if len(preview) > 180 else ''}"
-            )
-            try:
-                requests.post(webhook_url, json={"text": text}, timeout=6)
-            except Exception:
-                pass  # don't block student
-
-        # Firestore: create submission, return short ref for Slack (hidden from student)
-        def submit_answer(code, name, level, day, chapter, lesson_key, answer):
-            if not answer or not answer.strip():
-                st.warning("Please type your answer before submitting.")
-                return False, None
-            posts_ref = db.collection("submissions").document(level).collection("posts")
-            now = datetime.utcnow()
-            payload = {
-                "student_code": code,
-                "student_name": name or "Student",
-                "level": level,
-                "day": day,
-                "chapter": chapter,
-                "lesson_key": lesson_key,
-                "answer": answer.strip(),
-                "status": "submitted",
-                "created_at": now,
-                "updated_at": now,
-                "version": 1,
-            }
-            _, ref = posts_ref.add(payload)
-            doc_id = ref.id
-            short_ref = f"{doc_id[:8].upper()}-{day}"
-            return True, short_ref
 
         # Two-step confirm + Submit / Save to Notes / Ask a Question
         col1, col2, col3 = st.columns(3)
@@ -4830,16 +4937,30 @@ if tab == "My Course":
             can_submit = (confirm_final and confirm_lock and (not locked))
 
             if st.button("✅ Confirm & Submit", type="primary", disabled=not can_submit):
-                ok, short_ref = submit_answer(
-                    code=code,
-                    name=name,
-                    level=student_level,
-                    day=info["day"],
-                    chapter=chapter_name,
-                    lesson_key=lesson_key,
-                    answer=st.session_state.get(lesson_key, "")
-                )
-                if ok:
+                # Atomic lock first (prevents double writes)
+                if not acquire_lock(student_level, code, lesson_key):
+                    st.session_state[locked_key] = True
+                    st.warning("You have already submitted this assignment. It is locked.")
+                else:
+                    # Write the submission (first and only time)
+                    posts_ref = db.collection("submissions").document(student_level).collection("posts")
+                    now = datetime.utcnow()
+                    payload = {
+                        "student_code": code,
+                        "student_name": name or "Student",
+                        "level": student_level,
+                        "day": info["day"],
+                        "chapter": chapter_name,
+                        "lesson_key": lesson_key,
+                        "answer": st.session_state.get(draft_key, "").strip(),
+                        "status": "submitted",
+                        "created_at": now,
+                        "updated_at": now,
+                        "version": 1,
+                    }
+                    _, ref = posts_ref.add(payload)
+                    short_ref = f"{ref.id[:8].upper()}-{info['day']}"
+
                     st.session_state[locked_key] = True
                     st.success("Submitted! Your work has been sent to your tutor.")
                     st.caption("You’ll be **emailed when it’s marked**. Check **Results & Resources** for your score and feedback.")
@@ -4854,14 +4975,13 @@ if tab == "My Course":
                             day=info["day"],
                             chapter=chapter_name,
                             receipt=short_ref,
-                            preview=st.session_state.get(lesson_key, "")
+                            preview=st.session_state.get(draft_key, "")
                         )
 
         # --- Column 2: Ask the Teacher (jump to Classroom Q&A) ---
         with col2:
             st.markdown("#### ❓ Ask the Teacher")
             if st.button("Open Classroom Q&A", key=f"open_qna_{lesson_key}", disabled=locked):
-                # set a jump flag; DON'T touch the radio key directly here
                 st.session_state["__go_classroom"] = True
                 st.rerun()
 
@@ -4869,31 +4989,12 @@ if tab == "My Course":
         with col3:
             st.markdown("#### 📝 Add Notes")
             if st.button("Open Notes", key=f"open_notes_{lesson_key}", disabled=locked):
-                # set a jump flag; no prefills
                 st.session_state["__go_notes"] = True
                 st.rerun()
 
         st.divider()
 
         # Submission status (latest only; no receipt shown)
-        def fetch_latest(level, code, lesson_key):
-            posts_ref = db.collection("submissions").document(level).collection("posts")
-            try:
-                docs = posts_ref.where("student_code","==",code)\
-                                .where("lesson_key","==",lesson_key)\
-                                .order_by("updated_at", direction=firestore.Query.DESCENDING)\
-                                .limit(1).stream()
-                for d in docs:
-                    return d.to_dict()
-            except Exception:
-                docs = posts_ref.where("student_code","==",code)\
-                                .where("lesson_key","==",lesson_key)\
-                                .stream()
-                items = [d.to_dict() for d in docs]
-                items.sort(key=lambda x: x.get("updated_at"), reverse=True)
-                return items[0] if items else None
-            return None
-
         latest = fetch_latest(student_level, code, lesson_key)
         if latest:
             ts = latest.get('updated_at')
@@ -4902,6 +5003,7 @@ if tab == "My Course":
             st.caption("You’ll receive an **email** when it’s marked. See **Results & Resources** for scores & feedback.")
         else:
             st.info("No submission yet. Complete the two confirmations and click **Confirm & Submit**.")
+
 
     if cb_subtab == "🧑‍🏫 Classroom":
         # --- Classroom banner (top of subtab) ---
@@ -7982,34 +8084,30 @@ if tab == "Exams Mode & Custom Chat":
         if st.button("⬅️ Back"):
             back_step()
 
-
-    # ——— Stage 99: Pronunciation & Speaking Checker (cloud-first: web recorder + latest upload)
+    # ——— Stage 99: Pronunciation & Speaking Checker (Web Recorder only)
     if st.session_state.get("falowen_stage") == 99:
         import datetime as _dt
-        import time
         from io import BytesIO
         import urllib.parse as _urllib
         import requests
-        from google.cloud import firestore
-        import streamlit as st  # ensure imported
-
-        # Where your tiny web recorder lives
-        RECORDER_URL = "https://speak.falowen.app"
-        RECORDER_FALLBACK = "https://learngermanghana.github.io/a1spreche/"
+        try:
+            FSQuery  # defined earlier as alias to firestore.Query
+        except NameError:
+            from google.cloud import firestore as _fs
+            FSQuery = _fs.Query
 
         # ----- Daily limit guard (3/day)
-        today_str = _dt.date.today().isoformat()
         code_val = (st.session_state.get("student_code") or "").strip()
         if not code_val:
             st.error("Missing student code in session. Please sign in again.")
             st.stop()
 
+        today_str = _dt.date.today().isoformat()
         uses_ref = db.collection("pron_uses").document(code_val)
         snap = uses_ref.get()
         data = snap.to_dict() if snap.exists else {}
         last_date = data.get("date")
         count = int(data.get("count", 0))
-
         if last_date != today_str:
             count = 0
         if count >= 3:
@@ -8022,122 +8120,91 @@ if tab == "Exams Mode & Custom Chat":
         # ----- UI
         st.subheader("🎤 Pronunciation & Speaking Checker")
         st.info(
-            "Step 1) Tap **Open Web Recorder** and record (≤ 60s), then press **Upload** there.\n\n"
-            "Step 2) Return here and tap **🔎 Check latest upload** to transcribe and get feedback."
+            "Step 1) Tap **Open Web Recorder** and record (≤ 60s), then press **Upload** on that page.\n\n"
+            "Step 2) Return here and tap **Check latest upload** to transcribe and get feedback."
         )
 
-        rec_url_primary = f"{RECORDER_URL}?code={_urllib.quote(code_val)}"
-        rec_url_fallback = f"{RECORDER_FALLBACK}?code={_urllib.quote(code_val)}"
+        # Use the GitHub Pages recorder (speak.falowen.app not ready yet)
+        RECORDER_URL = "https://speak.falowen.app/"
+        rec_url = RECORDER_URL + f"?code={_urllib.quote(code_val)}"
 
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns([1, 1])
         with c1:
-            st.link_button("🎙️ Open Web Recorder", rec_url_primary, use_container_width=True)
-            st.caption(f"Alternative link: [open fallback]({rec_url_fallback})")
+            st.link_button("🎙️ Open Web Recorder", rec_url, use_container_width=True)
         with c2:
             go = st.button("🔎 Check latest upload", use_container_width=True)
 
-        st.caption("Tip: After uploading in the recorder, wait 2–3 seconds, then click **Check latest upload**.")
+        st.caption("Tip: After uploading in the recorder, wait ~2 seconds before clicking **Check latest upload**.")
 
-        # ===== Helpers =====
-        def _ext_from(ct: str, u: str) -> str:
-            ct = (ct or "").lower()
-            lu = (u or "").lower()
-            if "wav" in ct or lu.endswith(".wav"): return "wav"
-            if "mpeg" in ct or "mp3" in ct or lu.endswith(".mp3"): return "mp3"
-            if "m4a" in ct or "mp4" in ct or lu.endswith(".m4a"): return "m4a"
-            if "ogg" in ct or lu.endswith(".ogg"): return "ogg"
-            if "webm" in ct or lu.endswith(".webm"): return "webm"
-            if "3gpp" in ct or lu.endswith(".3gp"): return "3gp"
-            return "webm"
-
-        def _normalize_code(s: str) -> str:
-            return (s or "").strip()
-
-        # ===== Fetch & process latest upload =====
         if go:
-            code_val = _normalize_code(code_val)
-
-            # Build query: latest doc for this code by createdAt DESC
+            # Query newest upload for this student (needs composite index: code==, createdAt desc)
             try:
                 q = (
                     db.collection("pron_inbox")
                     .where("code", "==", code_val)
-                    .order_by("createdAt", direction=firestore.Query.DESCENDING)
+                    .order_by("createdAt", direction=FSQuery.DESCENDING)
                     .limit(1)
                 )
-            except Exception as e:
-                st.error(f"Query setup error: {e}")
-                st.stop()
-
-            latest_doc = None
-            deadline = time.time() + 15  # poll ~15s to allow the recorder to finish writing
-            while time.time() < deadline and latest_doc is None:
-                try:
-                    docs = list(q.stream())
-                    latest_doc = docs[0] if docs else None
-                except Exception:
-                    latest_doc = None
-                if latest_doc is None:
-                    time.sleep(2)
-
-            if latest_doc is None:
-                st.info("No cloud upload found yet. In the Web Recorder, press **Upload**, wait ~2 seconds, then click **Check latest upload** here.")
-                st.stop()
-
-            rec = latest_doc.to_dict() or {}
-
-            # Tolerate alternate field names
-            url = rec.get("url") or rec.get("downloadURL")
-            content_type = (rec.get("contentType") or rec.get("mimeType") or "").lower()
-            created_at = rec.get("createdAt")
-
-            try:
-                if hasattr(created_at, "isoformat"):
-                    st.caption(f"Latest upload time (server): {created_at.isoformat()}")
+                docs = list(q.stream())
             except Exception:
-                pass
+                st.error("Couldn’t fetch your cloud upload. Create the Firestore index for (code ==, createdAt desc) if prompted, then try again.")
+                st.stop()
 
+            if not docs:
+                st.info("No cloud upload found yet. Make sure you pressed **Upload** in the Web Recorder.")
+                st.stop()
+
+            rec = docs[0].to_dict() or {}
+            url = rec.get("url")
+            ctype = (rec.get("contentType") or "").lower()
             if not url:
-                st.error("Upload record found but missing file URL.")
+                st.error("Upload record is missing a download URL. Please try uploading again.")
                 st.stop()
 
-            # Download file bytes
+            # Preview from cloud
+            st.audio(url)
+
+            # Download for Whisper
             try:
-                r = requests.get(url, timeout=30)
-                r.raise_for_status()
-                audio_bytes = r.content
+                resp = requests.get(url, timeout=20)
+                resp.raise_for_status()
             except Exception as e:
-                st.error(f"Could not download your audio file: {e}")
+                st.error(f"Couldn’t download your audio from cloud storage: {e}")
                 st.stop()
 
-            # Determine extension and preview bytes directly
-            ext = _ext_from(content_type, url)
-            try:
-                st.audio(audio_bytes, format=f"audio/{'mpeg' if ext=='mp3' else ext}")
-            except Exception:
-                st.caption("Preview may be blocked by the browser; continuing…")
+            bio = BytesIO(resp.content); bio.seek(0)
 
-            # Prepare BytesIO for Whisper
-            bio = BytesIO(audio_bytes)
+            # Pick extension to help Whisper
+            ext = "webm"
+            if "mp3" in ctype:
+                ext = "mp3"
+            elif "wav" in ctype:
+                ext = "wav"
+            elif "m4a" in ctype or "mp4" in ctype or "aac" in ctype:
+                ext = "m4a"
+            elif "ogg" in ctype:
+                ext = "ogg"
+            elif "3gpp" in ctype:
+                ext = "3gp"
             setattr(bio, "name", f"speech.{ext}")
 
-            # ----- Transcribe (German only)
+            # Transcribe (German)
             try:
-                transcript_resp = client.audio.transcriptions.create(
+                t = client.audio.transcriptions.create(
                     file=bio,
                     model="whisper-1",
                     language="de",
                     temperature=0,
                     prompt="Dies ist deutsche Sprache. Bitte nur transkribieren (keine Übersetzung).",
                 )
-                transcript_text = transcript_resp.text
+                transcript_text = t.text
             except Exception as e:
                 st.error(f"Sorry, could not process audio: {e}")
                 st.stop()
 
             st.markdown(f"**Transcribed (German):**  \n> {transcript_text}")
 
-            # ----- Evaluate (English)
+            # Evaluate (English)
             eval_prompt = (
                 "You are an English-speaking tutor evaluating a **German** speaking sample.\n"
                 f'The student said (in German): "{transcript_text}"\n\n'
@@ -8150,51 +8217,25 @@ if tab == "Exams Mode & Custom Chat":
                 "Grammar: XX/100\nTips:\n1. …\n2. …\n3. …\n\n"
                 "Fluency: XX/100\nTips:\n1. …\n2. …\n3. …"
             )
-
-            with st.spinner("Evaluating your sample…"):
+            with st.spinner("Evaluating your sample..."):
                 try:
-                    eval_resp = client.chat.completions.create(
+                    r = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[
-                            {
-                                "role": "system",
-                                "content": (
-                                    "You are an English-speaking tutor evaluating German speech. "
-                                    "Always answer in clear, concise English using the requested format."
-                                ),
-                            },
+                            {"role": "system", "content": "You are an English-speaking tutor evaluating German speech. Always answer in clear, concise English using the requested format."},
                             {"role": "user", "content": eval_prompt},
                         ],
                         temperature=0.2,
                     )
-                    result_text = eval_resp.choices[0].message.content
+                    result_text = r.choices[0].message.content
                 except Exception as e:
                     st.error(f"Evaluation error: {e}")
                     result_text = None
 
             if result_text:
                 st.markdown(result_text)
-
-                # Increment daily counter (transaction to avoid races)
-                transaction = db.transaction()
-
-                @firestore.transactional
-                def _increment(tx):
-                    snap2 = uses_ref.get(transaction=tx)
-                    d2 = snap2.to_dict() if snap2.exists else {}
-                    last_date2 = d2.get("date")
-                    c2 = int(d2.get("count", 0))
-                    if last_date2 != today_str:
-                        c2 = 0
-                    tx.set(uses_ref, {"count": c2 + 1, "date": today_str})
-
-                try:
-                    _increment(transaction)
-                except Exception:
-                    # Fallback non-transactional set
-                    uses_ref.set({"count": count + 1, "date": today_str})
-
-                st.info("💡 Tip: Use **Custom Chat** first to build ideas, then record and upload with the Web Recorder.")
+                uses_ref.set({"count": count + 1, "date": today_str})
+                st.success(f"Saved ✅ — attempt {count + 1} of 3 for today.")
                 if st.button("🔄 Check another upload"):
                     st.rerun()
             else:
@@ -8204,7 +8245,6 @@ if tab == "Exams Mode & Custom Chat":
             st.session_state["falowen_stage"] = 1
             st.rerun()
 #
-
 
 
 # =========================================
@@ -9286,84 +9326,20 @@ def get_vocab_stats(student_code):
 
 
 # ================================
-# HELPERS: Writing (Sentence Builder) persistence
+# CONFIG: Sheet for Vocab + Audio
 # ================================
-def save_sentence_attempt(student_code, level, target_sentence, chosen_sentence, correct, tip):
-    """Append a sentence-builder attempt to Firestore."""
-    _db = _get_db()
-    if _db is None:
-        st.warning("Firestore not initialized; skipping sentence stats save.")
-        return
-
-    doc_ref = _db.collection("sentence_builder_stats").document(student_code)
-    doc = doc_ref.get()
-    data = doc.to_dict() if doc.exists else {}
-    history = data.get("history", [])
-    history.append({
-        "level": level,
-        "target": target_sentence,
-        "chosen": chosen_sentence,
-        "correct": bool(correct),
-        "tip": tip,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-    })
-    doc_ref.set({
-        "history": history,
-        "last_played": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "total_sessions": len(history),
-    }, merge=True)
-
-def get_sentence_progress(student_code: str, level: str):
-    """
-    Returns (correct_unique_count, total_items_for_level)
-    based on history in 'sentence_builder_stats'.
-    """
-    _db = _get_db()
-    correct_set = set()
-    if _db is not None:
-        ref = _db.collection("sentence_builder_stats").document(student_code)
-        doc = ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            for h in data.get("history", []):
-                if h.get("level") == level and h.get("correct"):
-                    correct_set.add(h.get("target"))
-    total_items = len(SENTENCE_BANK.get(level, []))
-    return len(correct_set), total_items
-
+SHEET_ID  = "1I1yAnqzSh3DPjwWRh9cdRSfzNSPsi7o4r5Taj9Y36NU"
+SHEET_GID = 0  # <-- change this if your Vocab tab uses another gid
 
 # ================================
-# HELPERS: Vocab CSV (optional flashcards list)
+# HELPERS: Utilities used below
 # ================================
-@st.cache_data
-def load_vocab_lists():
-    """
-    Optional CSV for flashcards: columns Level, German, English
-    """
-    sheet_id = "1I1yAnqzSh3DPjwWRh9cdRSfzNSPsi7o4r5Taj9Y36NU"  # Vocab sheet
-    csv_url  = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
-    try:
-        df = pd.read_csv(csv_url)
-    except Exception as e:
-        st.error(f"Could not fetch vocab CSV: {e}")
-        return {}
-    df.columns = df.columns.str.strip()
-    missing = [c for c in ("Level","German","English") if c not in df.columns]
-    if missing:
-        st.error(f"Missing column(s) in your vocab sheet: {missing}")
-        return {}
-    df = df[["Level","German","English"]].dropna()
-    lists = {}
-    for lvl, grp in df.groupby("Level"):
-        lists[lvl] = list(zip(grp["German"], grp["English"]))
-    return lists
+def normalize_join(tokens):
+    s = " ".join(tokens)
+    for p in [",", ".", "!", "?", ":", ";"]:
+        s = s.replace(f" {p}", p)
+    return s
 
-VOCAB_LISTS = load_vocab_lists()
-
-
-# ================================
-# SMALL UI + CHECK HELPERS
-# ================================
 def render_message(role, msg):
     align   = "left"   if role=="assistant" else "right"
     bgcolor = "#FAFAFA" if role=="assistant" else "#D2F8D2"
@@ -9381,32 +9357,12 @@ def clean_text(text):
 
 def is_correct_answer(user_input, answer):
     import re
-    # Clean both sides; accept comma/;/ slash-separated variants
     possible = [clean_text(a) for a in re.split(r"[,/;]", str(answer))]
     return clean_text(str(user_input)) in possible
 
-def normalize_join(tokens):
-    """Join tokens and fix spaces before punctuation for sentence builder."""
-    s = " ".join(tokens)
-    for p in [",", ".", "!", "?", ":", ";"]:
-        s = s.replace(f" {p}", p)
-    return s
-
-# ---------- Dictionary helpers ----------
-def _flatten_vocab_entries(vocab_lists: dict):
-    rows = []
-    for lvl, pairs in (vocab_lists or {}).items():
-        for de, en in pairs:
-            rows.append({
-                "level":   str(lvl).upper().strip(),
-                "german":  str(de).strip(),
-                "english": str(en).strip()
-            })
-    return rows
-
+# ---------- Fallback TTS bytes (for when sheet link missing) ----------
 @st.cache_data(show_spinner=False)
 def _dict_tts_bytes_de(word: str, slow: bool = False):
-    """Return MP3 bytes for a German word (cached)."""
     try:
         from gtts import gTTS
         import io
@@ -9418,6 +9374,86 @@ def _dict_tts_bytes_de(word: str, slow: bool = False):
     except Exception:
         return None
 
+# ---- Safety shims for Sentence Builder stats (prevents NameError) ----
+if 'get_sentence_progress' not in globals():
+    def get_sentence_progress(student_code: str, level: str):
+        # Fallback: no DB? just return 0 done, and the count of available sentences
+        try:
+            return 0, len(SENTENCE_BANK.get(level, []))
+        except Exception:
+            return 0, 0  # if SENTENCE_BANK is also missing
+
+if 'save_sentence_attempt' not in globals():
+    def save_sentence_attempt(student_code, level, target_sentence, chosen_sentence, correct, tip):
+        # No-op fallback if Firestore/_get_db not set up
+        return
+
+
+# ================================
+# HELPERS: Load vocab + audio from Sheet
+# ================================
+@st.cache_data
+def load_vocab_lists():
+    """
+    Reads the Vocab tab CSV (Level, German, English) and optional audio columns:
+    - Audio (normal) / Audio (slow) / Audio
+    Returns:
+      VOCAB_LISTS: dict[level] -> list[(German, English)]
+      AUDIO_URLS:  dict[(level, German)] -> {"normal": url, "slow": url}
+    """
+    import pandas as pd
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
+    try:
+        df = pd.read_csv(csv_url)
+    except Exception as e:
+        st.error(f"Could not fetch vocab CSV: {e}")
+        return {}, {}
+
+    df.columns = df.columns.str.strip()
+    missing = [c for c in ("Level","German","English") if c not in df.columns]
+    if missing:
+        st.error(f"Missing column(s) in your vocab sheet: {missing}")
+        return {}, {}
+
+    # Normalize
+    df["Level"]  = df["Level"].astype(str).str.strip()
+    df["German"] = df["German"].astype(str).str.strip()
+    df["English"]= df["English"].astype(str).str.strip()
+    df = df.dropna(subset=["Level","German"])
+
+    # Flexible audio detection
+    def pick(*names):
+        for n in names:
+            if n in df.columns:
+                return n
+        return None
+    normal_col = pick("Audio (normal)", "Audio normal", "Audio_Normal", "Audio")
+    slow_col   = pick("Audio (slow)", "Audio slow", "Audio_Slow")
+
+    # Build outputs
+    vocab_lists = {lvl: list(zip(grp["German"], grp["English"])) for lvl, grp in df.groupby("Level")}
+    audio_urls = {}
+    for _, r in df.iterrows():
+        key = (r["Level"], r["German"])
+        audio_urls[key] = {
+            "normal": str(r.get(normal_col, "")).strip() if normal_col else "",
+            "slow":   str(r.get(slow_col, "")).strip()   if slow_col else "",
+        }
+    return vocab_lists, audio_urls
+
+VOCAB_LISTS, AUDIO_URLS = load_vocab_lists()
+
+def refresh_vocab_from_sheet():
+    load_vocab_lists.clear()
+    global VOCAB_LISTS, AUDIO_URLS
+    VOCAB_LISTS, AUDIO_URLS = load_vocab_lists()
+
+def get_audio_url(level: str, german_word: str) -> str:
+    """Prefer slow for A1, otherwise normal; fallback to whichever exists."""
+    urls = AUDIO_URLS.get((str(level).upper(), str(german_word).strip()), {})
+    lvl = str(level).upper()
+    return (urls.get("slow") if (lvl == "A1" and urls.get("slow")) else urls.get("normal")) or urls.get("slow") or ""
+
 # ================================
 # TAB: Vocab Trainer (locked by Level)
 # ================================
@@ -9425,13 +9461,8 @@ if tab == "Vocab Trainer":
     # --- Who is this? ---
     student_code = st.session_state.get("student_code", "demo001")
 
-    # --- Lock the level from your Sheet ---
-    student_level_locked = get_student_level(
-        student_code,
-        default=(st.session_state.get("student_level", "A1"))
-    )
-    if not student_level_locked:
-        student_level_locked = "A1"
+    # --- Lock the level from your Sheet/profile ---
+    student_level_locked = get_student_level(student_code, default=st.session_state.get("student_level", "A1")) or "A1"
 
     # Header
     st.markdown(
@@ -9449,6 +9480,16 @@ if tab == "Vocab Trainer":
     st.caption("Your level is loaded automatically from the school list. Ask your tutor if this looks wrong.")
     st.divider()
 
+    # Small toolbar
+    tcol1, tcol2 = st.columns([1, 1])
+    with tcol1:
+        if st.button("🔄 Refresh vocab from sheet", use_container_width=True):
+            refresh_vocab_from_sheet()
+            st.success("Refreshed vocab + audio from sheet.")
+            st.rerun()
+    with tcol2:
+        st.caption("Uses 'Audio (slow)' for A1 by default; 'Audio (normal)' for others.")
+
     subtab = st.radio(
         "Choose practice:",
         ["Sentence Builder", "Vocab Practice", "Dictionary"],
@@ -9457,15 +9498,19 @@ if tab == "Vocab Trainer":
     )
 
     # ===========================
-    # SUBTAB: Sentence Builder
+    # SUBTAB: Sentence Builder  (unchanged logic, audio not needed here)
     # ===========================
     if subtab == "Sentence Builder":
         student_level = student_level_locked
         st.info(f"✍️ You are practicing **Sentence Builder** at **{student_level}** (locked from your profile).")
 
-        # --- Guide & Progress (collapsed) ---
+        # --- Guide & Progress ---
         with st.expander("✍️ Sentence Builder — Guide & Progress", expanded=False):
-            done_unique, total_items = get_sentence_progress(student_code, student_level)
+            try:
+                done_unique, total_items = get_sentence_progress(student_code, student_level)
+            except Exception:
+                total_items = len(SENTENCE_BANK.get(student_level, [])) if 'SENTENCE_BANK' in globals() else 0
+                done_unique = 0
             pct = int((done_unique / total_items) * 100) if total_items else 0
             st.progress(pct)
             st.caption(f"**Overall Progress:** {done_unique} / {total_items} unique sentences correct ({pct}%).")
@@ -9477,40 +9522,23 @@ if tab == "Vocab Trainer":
                 """,
                 unsafe_allow_html=True
             )
-            st.caption(
-                "Tip: Click words to build the sentence. Clear to reset, Check to submit, "
-                "Next for a new one."
-            )
-            st.markdown(
-                "**What these numbers mean:**  \n"
-                "- **Score** = Correct sentences *this session*.  \n"
-                "- **Progress** (bar above) = Unique sentences you have *ever* solved at this level."
-            )
+            st.caption("Tip: Click words to build the sentence. Clear to reset, Check to submit, Next for a new one.")
+            st.markdown("**Score** = correct this session. **Progress bar** = unique lifetime correct for this level.")
 
         # ---- Session state defaults ----
         init_defaults = {
-            "sb_round": 0,
-            "sb_pool": None,
-            "sb_pool_level": None,
-            "sb_current": None,
-            "sb_shuffled": [],
-            "sb_selected_idx": [],
-            "sb_score": 0,
-            "sb_total": 0,
-            "sb_feedback": "",
-            "sb_correct": None,
+            "sb_round": 0, "sb_pool": None, "sb_pool_level": None, "sb_current": None,
+            "sb_shuffled": [], "sb_selected_idx": [], "sb_score": 0, "sb_total": 0,
+            "sb_feedback": "", "sb_correct": None,
         }
         for k, v in init_defaults.items():
-            if k not in st.session_state:
-                st.session_state[k] = v
+            st.session_state.setdefault(k, v)
 
         # ---- Init / Level change ----
         if (st.session_state.sb_pool is None) or (st.session_state.sb_pool_level != student_level):
             import random
             st.session_state.sb_pool_level = student_level
-            st.session_state.sb_pool = SENTENCE_BANK.get(
-                student_level, SENTENCE_BANK.get("A1", [])
-            ).copy()
+            st.session_state.sb_pool = SENTENCE_BANK.get(student_level, SENTENCE_BANK.get("A1", [])).copy()
             random.shuffle(st.session_state.sb_pool)
             st.session_state.sb_round = 0
             st.session_state.sb_score = 0
@@ -9523,11 +9551,8 @@ if tab == "Vocab Trainer":
 
         def new_sentence():
             import random
-            # Refill pool if empty
             if not st.session_state.sb_pool:
-                st.session_state.sb_pool = SENTENCE_BANK.get(
-                    student_level, SENTENCE_BANK.get("A1", [])
-                ).copy()
+                st.session_state.sb_pool = SENTENCE_BANK.get(student_level, SENTENCE_BANK.get("A1", [])).copy()
                 random.shuffle(st.session_state.sb_pool)
             if st.session_state.sb_pool:
                 st.session_state.sb_current = st.session_state.sb_pool.pop()
@@ -9544,15 +9569,11 @@ if tab == "Vocab Trainer":
         if st.session_state.sb_current is None:
             new_sentence()
 
-        # ---- Top metrics for session ----
+        # ---- Top metrics ----
         cols = st.columns([3, 2, 2])
         with cols[0]:
             st.session_state.setdefault("sb_target", 5)
-            _ = st.number_input(
-                "Number of sentences this session",
-                min_value=1, max_value=20,
-                key="sb_target"
-            )
+            _ = st.number_input("Number of sentences this session", 1, 20, key="sb_target")
         target = int(st.session_state.sb_target)
         with cols[1]:
             st.metric("Score (this session)", f"{st.session_state.sb_score}")
@@ -9561,12 +9582,11 @@ if tab == "Vocab Trainer":
 
         st.divider()
 
-        # --- English prompt panel ---
+        # Prompt box
         cur = st.session_state.sb_current or {}
         prompt_en = cur.get("prompt_en", "")
         hint_en = cur.get("hint_en", "")
         grammar_tag = cur.get("grammar_tag", "")
-
         if prompt_en:
             st.markdown(
                 f"""
@@ -9581,12 +9601,10 @@ if tab == "Vocab Trainer":
                 unsafe_allow_html=True
             )
             with st.expander("💡 Need a nudge? (Hint)"):
-                if hint_en:
-                    st.markdown(f"**Hint:** {hint_en}")
-                if grammar_tag:
-                    st.caption(f"Grammar: {grammar_tag}")
+                if hint_en: st.markdown(f"**Hint:** {hint_en}")
+                if grammar_tag: st.caption(f"Grammar: {grammar_tag}")
 
-        # ---- Word buttons ----
+        # Word buttons
         st.markdown("#### 🧩 Click the words in order")
         if st.session_state.sb_shuffled:
             word_cols = st.columns(min(6, len(st.session_state.sb_shuffled)) or 1)
@@ -9599,12 +9617,12 @@ if tab == "Vocab Trainer":
                         st.session_state.sb_selected_idx.append(i)
                         st.rerun()
 
-        # ---- Preview ----
+        # Preview
         chosen_tokens = [st.session_state.sb_shuffled[i] for i in st.session_state.sb_selected_idx]
         st.markdown("#### ✨ Your sentence")
         st.code(normalize_join(chosen_tokens) if chosen_tokens else "—", language="text")
 
-        # ---- Actions ----
+        # Actions
         a, b, c = st.columns(3)
         with a:
             if st.button("🧹 Clear"):
@@ -9624,9 +9642,7 @@ if tab == "Vocab Trainer":
                     st.session_state.sb_feedback = "✅ **Correct!** Great job!"
                 else:
                     tip = st.session_state.sb_current.get("hint_en", "")
-                    st.session_state.sb_feedback = (
-                        f"❌ **Not quite.**\n\n**Correct:** {target_sentence}\n\n*Tip:* {tip}"
-                    )
+                    st.session_state.sb_feedback = f"❌ **Not quite.**\n\n**Correct:** {target_sentence}\n\n*Tip:* {tip}"
                 save_sentence_attempt(
                     student_code=student_code,
                     level=student_level,
@@ -9644,37 +9660,27 @@ if tab == "Vocab Trainer":
                 new_sentence()
                 st.rerun()
 
-        # ---- Feedback box ----
+        # Feedback
         if st.session_state.sb_feedback:
-            if st.session_state.sb_correct:
-                st.success(st.session_state.sb_feedback)
-            else:
-                st.info(st.session_state.sb_feedback)
+            (st.success if st.session_state.sb_correct else st.info)(st.session_state.sb_feedback)
 
     # ===========================
-    # SUBTAB: Vocab Practice (flashcards)
+    # SUBTAB: Vocab Practice  (download-only audio)
     # ===========================
     elif subtab == "Vocab Practice":
-        # init session vars
         defaults = {
-            "vt_history": [],
-            "vt_list": [],
-            "vt_index": 0,
-            "vt_score": 0,
-            "vt_total": None,
-            "vt_saved": False,
-            "vt_session_id": None,
+            "vt_history": [], "vt_list": [], "vt_index": 0,
+            "vt_score": 0, "vt_total": None, "vt_saved": False, "vt_session_id": None,
         }
         for k, v in defaults.items():
             st.session_state.setdefault(k, v)
 
-        # --- Stats ---
+        # Stats
         with st.expander("📝 Your Vocab Stats", expanded=False):
             stats = get_vocab_stats(student_code)
             st.markdown(f"- **Sessions:** {stats['total_sessions']}")
             st.markdown(f"- **Last Practiced:** {stats['last_practiced']}")
             st.markdown(f"- **Unique Words:** {len(stats['completed_words'])}")
-
             if st.checkbox("Show Last 5 Sessions"):
                 for a in stats["history"][-5:][::-1]:
                     st.markdown(
@@ -9683,17 +9689,17 @@ if tab == "Vocab Trainer":
                         unsafe_allow_html=True
                     )
 
-        # lock level
+        # Level lock
         level = student_level_locked
         items = VOCAB_LISTS.get(level, [])
-        # re-use stats outside the expander
+
+        # If stats not set above, fetch here too
         if 'stats' not in locals():
             stats = get_vocab_stats(student_code)
         completed = set(stats["completed_words"])
         not_done = [p for p in items if p[0] not in completed]
         st.info(f"{len(not_done)} words NOT yet done at {level}.")
 
-        # reset button
         if st.button("🔁 Start New Practice", key="vt_reset"):
             for k in defaults:
                 st.session_state[k] = defaults[k]
@@ -9702,13 +9708,11 @@ if tab == "Vocab Trainer":
         mode = st.radio("Select words:", ["Only new words", "All words"], horizontal=True, key="vt_mode")
         session_vocab = (not_done if mode == "Only new words" else items).copy()
 
-        # pick count and start
         if st.session_state.vt_total is None:
             maxc = len(session_vocab)
             if maxc == 0:
                 st.success("🎉 All done! Switch to 'All words' to repeat.")
                 st.stop()
-
             count = st.number_input("How many today?", 1, maxc, min(7, maxc), key="vt_count")
             if st.button("Start", key="vt_start"):
                 import random
@@ -9723,59 +9727,44 @@ if tab == "Vocab Trainer":
                 st.session_state.vt_session_id = str(uuid4())
                 st.rerun()
 
-        # show chat/history
         if st.session_state.vt_history:
             st.markdown("### 🗨️ Practice Chat")
             for who, msg in st.session_state.vt_history:
                 render_message(who, msg)
 
-        # practice loop
         tot = st.session_state.vt_total
         idx = st.session_state.vt_index
         if isinstance(tot, int) and idx < tot:
             word, answer = st.session_state.vt_list[idx]
 
-            # audio
-            if st.button("🔊 Play & Download", key=f"tts_{idx}"):
-                try:
-                    from gtts import gTTS
-                    import tempfile
-                    t = gTTS(text=word, lang="de")
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                        t.save(fp.name)
-                        st.audio(fp.name, format="audio/mp3")
-                        fp.seek(0)
-                        blob = fp.read()
+            # ---- AUDIO (download-only: prefer sheet link; fallback to gTTS bytes) ----
+            audio_url = get_audio_url(level, word)
+            if audio_url:
+                st.markdown(f"[⬇️ Download / Open MP3]({audio_url})")
+            else:
+                audio_bytes = _dict_tts_bytes_de(word)  # fallback generation
+                if audio_bytes:
                     st.download_button(
-                        f"⬇️ {word}.mp3",
-                        data=blob,
+                        "⬇️ Download MP3",
+                        data=audio_bytes,
                         file_name=f"{word}.mp3",
-                        mime="audio/mp3",
-                        key=f"tts_dl_{idx}"
+                        mime="audio/mpeg",
+                        key=f"dl_{idx}"
                     )
-                except Exception as e:
-                    st.error(f"Could not generate audio (gTTS): {e}")
+                else:
+                    st.caption("Audio not available yet.")
 
-            # bigger, bolder, clearer input
+            # nicer input styling
             st.markdown(
                 """
                 <style>
-                div[data-baseweb="input"] input {
-                    font-size: 18px !important;
-                    font-weight: 600 !important;
-                    color: black !important;
-                }
+                div[data-baseweb="input"] input { font-size: 18px !important; font-weight: 600 !important; color: black !important; }
                 </style>
                 """,
                 unsafe_allow_html=True
             )
 
-            usr = st.text_input(
-                f"{word} = ?",
-                key=f"vt_input_{idx}",
-                placeholder="Type your answer here..."
-            )
-
+            usr = st.text_input(f"{word} = ?", key=f"vt_input_{idx}", placeholder="Type your answer here...")
             if usr and st.button("Check", key=f"vt_check_{idx}"):
                 st.session_state.vt_history.append(("user", usr))
                 if is_correct_answer(usr, answer):
@@ -9787,13 +9776,10 @@ if tab == "Vocab Trainer":
                 st.session_state.vt_index += 1
                 st.rerun()
 
-        # done
         if isinstance(tot, int) and idx >= tot:
             score = st.session_state.vt_score
             words = [w for w, _ in (st.session_state.vt_list or [])]
             st.markdown(f"### 🏁 Done! You scored {score}/{tot}.")
-
-            # Save exactly once per session, duplicate-safe
             if not st.session_state.get("vt_saved", False):
                 if not st.session_state.get("vt_session_id"):
                     from uuid import uuid4
@@ -9809,19 +9795,24 @@ if tab == "Vocab Trainer":
                     )
                 st.session_state.vt_saved = True
                 st.rerun()
-
             if st.button("Practice Again", key="vt_again"):
                 for k in defaults:
                     st.session_state[k] = defaults[k]
                 st.rerun()
 
     # ===========================
-    # SUBTAB: Dictionary (simple, sticky search, mobile-friendly)
+    # SUBTAB: Dictionary  (download-only audio)
     # ===========================
     elif subtab == "Dictionary":
-        import io, json, difflib
+        import io, json, difflib, pandas as pd
 
-        # ---------- Helpers ----------
+        # functions used here
+        _map = {"ä":"ae","ö":"oe","ü":"ue","ß":"ss"}
+        def _norm(s: str) -> str:
+            s = (s or "").strip().lower()
+            for k,v in _map.items(): s = s.replace(k, v)
+            return "".join(ch for ch in s if ch.isalnum() or ch.isspace())
+
         def _fallback_df(levels):
             rows = []
             for lvl in levels:
@@ -9844,82 +9835,17 @@ if tab == "Vocab Trainer":
                 df = df.drop_duplicates(subset=["Level","German"]).reset_index(drop=True)
             return df
 
-        def _tts_bytes_de(text: str) -> bytes:
-            try:
-                from gtts import gTTS
-                buf = io.BytesIO()
-                gTTS(text=text, lang="de").write_to_fp(buf)
-                buf.seek(0)
-                return buf.read()
-            except Exception:
-                return b""
-
-        def _json_from_text(raw: str) -> dict:
-            txt = (raw or "").strip()
-            if txt.startswith("```"):
-                txt = txt.strip("`")
-                if "\n" in txt:
-                    txt = txt.split("\n", 1)[1]
-                if "```" in txt:
-                    txt = txt.split("```", 1)[0]
-            try:
-                return json.loads(txt)
-            except Exception:
-                return {}
-
-        def _enrich_word(german: str, english_hint: str, level: str):
-            """Fill Pronunciation + English + 2 examples if missing (quiet background call)."""
-            try:
-                prompt = (
-                    "You are a precise German lexicographer.\n"
-                    f'Word: "{german}"\n'
-                    f'Known English hint (may be empty): "{english_hint}"\n'
-                    f'Level: {level}\n\n'
-                    "Return compact JSON with keys: ipa, english, examples (2 items with keys de and en)."
-                )
-                resp = client.chat.completions.create(
-                    model="gpt-4o",
-                    temperature=0.2,
-                    max_tokens=220,
-                    messages=[
-                        {"role": "system", "content": "Return strict JSON only."},
-                        {"role": "user", "content": prompt},
-                    ],
-                )
-                data = _json_from_text(resp.choices[0].message.content)
-                ipa = str(data.get("ipa", "") or "")
-                eng = str(data.get("english", "") or english_hint or "")
-                exs = data.get("examples", []) or []
-                clean = []
-                for ex in exs[:2]:
-                    clean.append({
-                        "de": str(ex.get("de", "") or ""),
-                        "en": str(ex.get("en", "") or "")
-                    })
-                return {"pron": ipa, "english": eng, "examples": clean}
-            except Exception:
-                return {"pron": "", "english": english_hint or "", "examples": []}
-
-        # diacritic/umlaut normalization so "ae" finds "ä", etc.
-        _map = {"ä":"ae","ö":"oe","ü":"ue","ß":"ss"}
-        def _norm(s: str) -> str:
-            s = (s or "").strip().lower()
-            for k,v in _map.items():
-                s = s.replace(k, v)
-            return "".join(ch for ch in s if ch.isalnum() or ch.isspace())
-
-        # ---------- Build data (CSV + Sentence Bank) ----------
+        # Build data (for the locked level)
         levels = [student_level_locked]
         df_dict = _fallback_df(levels)
         df_dict = _merge_sentence_bank(df_dict, levels)
         for c in ["Level","German","English","Pronunciation"]:
-            if c not in df_dict.columns:
-                df_dict[c] = ""
+            if c not in df_dict.columns: df_dict[c] = ""
         df_dict["g_norm"] = df_dict["German"].astype(str).map(_norm)
         df_dict["e_norm"] = df_dict["English"].astype(str).map(_norm)
         df_dict = df_dict.sort_values(["German"]).reset_index(drop=True)
 
-        # ---------- Mobile-friendly sticky search ----------
+        # Sticky search UI
         st.markdown(
             """
             <style>
@@ -9936,114 +9862,55 @@ if tab == "Vocab Trainer":
             with cols[0]:
                 q = st.text_input("🔎 Search (German or English)", key="dict_q", placeholder="e.g., Wochenende, bakery, spielen")
             with cols[1]:
-                search_in = st.selectbox("Field", ["Both", "German", "English"], index=0, key="dict_field")
+                search_in = st.selectbox("Field", ["Both", "German", "English"], 0, key="dict_field")
             with cols[2]:
-                match_mode = st.selectbox("Match", ["Contains", "Starts with", "Exact"], index=0, key="dict_mode")
+                match_mode = st.selectbox("Match", ["Contains", "Starts with", "Exact"], 0, key="dict_mode")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # ---------- Filter (and add enrichment when empty) ----------
+        # Filter + choose top row
         df_view = df_dict.copy()
         suggestions = []
         top_row = None
 
         if q:
             qn = _norm(q)
-
-            # masks by field
             g_contains = df_view["g_norm"].str.contains(qn, na=False) if search_in in ("Both","German") else pd.Series([False]*len(df_view))
             g_starts   = df_view["g_norm"].str.startswith(qn, na=False) if search_in in ("Both","German") else pd.Series([False]*len(df_view))
             g_exact    = df_view["g_norm"].eq(qn) if search_in in ("Both","German") else pd.Series([False]*len(df_view))
-
             e_contains = df_view["e_norm"].str.contains(qn, na=False) if search_in in ("Both","English") else pd.Series([False]*len(df_view))
             e_starts   = df_view["e_norm"].str.startswith(qn, na=False) if search_in in ("Both","English") else pd.Series([False]*len(df_view))
             e_exact    = df_view["e_norm"].eq(qn) if search_in in ("Both","English") else pd.Series([False]*len(df_view))
 
-            if match_mode == "Contains":
-                mask = g_contains | e_contains
-            elif match_mode == "Starts with":
-                mask = g_starts | e_starts
-            else:
-                mask = g_exact | e_exact
-
+            mask = (g_contains | e_contains) if match_mode=="Contains" else (g_starts | e_starts) if match_mode=="Starts with" else (g_exact | e_exact)
             if mask.any():
                 df_view = df_view[mask].copy().reset_index(drop=True)
-                # prefer exact > starts > contains
                 exact_mask  = (g_exact | e_exact)
                 starts_mask = (g_starts | e_starts)
-                if exact_mask.any():
-                    top_row = df_view[exact_mask].iloc[0]
-                elif starts_mask.any():
-                    top_row = df_view[starts_mask].iloc[0]
-                else:
-                    top_row = df_view.iloc[0]
+                top_row = df_view[exact_mask].iloc[0] if exact_mask.any() else df_view[starts_mask].iloc[0] if starts_mask.any() else df_view.iloc[0]
             else:
-                # no local match → show fuzzy suggestions + enrich the query so learners still get value
                 vocab_all = df_view["German"].astype(str).unique().tolist()
                 suggestions = difflib.get_close_matches(q, vocab_all, n=5, cutoff=0.72)
-
-                enrich = _enrich_word(q, "", student_level_locked)
-                new_row = {
-                    "Level": student_level_locked,
-                    "German": q.capitalize() if q.islower() else q,
-                    "English": enrich.get("english", ""),
-                    "Pronunciation": enrich.get("pron", ""),
-                    "g_norm": _norm(q),
-                    "e_norm": _norm(enrich.get("english","")),
-                }
-                df_view = pd.concat([df_view, pd.DataFrame([new_row])], ignore_index=True)
-                top_row = pd.Series(new_row)
-                st.session_state.setdefault("dict_cache", {})
-                st.session_state["dict_cache"][(new_row["German"], student_level_locked)] = {
-                    "pron": new_row["Pronunciation"],
-                    "english": new_row["English"],
-                    "examples": enrich.get("examples", []),
-                }
+                # Still show a card for the query itself
+                dummy = {"Level": student_level_locked, "German": q, "English": "", "Pronunciation": "", "g_norm": qn, "e_norm": ""}
+                df_view = pd.concat([df_view, pd.DataFrame([dummy])], ignore_index=True)
+                top_row = pd.Series(dummy)
         else:
-            # no query → show first word (nice landing state) if available
-            if not df_view.empty:
-                top_row = df_view.iloc[0]
+            if not df_view.empty: top_row = df_view.iloc[0]
 
-        # ---------- Details (always ABOVE) ----------
-        if "dict_cache" not in st.session_state:
-            st.session_state["dict_cache"] = {}
-
+        # Details panel (download-only audio)
         if top_row is not None and len(top_row) > 0:
             de  = str(top_row["German"])
             en  = str(top_row.get("English", "") or "")
             lvl = str(top_row.get("Level", student_level_locked))
-            pron = str(top_row.get("Pronunciation", "") or "")
-
-            cache_key = (de, lvl)
-            cached = st.session_state["dict_cache"].get(cache_key, {})
-
-            # Backfill pronunciation/english/examples if missing
-            if not pron or not cached.get("examples"):
-                enrich = _enrich_word(de, en, lvl)
-                if not pron and enrich.get("pron"):
-                    pron = enrich["pron"]
-                if not en and enrich.get("english"):
-                    en = enrich["english"]
-                if enrich.get("examples"):
-                    cached["examples"] = enrich["examples"]
-                st.session_state["dict_cache"][cache_key] = {
-                    "pron": pron, "english": en, "examples": cached.get("examples", [])
-                }
-
-            examples = st.session_state["dict_cache"].get(cache_key, {}).get("examples", [])
 
             st.markdown(f"### {de}")
-            if en:
-                st.markdown(f"**Meaning:** {en}")
-            if pron:
-                st.caption(f"**Pronunciation:** /{pron}/")
+            if en: st.markdown(f"**Meaning:** {en}")
 
-            audio_bytes = _tts_bytes_de(de)
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                if st.button("🔊 Pronounce", key=f"say_{de}_{lvl}"):
-                    if audio_bytes:
-                        st.audio(audio_bytes, format="audio/mp3")
-            with c2:
+            sheet_audio = get_audio_url(lvl, de)
+            if sheet_audio:
+                st.markdown(f"[⬇️ Download / Open MP3]({sheet_audio})")
+            else:
+                audio_bytes = _dict_tts_bytes_de(de)
                 if audio_bytes:
                     st.download_button(
                         "⬇️ Download MP3",
@@ -10053,21 +9920,8 @@ if tab == "Vocab Trainer":
                         key=f"dl_{de}_{lvl}"
                     )
                 else:
-                    st.caption("Audio currently unavailable.")
+                    st.caption("Audio not available yet.")
 
-            with st.expander("📌 Examples", expanded=True):
-                if examples:
-                    for ex in examples[:2]:
-                        de_ex = (ex.get("de", "") or "").strip()
-                        en_ex = (ex.get("en", "") or "").strip()
-                        if de_ex:
-                            st.markdown(f"- **{de_ex}**")
-                            if en_ex:
-                                st.caption(f"  ↳ {en_ex}")
-                else:
-                    st.caption("No examples yet.")
-
-        # ---------- Did you mean (chips) ----------
         if q and suggestions:
             st.markdown("**Did you mean:**")
             bcols = st.columns(min(5, len(suggestions)))
@@ -10077,25 +9931,10 @@ if tab == "Vocab Trainer":
                         st.session_state["dict_q"] = s
                         st.rerun()
 
-        # ---------- Scrollable table INSIDE an expander (clean page) ----------
         with st.expander(f"Browse all words at level {student_level_locked}", expanded=False):
-            df_show = df_view[["German","English","Pronunciation"]].copy()
+            df_show = df_view[["German","English"]].copy()
             st.dataframe(df_show, use_container_width=True, height=420)
-#
 
-                
-
-# ===== BUBBLE FUNCTION FOR CHAT DISPLAY =====
-def bubble(role, text):
-    color = "#7b2ff2" if role == "assistant" else "#222"
-    bg = "#ede3fa" if role == "assistant" else "#f6f8fb"
-    name = "Herr Felix" if role == "assistant" else "You"
-    return f"""
-        <div style="background:{bg};color:{color};margin-bottom:8px;padding:13px 15px;
-        border-radius:14px;max-width:98vw;font-size:1.09rem;">
-            <b>{name}:</b><br>{text}
-        </div>
-    """
 
 
 
@@ -11173,7 +11012,6 @@ if tab == "Schreiben Trainer":
       const s = document.createElement('script'); s.type = "application/ld+json"; s.text = JSON.stringify(ld); document.head.appendChild(s);
     </script>
     """, height=0)
-
 
 
 
