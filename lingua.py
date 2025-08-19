@@ -37,6 +37,42 @@ from streamlit.components.v1 import html as st_html
 from streamlit_cookies_manager import EncryptedCookieManager
 from streamlit_quill import st_quill
 
+# ==== Email (Gmail via SMTP) ====
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+EMAIL_ADDRESS = st.secrets["EMAIL_ADDRESS"]   # your Gmail
+EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"] # your 16-char app password
+
+def send_reset_email(to_email: str, reset_link: str):
+    """Send a password reset email using Gmail SMTP."""
+    try:
+        # Create the email
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_ADDRESS
+        msg["To"] = to_email
+        msg["Subject"] = "Falowen Password Reset"
+
+        msg.attach(MIMEText(f"""
+            <p>Hello,</p>
+            <p>You requested to reset your password. Click the link below to continue:</p>
+            <p><a href="{reset_link}">{reset_link}</a></p>
+            <p>If you did not request this, you can safely ignore this email.</p>
+            <br>
+            <p>– Falowen Team</p>
+        """, "html"))
+
+        # Connect to Gmail SMTP
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_ADDRESS, to_email, msg.as_string())
+        server.quit()
+
+        st.success(f"✅ Reset link sent to {to_email}. Check your inbox.")
+    except Exception as e:
+        st.error(f"❌ Failed to send reset email: {e}")
 
 
 
@@ -138,17 +174,6 @@ st.markdown("""
 footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
-
-import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore, auth as admin_auth
-
-if not firebase_admin._apps:
-    cred = credentials.Certificate(dict(st.secrets["firebase"]))
-    firebase_admin.initialize_app(cred)
-
-db = firestore.client()
-
 
 # ==== FIREBASE ADMIN INIT (Firestore only; no Firebase Auth in login) ====
 try:
@@ -468,6 +493,8 @@ def qp_clear_keys(*keys):
         except KeyError:
             pass
 
+
+
 # ==== Cookie helpers (normal cookies) ====
 def _expire_str(dt: datetime) -> str:
     return dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
@@ -732,84 +759,39 @@ def render_google_oauth():
     )
 
 
-# ---- Firebase Config (from your Firebase Console > Project Settings) ----
-firebaseConfig = {
-    "apiKey": st.secrets["FIREBASE_API_KEY"],
-    "authDomain": st.secrets["FIREBASE_AUTH_DOMAIN"],
-    "projectId": st.secrets["FIREBASE_PROJECT_ID"],
-    "storageBucket": st.secrets["FIREBASE_STORAGE_BUCKET"],
-    "messagingSenderId": st.secrets["FIREBASE_SENDER_ID"],
-    "appId": st.secrets["FIREBASE_APP_ID"],
-    "databaseURL": ""  # Firestore doesn't need this
-}
-
-firebase = pyrebase.initialize_app(firebaseConfig)
-auth = firebase.auth()
-db = firestore.Client()
-
 def render_login_form():
     with st.form("login_form", clear_on_submit=False):
-        login_id = st.text_input(
-            "Student Code or Email",
-            help="Use your school email or Falowen code (e.g., felixa2)."
-        ).strip().lower()
+        login_id = st.text_input("Student Code or Email", help="Use your school email or Falowen code (e.g., felixa2)." ).strip().lower()
         login_pass = st.text_input("Password", type="password")
         login_btn = st.form_submit_button("Log In")
 
     if login_btn:
-        # ---- Step 1: Find student in Google Sheet ----
         df = load_student_data()
         df["StudentCode"] = df["StudentCode"].str.lower().str.strip()
         df["Email"] = df["Email"].str.lower().str.strip()
-
-        if "@" in login_id:
-            email = login_id
-            lookup = df[df["Email"] == email]
-        else:
-            lookup = df[df["StudentCode"] == login_id]
-            if lookup.empty:
-                st.error("No matching student code found.")
-                return
-            email = lookup.iloc[0]["Email"]
-
+        lookup = df[(df["StudentCode"] == login_id) | (df["Email"] == login_id)]
         if lookup.empty:
-            st.error("No matching student email or code found.")
-            return
-
+            st.error("No matching student code or email found."); return
         student_row = lookup.iloc[0]
-
-        # ---- Step 2: Firebase Auth check ----
-        try:
-            user = auth.sign_in_with_email_and_password(email, login_pass)
-            st.success("Authentication successful! Checking approval...")
-        except Exception:
-            st.error("Invalid email or password.")
-            return
-
-        # ---- Step 3: Check approval & contract (Google Sheet truth) ----
         if is_contract_expired(student_row):
-            st.error("Your contract has expired. Contact the office.")
-            return
-
-        if not student_row.get("Approved", True):
-            st.error("Your account has not been approved yet.")
-            return
-
-        # ---- Step 4: Mirror login in Firestore (optional) ----
+            st.error("Your contract has expired. Contact the office."); return
+        doc_ref = db.collection("students").document(student_row["StudentCode"])
+        doc = doc_ref.get()
+        if not doc.exists:
+            st.error("Account not found. Please use 'Sign Up (Approved)' first."); return
+        data = doc.to_dict() or {}
+        stored_pw = data.get("password", "")
+        is_hash = stored_pw.startswith(("$2a$", "$2b$", "$2y$")) and len(stored_pw) >= 60
         try:
-            doc_ref = db.collection("students").document(student_row["StudentCode"])
-            if not doc_ref.get().exists:
-                doc_ref.set({
-                    "Email": email,
-                    "StudentCode": student_row["StudentCode"],
-                    "lastLogin": datetime.utcnow().isoformat()
-                })
-            else:
-                doc_ref.update({"lastLogin": datetime.utcnow().isoformat()})
-        except Exception as e:
-            st.warning(f"Could not update Firestore record: {e}")
+            ok = bcrypt.checkpw(login_pass.encode("utf-8"), stored_pw.encode("utf-8")) if is_hash else stored_pw == login_pass
+            if ok and not is_hash:
+                new_hash = bcrypt.hashpw(login_pass.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                doc_ref.update({"password": new_hash})
+        except Exception:
+            ok = False
+        if not ok:
+            st.error("Incorrect password."); return
 
-        # ---- Step 5: Set session ----
         ua_hash = st.session_state.get("__ua_hash", "")
         sess_token = create_session_token(student_row["StudentCode"], student_row["Name"], ua_hash=ua_hash)
         st.session_state.update({
@@ -822,22 +804,25 @@ def render_login_form():
         set_student_code_cookie(cookie_manager, student_row["StudentCode"], expires=datetime.utcnow() + timedelta(days=180))
         _persist_session_client(sess_token, student_row["StudentCode"])
         set_session_token_cookie(cookie_manager, sess_token, expires=datetime.utcnow() + timedelta(days=30))
-
-        st.success(f"Welcome, {student_row['Name']} 🎉")
+        st.success(f"Welcome, {student_row['Name']}!")
         st.rerun()
 
-    # ---- Forgot Password ----
-    st.markdown("---")
-    st.caption("⚠️ Forgot your password?")
-    if st.button("Reset Password"):
-        if not login_id or "@" not in login_id:
-            st.warning("Enter your email in the login field above to reset your password.")
+    # --- Forgot Password Section ---
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.subheader("Forgot Password?")
+    email_for_reset = st.text_input("Enter your registered email to reset password:", key="reset_email")
+    if st.button("Send Reset Link"):
+        if not email_for_reset:
+            st.error("Please enter your email.")
         else:
-            try:
-                auth.send_password_reset_email(login_id)
-                st.success(f"A password reset link has been sent to **{login_id}**.")
-            except Exception as e:
-                st.error(f"Could not send reset email: {e}")
+            token = uuid4().hex
+            reset_link = f"https://falowen.app/reset?token={token}"
+            # store reset token
+            db.collection("password_resets").document(email_for_reset).set({
+                "token": token,
+                "created": datetime.utcnow().isoformat()
+            })
+            send_reset_email(email_for_reset, reset_link)
 
 
 
@@ -11564,6 +11549,7 @@ if tab == "Schreiben Trainer":
                     [],
                 )
                 st.rerun()
+
 
 
 
