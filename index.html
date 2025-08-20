@@ -4,39 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Falowen</title>
-
-  <!-- PWA bits -->
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#ffffff" />
-
-  <meta name="description" content="Falowen — German learning tools" />
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; line-height: 1.5; }
-    .card { max-width: 720px; border: 1px solid #eee; border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
-    code { background: #f6f8fa; padding: .2rem .4rem; border-radius: 6px; }
-    a { text-decoration: none; }
-  </style>
+  <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:2rem;line-height:1.5}.card{max-width:720px;border:1px solid #eee;border-radius:16px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.06)}</style>
 </head>
 <body>
   <div class="card">
     <h1>Falowen</h1>
-    <p>Site is live. Your Android verification file should be at
-      <code>/.well-known/assetlinks.json</code>.
-    </p>
-
+    <p>Site is live. Android verification JSON should be at <code>/.well-known/assetlinks.json</code>.</p>
     <ul>
-      <li><a href=".well-known/assetlinks.json">Open <code>.well-known/assetlinks.json</code></a></li>
-      <li><a href="manifest.webmanifest">Open <code>manifest.webmanifest</code></a></li>
-      <li><a href="sw.js">Open <code>sw.js</code></a></li>
+      <li><a href=".well-known/assetlinks.json">assetlinks.json</a></li>
+      <li><a href="manifest.webmanifest">manifest</a></li>
+      <li><a href="sw.js">service worker</a></li>
     </ul>
   </div>
-
   <script>
-    // Register the service worker (relative paths so it works on GitHub Pages or a custom domain)
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(console.error);
-      });
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.error));
     }
   </script>
 </body>
