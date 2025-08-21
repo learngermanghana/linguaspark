@@ -1,5 +1,5 @@
-// sw.js — Falowen PWA service worker (minimal)
-const CACHE_NAME = "falowen-cache-v1";
+// sw.js — Falowen PWA service worker (enhanced minimal)
+const CACHE_NAME = "falowen-cache-v2";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [
   OFFLINE_URL,
@@ -16,31 +16,39 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    // Speed up navigations when online
+    if (self.registration.navigationPreload) {
+      await self.registration.navigationPreload.enable();
+    }
+    // Clean old caches
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-// Navigation: network-first, fall back to offline
+// Fetch strategy:
+// - Navigations: network-first (+ nav preload), fallback to cached page or offline.html
+// - Same-origin static assets: cache-first with background fill
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-
-  // Only handle GET
   if (req.method !== "GET") return;
 
-  // App shell navigations
+  // Handle navigations (HTML/doc requests)
   if (req.mode === "navigate") {
     event.respondWith((async () => {
       try {
+        // Use preload response if available
+        const preload = await event.preloadResponse;
+        if (preload) return preload;
+
         const fresh = await fetch(req);
-        // Optionally cache last good HTML for back/forward use
+        // Optionally cache last good HTML for bfcache-like UX
         const cache = await caches.open(CACHE_NAME);
         cache.put(req, fresh.clone()).catch(() => {});
         return fresh;
       } catch {
-        // Return last cached page or offline fallback
         const cached = await caches.match(req);
         return cached || caches.match(OFFLINE_URL);
       }
@@ -48,9 +56,9 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: cache-first with background update
-  const dest = req.destination;
-  if (["style", "script", "image", "font"].includes(dest)) {
+  // Only cache same-origin static assets
+  const url = new URL(req.url);
+  if (url.origin === self.location.origin && ["style", "script", "image", "font"].includes(req.destination)) {
     event.respondWith((async () => {
       const cached = await caches.match(req);
       if (cached) return cached;
@@ -62,7 +70,7 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Optional: allow immediate activation
+// Optional: allow immediate activation from the page
 self.addEventListener("message", (e) => {
   if (e.data === "SKIP_WAITING") self.skipWaiting();
 });
